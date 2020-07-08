@@ -40,8 +40,8 @@ interface Antecedent {
   function __construct($attribute);
 
   /* The abstract members for inheritance */
-  function splitData($data, $defAcRt, $cla);
-  function covers($data, $i);
+  function splitData($data, $defAcRt, $cla); // TODO: figure out how to handle memory freeing for data.
+  function covers(&$data, $i);
 
   /* Print a textual representation of the antecedent */
   function toString();

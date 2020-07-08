@@ -1,6 +1,7 @@
 <?php
 
 include "Antecedent.php";
+include "Rule.php";
 
 /*
  * Interface for predictive models

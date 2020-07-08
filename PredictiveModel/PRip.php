@@ -34,24 +34,49 @@ interface Learner {
  * // (nota: l'allenamento dice anche quanto il modello e' buono. Nel caso di RuleBasedModel() ci sono dei metodi per valutare ogni singola regola. Come si valuta? vedremo)
  */
 class PRip implements Learner {
-  
-  private $options;
-  // Options:
-  // - Folds           Number of folds for REP. One fold is used as pruning set. (default 3)
-  // - MinNo           Minimal weights of instances within a split. (default 2.0)
-  // - Optimizations   Number of runs of optimizations. (Default: 2)
-  // - Seed            The seed of randomization (Default: 1)
-  // - Debug           Whether turn on the debug mode (Default: false)
-  // - CheckErr        Whether NOT check the error rate>=0.5 in stopping criteria  (default: check)
-  // - UsePruning      Whether NOT use pruning (Default: use pruning)
+
+  /** The limit of description length surplus in ruleset generation */
+  static private $MAX_DL_SURPLUS = 64.0;
+
+  /* Whether to turn on the debug mode (Default: false) */
+  private $debug;
+
+  /** Number of runs of optimizations */
+  private $optimizations;
+
+  /** Randomization seed */
+  private $seed;
+
+  /** The number of folds to split data into Grow and Prune for IREP
+    * (One fold is used as pruning set.)
+    */
+  private $folds;
+
+  /** Minimal weights of instance weights within a split */
+  private $minNo;
+
+  /** Whether check the error rate >= 0.5 in stopping criteria */
+  private $checkErr;
+
+  /** Whether use pruning, i.e. the data is clean or not */
+  private $usePruning;
 
   // TODO
   function __construct() {
+    $this->debug = false;
+    $this->optimizations = 2;
+    $this->seed = 1;
+    $this->folds = 3;
+    $this->minNo = 2.0;
+    $this->checkErr = true;
+    $this->usePruning = true;
   }
 
   function teach($model, $data) {
+
     return;
   }
+
 }
 
 ?>

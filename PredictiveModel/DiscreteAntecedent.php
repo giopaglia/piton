@@ -112,7 +112,7 @@ class DiscreteAntecedent implements Antecedent {
    * @return the boolean value indicating whether the instance is covered by
    *         this antecedent
    */
-  function covers($data, $i) {
+  function covers(&$data, $i) {
     $isCover = false;
     if (!$data->inst_isMissing($i, $this->att)) {
       if ($data->inst_valueOfAttr($i, $this->att) == $this->value) {
@@ -125,8 +125,13 @@ class DiscreteAntecedent implements Antecedent {
   /**
    * Print a textual representation of the antecedent
    */
-  function toString() {
-    return "DiscreteAntecedent: ({$this->att->getName()} == \"{$this->att->getDomain()[$this->value]}\") (maxInfoGain={$this->maxInfoGain}, accuRate={$this->accuRate}, cover={$this->cover}, accu={$this->accu})" . PHP_EOL;
+  function toString($short = false) {
+    if ($short) {
+      return "{$this->att->getName()} == \"{$this->att->getDomain()[$this->value]}\"";
+    }
+    else {
+      return "DiscreteAntecedent: ({$this->att->getName()} == \"{$this->att->getDomain()[$this->value]}\") (maxInfoGain={$this->maxInfoGain}, accuRate={$this->accuRate}, cover={$this->cover}, accu={$this->accu})" . PHP_EOL;
+    }
   }
 }
 

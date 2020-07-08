@@ -30,6 +30,7 @@ class Instances {
     $this->weights    = $weights;
   }
 
+  function numAttributes() { return count($this->attributes); }
   function numInstances() { return count($this->data); }
   function getInstance($i) { return $this->data[$i]; }
   function pushInstance($inst, $weight = 1)
@@ -62,6 +63,7 @@ class Instances {
    */
   
   function inst_valueOfAttr($i, $attr) {
+    // TODO maybe at some point this won't be necessary, and I'll directly use attr indices?
     $j = array_search($attr, $this->attributes);
     return $this->data[$i][$j];
   }

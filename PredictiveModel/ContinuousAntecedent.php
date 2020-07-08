@@ -194,7 +194,7 @@ class ContinuousAntecedent implements Antecedent {
    * @return the boolean value indicating whether the instance is covered by
    *         this antecedent
    */
-  function covers($data, $i) {
+  function covers(&$data, $i) {
     $isCover = true;
     if (!$data->inst_isMissing($i, $this->att)) {
       if ($this->value == 0) { // First bag
@@ -213,11 +213,19 @@ class ContinuousAntecedent implements Antecedent {
   /**
    * Print a textual representation of the antecedent
    */
-  function toString() {
-    return "ContinuousAntecedent: ({$this->att->getName()}" . (($this->value == 0) ? " <= " : " >= ") .
-      // number_format($this->splitPoint, 6)
-      number_format($this->splitPoint)
-      . ") (maxInfoGain={$this->maxInfoGain}, accuRate={$this->accuRate}, cover={$this->cover}, accu={$this->accu})" . PHP_EOL;
+  function toString($short = false) {
+    if ($short) {
+      return "{$this->att->getName()}" . (($this->value == 0) ? " <= " : " >= ") .
+        // number_format($this->splitPoint, 6)
+        number_format($this->splitPoint)
+        ;
+    }
+    else {
+      return "ContinuousAntecedent: ({$this->att->getName()}" . (($this->value == 0) ? " <= " : " >= ") .
+        // number_format($this->splitPoint, 6)
+        number_format($this->splitPoint)
+        . ") (maxInfoGain={$this->maxInfoGain}, accuRate={$this->accuRate}, cover={$this->cover}, accu={$this->accu})" . PHP_EOL;
+    }
   }
 }
 
