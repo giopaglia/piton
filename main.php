@@ -6,19 +6,6 @@ include "local-lib.php";
 include "PredictiveModel/RuleBasedModel.php";
 include "PredictiveModel/PRip.php";
 
-
-// TODO make sql querying secure with addslashes or whatever
-// Useful sources: 
-// - https://stackoverflow.com/questions/21088937/is-this-mysqli-safe
-// - https://stackoverflow.com/questions/28606581/which-is-a-right-safe-mysqli-query
-// - https://stackoverflow.com/questions/34566530/prevent-sql-injection-in-mysqli
-// - https://stackoverflow.com/questions/20179565/php-secure-mysqli-query
-// - https://stackoverflow.com/questions/15062290/how-to-use-mysqli-securely
-// - https://www.php.net/manual/en/mysqli-stmt.bind-result.php
-// - https://stackoverflow.com/questions/330268/i-have-an-array-of-integers-how-do-i-use-each-one-in-a-mysql-query-in-php
-// 
-
-
 /*
  * This class can be used to learn intelligent models from a MySQL database.
  *
@@ -257,6 +244,11 @@ class DBFit {
 
 }
 
+ /****************************************************
+ *                                                   *
+ *                 Here I test stuff                 *
+ *                                                   *
+ ****************************************************/
 
 $db = getDBConnection();
 
@@ -299,4 +291,15 @@ $db_fit->test_all_capabilities();
 
 echo "All good" . PHP_EOL;
 
+
+// TODO make sql querying secure with addslashes or whatever
+// Useful sources: 
+// - https://stackoverflow.com/questions/21088937/is-this-mysqli-safe
+// - https://stackoverflow.com/questions/28606581/which-is-a-right-safe-mysqli-query
+// - https://stackoverflow.com/questions/34566530/prevent-sql-injection-in-mysqli
+// - https://stackoverflow.com/questions/20179565/php-secure-mysqli-query
+// - https://stackoverflow.com/questions/15062290/how-to-use-mysqli-securely
+// - https://www.php.net/manual/en/mysqli-stmt.bind-result.php
+// - https://stackoverflow.com/questions/330268/i-have-an-array-of-integers-how-do-i-use-each-one-in-a-mysql-query-in-php
+// 
 ?>

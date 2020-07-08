@@ -1,5 +1,7 @@
 <?php
 
+/* Library of generic utils */
+
 define("MODELS_FOLDER", "models");
 
 function mysql_set($arr, $map_function = "mysql_quote_str") { return "(" . mysql_list($arr, $map_function) . ")"; }
