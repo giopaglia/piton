@@ -4,10 +4,10 @@ include "Antecedent.php";
 include "Rule.php";
 
 /*
- * Interface for predictive models
+ * Interface for discriminative models
  */
-interface PredictiveModel {
-    function fit($data, $learner);
+interface DiscriminativeModel {
+    function fit(&$data, $learner);
     function predict($input_data);
     
     function save($path);
@@ -17,7 +17,7 @@ interface PredictiveModel {
 /*
  * This class represents a propositional rule-based model.
  */
-class RuleBasedModel implements PredictiveModel {
+class RuleBasedModel implements DiscriminativeModel {
     private $rules;
     
     function __construct() {
@@ -25,7 +25,7 @@ class RuleBasedModel implements PredictiveModel {
         $this->rules = [];
     }
 
-    function fit($data, $learner) {
+    function fit(&$data, $learner) {
         echo "RuleBasedModel->fit(" . serialize($data) . ", " . serialize($learner) . ")" . PHP_EOL;
         $learner->teach($this, $data);
     }

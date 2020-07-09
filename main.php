@@ -3,8 +3,8 @@
 include "lib.php";
 include "local-lib.php";
 
-include "PredictiveModel/RuleBasedModel.php";
-include "PredictiveModel/PRip.php";
+include "DiscriminativeModel/RuleBasedModel.php";
+include "DiscriminativeModel/PRip.php";
 
 /*
  * This class can be used to learn intelligent models from a MySQL database.
@@ -71,7 +71,7 @@ class DBFit {
     // Move output column such that it's the last column
     if (($k = array_search($this->output_column_name, $this->column_names)) !== false) {
       unset($this->column_names[$k]);
-      $this->column_names[] = $this->output_column_name;
+      array_unshift($this->column_names, $this->output_column_name);
     };
 
     /* Obtain column types & derive attributes */
@@ -90,6 +90,7 @@ class DBFit {
     foreach ($columns as $column) {
       // echo $column["Type"] . PHP_EOL;
       // TODO: I'm assuming there are no missing values (i.e $column["Null"] == "NO")
+      // TODO figure out, where does "boolean" go?
       switch(true) {
         case in_array($column["Type"], ["int", "float", "double", "real", "date"]):
           $attribute = new ContinuousAttribute($column["Field"], $column["Type"]);
@@ -194,7 +195,7 @@ class DBFit {
   // Use the model for predicting
   function predict($input_data) {
     echo "DBFit->predict(".serialize($input_data).")" . PHP_EOL;
-    assert($this->model instanceof PredictiveModel, "Error! Model is not initialized");
+    assert($this->model instanceof DiscriminativeModel, "Error! Model is not initialized");
     return $this->model->predict($input_data);
   }
 
@@ -205,13 +206,9 @@ class DBFit {
     $dataframe = $this->read_data();
 
     /* For testing, let's use the original data and cut the output column */
+    $input_dataframe = clone $dataframe;
+    $input_dataframe->dropOutputAttr();
     $attrs = $dataframe->getAttrs();
-    $data = $dataframe->getData();
-    $attrs = array_slice($attrs, 0, -1);
-    $input_data = [];
-    foreach ($data as $row) {
-      $input_data[] = array_slice($row, 0, -1);
-    }
 
     echo "TESTING ANTECEDENTSDiscreteAntecedent & SPLIT DATA" . PHP_EOL;
     $ant = new DiscreteAntecedent($attrs[1]);
@@ -232,8 +229,6 @@ class DBFit {
     }
     echo $ant->toString();
     echo "END TESTING ContinuousAntecedent & SPLIT DATA" . PHP_EOL;
-
-    $input_dataframe = new Instances($attrs, $input_data);
     
     $this->update_model();
     $this->predict($input_dataframe);

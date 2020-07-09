@@ -56,6 +56,13 @@ function filesin($a, $full_path = false, $sortby=false)
 	return $ret;
 }
 
+// Source: https://www.php.net/manual/en/function.srand.php
+function make_seed()
+{
+  list($usec, $sec) = explode(' ', microtime());
+  return $sec + $usec * 1000000;
+}
+
 function startsWith($haystack, $needle) { return $needle === "" || strrpos($haystack, $needle, -strlen($haystack)) !== false; }
 function endsWith($haystack, $needle)   { return $needle === "" || (($temp = strlen($haystack) - strlen($needle)) >= 0 && strpos($haystack, $needle, $temp) !== false); }
 function safePrefix($haystack, $needle) { return (startsWith($haystack, $needle) ? $haystack : $needle . $haystack); }

@@ -39,6 +39,26 @@ class Instances {
     $this->weights[] = $weight;
   }
   
+  function dropAttr($j) {
+    unset($this->attributes[$j]);
+    foreach ($this->data as $i => $row) {
+      unset($this->data[$i][$j]);
+    }
+  }
+  function dropOutputAttr() {
+    $this->dropAttr(0);
+  }
+
+  /* Remove instances with missing values for the output column */
+  function removeUselessInsts() {
+    for ($x = $this->numInstances() - 1; $x >= 0; $x--) {
+      if ($this->inst_classValue($x) === NULL) {
+        unset($this->weights[$x]);
+        unset($this->data[$x]);
+      }
+    }
+  }
+
   function sortByAttr($attr)
   {
     echo "Instances->sortByAttr(" . get_var_dump($attr) . ")" . PHP_EOL;
@@ -78,7 +98,7 @@ class Instances {
 
   function inst_classValue($i) {
     $row = $this->data[$i];
-    return $row[array_key_last($row)];
+    return $row[0];
   }
 
   /**
