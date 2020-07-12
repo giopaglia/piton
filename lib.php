@@ -2,6 +2,8 @@
 
 /* Library of generic utils */
 
+define("PACKAGE_NAME", "DBFit");
+
 define("MODELS_FOLDER", "models");
 
 function mysql_set($arr, $map_function = "mysql_quote_str") { return "(" . mysql_list($arr, $map_function) . ")"; }
@@ -31,6 +33,43 @@ function join_paths() {
     $paths = array_filter($paths);
     return join('/', $paths);
 }
+
+/*
+ * This is a Python/Ruby style zip()
+ *
+ * zip(array $a1, array $a2, ... array $an, [bool $python=true])
+ *
+ * The last argument is an optional bool that determines the how the function
+ * handles when the array arguments are different in length
+ *
+ * By default, it does it the Python way, that is, the returned array will
+ * be truncated to the length of the shortest argument
+ *
+ * If set to FALSE, it does it the Ruby way, and NULL values are used to
+ * fill the undefined entries
+ *
+ * Source: https://stackoverflow.com/questions/2815162/is-there-a-php-function-like-pythons-zip
+ */
+function zip() {
+    $args = func_get_args();
+
+    $ruby = array_pop($args);
+    if (is_array($ruby))
+        $args[] = $ruby;
+
+    $counts = array_map('count', $args);
+    $count = ($ruby) ? min($counts) : max($counts);
+    $zipped = array();
+
+    for ($i = 0; $i < $count; $i++) {
+        for ($j = 0; $j < count($args); $j++) {
+            $val = (isset($args[$j][$i])) ? $args[$j][$i] : null;
+            $zipped[$i][$j] = $val;
+        }
+    }
+    return $zipped;
+}
+
 
 # Files in directory
 function filesin($a, $full_path = false, $sortby=false)

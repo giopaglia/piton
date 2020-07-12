@@ -101,6 +101,35 @@ class Instances {
     return $row[0];
   }
 
+  /** Save data to file, (dense) ARFF/Weka format */
+  function save_ARFF($path) {
+    echo "Instances->save_ARFF($path)" . PHP_EOL;
+    $f = fopen($path, "w");
+    fwrite($f, "% Generated with \"" . PACKAGE_NAME . "\"\n");
+    fwrite($f, "\n");
+    fwrite($f, "@RELATION " . basename($path) . "\n\n");
+
+    /* Attributes */
+    foreach($this->attributes as $attr) {
+      fwrite($f, "@ATTRIBUTE {$attr->getName()} {$attr->getARFFType()} ");
+      fwrite($f, "\n");
+    }
+    
+    /* Print the ARFF representation of a value of the attribute */
+    $getARFFRepr = function($val, $attr)
+    {
+      return $val === NULL ? "?" : $attr->reprVal($val);
+    };
+    
+    /* Data */
+    fwrite($f, "\n@DATA\n");
+    foreach ($this->data as $row) {
+      fwrite($f, join(",", array_map($getARFFRepr, $row, $this->attributes)) . "\n");
+    }
+
+    fclose($f);
+  }
+
   /**
    * Print a textual representation of the instances
    */

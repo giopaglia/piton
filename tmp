@@ -1,0 +1,20 @@
+% Generated with "DBFit"
+
+@RELATION tmp
+
+@ATTRIBUTE Sillyness {Silly,NotSilly} 
+@ATTRIBUTE ID numeric 
+@ATTRIBUTE Gender {M,F,Other} 
+@ATTRIBUTE Age numeric 
+
+@DATA
+Silly,1,M,0
+NotSilly,2,Other,27
+Silly,3,?,56
+NotSilly,4,F,47
+NotSilly,5,M,40
+Silly,6,?,38
+Silly,7,M,57
+NotSilly,8,Other,20
+NotSilly,9,F,19
+NotSilly,10,F,?
