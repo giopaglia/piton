@@ -47,8 +47,9 @@ class DiscreteAttribute implements Attribute {
   private $domain;
   function getDomain() { return $this->domain; }
   function setDomain($d) { $this->domain = $d; }
+  function pushDomainVal($v) { $this->domain[] = $v; }
 
-  function __construct($name, $type, $domain) {
+  function __construct($name, $type, $domain = []) {
     $this->name   = $name;
     $this->type   = $type;
     $this->domain = $domain;
@@ -58,7 +59,7 @@ class DiscreteAttribute implements Attribute {
 
   /* Print a textual representation of a value of the attribute */
   function reprVal($val) {
-    return $this->domain[$val];
+    return strval($this->domain[$val]);
   }
 
   /* Print a textual representation of the attribute */
@@ -85,11 +86,12 @@ class ContinuousAttribute implements Attribute {
 
   /** The type of the attribute (ARFF/Weka style)  */
   static $type2ARFFtype = [
-    "int"     => "numeric"
-  , "float"   => "numeric"
-  , "double"  => "numeric"
-  //, "bool"    => "numeric"
-  , "date"    => "date"
+    "int"       => "numeric"
+  , "float"     => "numeric"
+  , "double"    => "numeric"
+  //, "bool"      => "numeric"
+  , "date"      => "date \"yyyy-MM-dd\""
+  , "datetime"  => "date \"yyyy-MM-dd'T'HH:mm:ss\""
   ];
   function getARFFType() {
     return self::$type2ARFFtype[$this->getType()];
@@ -102,7 +104,21 @@ class ContinuousAttribute implements Attribute {
 
   /* Print a textual representation of a value of the attribute */
   function reprVal($val) {
-    return strval($val);
+    switch ($this->getARFFType()) {
+      case "date \"yyyy-MM-dd\"":
+        $date = new DateTime();
+        $date->setTimestamp($val);
+        return $date->format("Y-m-d");
+        break;
+      case "date \"yyyy-MM-dd'T'HH:mm:ss\"":
+        $date = new DateTime();
+        $date->setTimestamp($val);
+        return $date->format("Y-m-d\TH:i:s");
+        break;
+      default:
+        return strval($val);
+        break;
+    }
   }
 
   /* Print a textual representation of the attribute */

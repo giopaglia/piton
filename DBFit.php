@@ -31,13 +31,20 @@ class DBFit {
   private $join_criterion;
   private $columns;
   private $output_column_name;
+  private $limit;
 
   private $model_type;
   private $learning_method;
 
   /* MAP: Mysql column type -> attr type */
   static $col2attr_type = [
-    "date" => [
+    "datetime" => [
+      "" => "datetime"
+    , "DaysSince" => "int"
+    , "MonthsSince" => "int"
+    , "YearsSince" => "int"
+    ]
+  , "date" => [
       "" => "date"
     , "DaysSince" => "int"
     , "MonthsSince" => "int"
@@ -80,7 +87,10 @@ class DBFit {
     $stmt = $this->db->prepare($sql);
     $stmt->execute();
     $raw_mysql_columns = [];
-    foreach ($stmt->get_result() as $row) {
+    $res = $stmt->get_result();
+    assert($res !== false, "SQL query failed.");
+
+    foreach ($res as $row) {
       // echo get_var_dump($row) . PHP_EOL;
       $raw_mysql_columns[] = $row;
     }
@@ -100,7 +110,10 @@ class DBFit {
       $attr_name = self::getColumnAttrName($column);
 
       switch(true) {
-        case in_array($mysql_column["Type"], ["int", "float", "double", "real", "date"]):
+        case self::getColumnTreatment($column) == "ForceCategorical":
+          $attribute = new DiscreteAttribute($attr_name, "enum");
+          break;
+        case in_array($mysql_column["Type"], ["int", "float", "double", "real", "date", "datetime"]):
           $attribute = new ContinuousAttribute($attr_name, self::getColumnAttrType($mysql_column["Type"], $column));
           break;
         case self::isEnumType($mysql_column["Type"]):
@@ -117,8 +130,13 @@ class DBFit {
     /* Obtain data */
     $data = [];
     $cols_attrs = zip($attributes, $mysql_columns, $this->columns);
-    //var_dump($cols_attrs);
+    var_dump($cols_attrs);
     $sql = "SELECT " . mysql_list(array_map(["self", "getColumnName"], $this->columns)) . " FROM " . mysql_list($this->table_names);
+    
+    if ($this->limit !== NULL) {
+      $sql .= " LIMIT {$this->limit}";
+    }
+
     // TODO: Use $join_criterion to introduce WHERE and (INNER) JOIN.
     echo "SQL: $sql" . PHP_EOL;
     $stmt = $this->db->prepare($sql);
@@ -139,13 +157,29 @@ class DBFit {
         $val = $raw_val;
 
         if ($raw_val !== NULL) {
-          if ($ms_column["Type"] == "date") {
-            // Get timestamp
-            $date = DateTime::createFromFormat("Y-m-d", $raw_val);
-            assert($date !== false, "Incorrect date string");
+          if ($attribute instanceof DiscreteAttribute) {
+            $val = array_search($raw_val, $attribute->getDomain());
+            if ($val === false) {
+              if (self::getColumnTreatment($column) == "ForceCategorical"){
+                $attribute->pushDomainVal($raw_val);
+                $val = array_search($raw_val, $attribute->getDomain());
+              }
+              else {
+                die("Something's off. Couldn't find element \"" . get_var_dump($raw_val) . "\" in domain of attribute {$attribute->getName()}. " . serialize($attribute));
+              }
+            }
+          }
+          else if (in_array($ms_column["Type"], ["date", "datetime"])) {
+            $type_to_format = [
+              "date"     => "Y-m-d"
+            , "datetime" => "Y-m-d H:i:s"
+            ];
+            $date = DateTime::createFromFormat($type_to_format[$ms_column["Type"]], $raw_val);
+            assert($date !== false, "Incorrect date string \"$raw_val\"");
 
             switch (self::getColumnTreatment($column)) {
               case NULL:
+                // By default, consider the timestamp
                 $val = $date->getTimestamp();
                 break;
               case "DaysSince":
@@ -165,21 +199,7 @@ class DBFit {
                 break;
             };
           }
-
-          // For convenience, use domain indices instead of bare values
-          if ($attribute instanceof DiscreteAttribute) {
-            $val = array_search($raw_val, $attribute->getDomain());
-          }
-
-          // TODO use the column "treatment" to derive $val from $raw_val
         }
-
-        switch (self::getColumnTreatment($column)) {
-          case NULL: break;
-          default:
-            # code...
-            break;
-        };
 
         $row[] = $val;
       }
@@ -202,12 +222,13 @@ class DBFit {
 
     assert($this->model_type == "RuleBased", "Only \"RuleBased\" is available as a predictive model");
 
+    $this->model = new RuleBasedModel();
+    
     assert($this->learning_method == "RIPPER", "Only \"RIPPER\" is available as a learning method");
 
-    $dataframe = $this->read_data();
-
-
     $learner = new PRip();
+    
+    $dataframe = $this->read_data();
     $this->model->fit($dataframe, $learner);
   }
 
@@ -227,7 +248,9 @@ class DBFit {
       $path = $models[0];
       echo "ASDASDASD $path";
     }
-    $this->model->load($path);
+    die("TODO load_model");
+    //$this->model = DiscriminativeModel::loadModel($path);
+    // $this->model = new DiscriminativeModel::loadModel($path);
   }
 
   // Learn a model, and save to file
@@ -241,7 +264,7 @@ class DBFit {
   // Use the model for predicting
   function predict($input_data) {
     echo "DBFit->predict(".serialize($input_data).")" . PHP_EOL;
-    assert($this->model instanceof DiscriminativeModel, "Error! Model is not initialized");
+    assert($this->model instanceof _DiscriminativeModel, "Error! Model is not initialized");
     return $this->model->predict($input_data);
   }
 
@@ -278,7 +301,7 @@ class DBFit {
     
     $this->update_model();
     $this->predict($input_dataframe);
-    $this->load_model();
+    // $this->load_model();
     // $this->predict($input_dataframe);
     
   }
@@ -291,7 +314,7 @@ class DBFit {
     return !is_array($col) ? NULL : $col[1];
   }
   static function getColumnAttrName($col) {
-    return !is_array($col) ? self::getColumnName($col) : $col[2];
+    return !is_array($col) || !array_key_exists(2, $col) ? self::getColumnName($col) : $col[2];
   }
 
   static function getColumnAttrType($mysql_type, $col) {
@@ -306,69 +329,13 @@ class DBFit {
   }
 
 
-  /**
-   * @return mixed
-   */
-  public function getModel()
-  {
-      return $this->model;
-  }
-
-  /**
-   * @return mixed
-   */
-  public function getDb()
-  {
-      return $this->db;
-  }
-
-  /**
-   * @return mixed
-   */
-  public function getTableNames()
-  {
-      return $this->table_names;
-  }
-
-  /**
-   * @return mixed
-   */
-  public function getJoinCriterion()
-  {
-      return $this->join_criterion;
-  }
-
-  /**
-   * @return mixed
-   */
-  public function getColumns()
-  {
-      return $this->columns;
-  }
-
-  /**
-   * @return mixed
-   */
-  public function getOutputColumnName()
-  {
-      return $this->output_column_name;
-  }
-
-  /**
-   * @return mixed
-   */
-  public function getModelType()
-  {
-      return $this->model_type;
-  }
-
-  /**
-   * @return mixed
-   */
-  public function getLearningMethod()
-  {
-      return $this->learning_method;
-  }
+    /**
+     * @return mixed
+     */
+    public function getModel()
+    {
+        return $this->model;
+    }
 
     /**
      * @param mixed $model
@@ -380,6 +347,14 @@ class DBFit {
         $this->model = $model;
 
         return $this;
+    }
+
+    /**
+     * @return mixed
+     */
+    public function getDb()
+    {
+        return $this->db;
     }
 
     /**
@@ -395,6 +370,14 @@ class DBFit {
     }
 
     /**
+     * @return mixed
+     */
+    public function getTableNames()
+    {
+        return $this->table_names;
+    }
+
+    /**
      * @param mixed $table_names
      *
      * @return self
@@ -404,6 +387,14 @@ class DBFit {
         $this->table_names = $table_names;
 
         return $this;
+    }
+
+    /**
+     * @return mixed
+     */
+    public function getJoinCriterion()
+    {
+        return $this->join_criterion;
     }
 
     /**
@@ -419,6 +410,14 @@ class DBFit {
     }
 
     /**
+     * @return mixed
+     */
+    public function getColumns()
+    {
+        return $this->columns;
+    }
+
+    /**
      * @param mixed $columns
      *
      * @return self
@@ -428,6 +427,14 @@ class DBFit {
         $this->columns = $columns;
 
         return $this;
+    }
+
+    /**
+     * @return mixed
+     */
+    public function getOutputColumnName()
+    {
+        return $this->output_column_name;
     }
 
     /**
@@ -443,6 +450,34 @@ class DBFit {
     }
 
     /**
+     * @return mixed
+     */
+    public function getLimit()
+    {
+        return $this->limit;
+    }
+
+    /**
+     * @param mixed $limit
+     *
+     * @return self
+     */
+    public function setLimit($limit)
+    {
+        $this->limit = $limit;
+
+        return $this;
+    }
+
+    /**
+     * @return mixed
+     */
+    public function getModelType()
+    {
+        return $this->model_type;
+    }
+
+    /**
      * @param mixed $model_type
      *
      * @return self
@@ -452,6 +487,14 @@ class DBFit {
         $this->model_type = $model_type;
 
         return $this;
+    }
+
+    /**
+     * @return mixed
+     */
+    public function getLearningMethod()
+    {
+        return $this->learning_method;
     }
 
     /**

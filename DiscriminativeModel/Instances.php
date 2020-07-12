@@ -111,7 +111,7 @@ class Instances {
 
     /* Attributes */
     foreach($this->attributes as $attr) {
-      fwrite($f, "@ATTRIBUTE {$attr->getName()} {$attr->getARFFType()} ");
+      fwrite($f, "@ATTRIBUTE {$attr->getName()} {$attr->getARFFType()}");
       fwrite($f, "\n");
     }
     
@@ -123,8 +123,10 @@ class Instances {
     
     /* Data */
     fwrite($f, "\n@DATA\n");
-    foreach ($this->data as $row) {
-      fwrite($f, join(",", array_map($getARFFRepr, $row, $this->attributes)) . "\n");
+    foreach (zip($this->data, $this->weights) as $arr) {
+      $row = $arr[0];
+      $weight = $arr[1];
+      fwrite($f, join(",", array_map($getARFFRepr, $row, $this->attributes)) . ", {" . $weight . "}\n");
     }
 
     fclose($f);

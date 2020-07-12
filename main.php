@@ -54,8 +54,9 @@ $db_fit->setLearningMethod($learning_method);
 $db_fit->test_all_capabilities();
 */
 
-$table_names = ["covid19_italy_province.csv"];
-$column = [["Date", "DaysSince"] , "ProvinceCode", "TotalPositiveCases"];
+
+$table_names = ["covid19_italy_province"];
+$column = [["Date", "DaysSince", "DaysAgo"] , ["ProvinceCode", "ForceCategorical"], "Date", "TotalPositiveCases"];
 $join_criterion = NULL;
 $output_column_name = "TotalPositiveCases";
 
@@ -65,6 +66,7 @@ $db_fit->setTableNames($table_names);
 $db_fit->setColumns($column);
 $db_fit->setJoinCriterion($join_criterion);
 $db_fit->setOutputColumnName($output_column_name);
+$db_fit->setLimit(1000);
 $db_fit->setModelType($model_type);
 $db_fit->setLearningMethod($learning_method);
 $db_fit->test_all_capabilities();
