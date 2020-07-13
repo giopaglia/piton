@@ -56,6 +56,34 @@ class RuleBasedModel implements _DiscriminativeModel {
     // TODO
   }
 
+
+    /**
+     * @return mixed
+     */
+    public function getRules()
+    {
+        return $this->rules;
+    }
+
+    /**
+     * @param mixed $rules
+     *
+     * @return self
+     */
+    public function setRules($rules)
+    {
+        $this->rules = $rules;
+
+        return $this;
+    }
+
+    /**
+     * @return self
+     */
+    public function resetRules()
+    {
+        return $this->setRules([]);
+    }
 }
 
 

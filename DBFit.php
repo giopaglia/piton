@@ -76,7 +76,7 @@ class DBFit {
     
     // Move output column such that it's the FIRST column
     if (($k = array_search($this->output_column_name, $this->columns)) !== false) {
-      unset($this->columns[$k]);
+      array_splice($this->columns, $k, $k+1);
       array_unshift($this->columns, $this->output_column_name);
     };
 
@@ -130,7 +130,7 @@ class DBFit {
     /* Obtain data */
     $data = [];
     $cols_attrs = zip($attributes, $mysql_columns, $this->columns);
-    var_dump($cols_attrs);
+    // var_dump($cols_attrs);
     $sql = "SELECT " . mysql_list(array_map(["self", "getColumnName"], $this->columns)) . " FROM " . mysql_list($this->table_names);
     
     if ($this->limit !== NULL) {
@@ -211,7 +211,7 @@ class DBFit {
     
     $dataframe = new Instances($attributes, $data);
     
-    echo $dataframe->save_ARFF("tmp");
+    $dataframe->save_ARFF("tmp");
 
     return $dataframe;
   }
@@ -246,7 +246,7 @@ class DBFit {
       }
       sort($models, true);
       $path = $models[0];
-      echo "ASDASDASD $path";
+      echo "$path";
     }
     die("TODO load_model");
     //$this->model = DiscriminativeModel::loadModel($path);
@@ -279,25 +279,28 @@ class DBFit {
     $input_dataframe->dropOutputAttr();
     $attrs = $dataframe->getAttrs();
     //var_dump($attrs);
-    echo "TESTING DiscreteAntecedent & SPLIT DATA" . PHP_EOL;
-    $ant = new DiscreteAntecedent($attrs[2]);
-    $splitData = $ant->splitData($dataframe, 0.5, 1);
-    foreach ($splitData as $k => $d) {
-      echo "[$k] => " . PHP_EOL;
-      echo $d->toString();
-    }
-    echo $ant->toString();
-    echo "END TESTING DiscreteAntecedent & SPLIT DATA" . PHP_EOL;
+    // echo "TESTING DiscreteAntecedent & SPLIT DATA" . PHP_EOL;
+    // $ant = new DiscreteAntecedent($attrs[2]);
+    // $splitData = $ant->splitData($dataframe, 0.5, 1);
+    // foreach ($splitData as $k => $d) {
+      // echo "[$k] => " . PHP_EOL;
+      // echo $d->toString();
+    // }
+    // echo $ant->toString();
+    // echo "END TESTING DiscreteAntecedent & SPLIT DATA" . PHP_EOL;
 
-    echo "TESTING ContinuousAntecedent & SPLIT DATA" . PHP_EOL;
-    $ant = new ContinuousAntecedent($attrs[3]);
-    $splitData = $ant->splitData($dataframe, 0.5, 1);
-    foreach ($splitData as $k => $d) {
-      echo "[$k] => " . PHP_EOL;
-      echo $d->toString();
-    }
-    echo $ant->toString();
-    echo "END TESTING ContinuousAntecedent & SPLIT DATA" . PHP_EOL;
+    // echo "TESTING ContinuousAntecedent & SPLIT DATA" . PHP_EOL;
+    // $ant = new ContinuousAntecedent($attrs[3]);
+    // $splitData = $ant->splitData($dataframe, 0.5, 1);
+    // foreach ($splitData as $k => $d) {
+      // echo "[$k] => " . PHP_EOL;
+      // echo $d->toString();
+    // }
+    // echo $ant->toString();
+    // echo "END TESTING ContinuousAntecedent & SPLIT DATA" . PHP_EOL;
+    
+    echo PHP_EOL;
+    echo PHP_EOL;
     
     $this->update_model();
     $this->predict($input_dataframe);

@@ -4,7 +4,7 @@
  * Interface for learner/optimizers
  */
 interface Learner {
-    function teach($model, $data);
+    function teach(_DiscriminativeModel $model, Instances $data);
 }
 
 /*
@@ -61,7 +61,6 @@ class PRip implements Learner {
   /** Whether use pruning, i.e. the data is clean or not */
   private $usePruning;
 
-  // TODO
   function __construct($random_seed = 1) { // TODO: in the end use seed = NULL.
     if ($random_seed == NULL) {
       $random_seed = make_seed();
@@ -84,32 +83,25 @@ class PRip implements Learner {
    * @throws Exception if classifier can't be built successfully
    */
   function teach($model, $data) {
-    echo "PRip->teach([model], " . $data->toString() . ")" . PHP_EOL;
+    echo "PRip->teach([model], [data])" . PHP_EOL;
 
     /* Remove instances with missing class */
     $data->removeUselessInsts();
+    echo $data->toString() . PHP_EOL;
 
     srand($this->seed);
 
-    /*TODO
-    Instances data = null;
-    m_Filter = new ClassOrder();
-    ((ClassOrder) m_Filter).setSeed(rand());
-    ((ClassOrder) m_Filter).setClassOrder(ClassOrder.FREQ_ASCEND);
-    m_Filter.setInputFormat(instances);
-    data = Filter.useFilter(instances, m_Filter);
-
-    if (data == null) {
-      throw new Exception(" Unable to randomize the class orders.");
-    }
-
-    m_Class = data.classAttribute();
-    m_Ruleset = new ArrayList<Rule>();
-    m_RulesetStats = new ArrayList<RuleStats>();
-    m_Distributions = new ArrayList<double[]>();
+    $model->resetRules();
+    
+    /*
+    // Sort by class FREQ_ASCEND
+    $classAttr = $this->data->getClassAttribute();
+    $orderedClassCounts = $this->data->getOrderedClassCounts();
+    // m_RulesetStats = new ArrayList<RuleStats>();
+    // m_Distributions = new ArrayList<double[]>();
 
     // Sort by classes frequency
-    double[] orderedClasses = ((ClassOrder) m_Filter).getClassCounts();
+    $orderedClasses = ((ClassOrder) m_Filter).getClassCounts();
     if (m_Debug) {
       System.err.println("Sorted classes:");
       for (int x = 0; x < m_Class.numValues(); x++) {
@@ -117,30 +109,28 @@ class PRip implements Learner {
           + orderedClasses[x] + " instances.");
       }
     }
+
     // Iterate from less prevalent class to more frequent one
-    oneClass: for (int y = 0; y < data.numClasses() - 1; y++) { // For each
+    for ($y = 0; $y < $this->data.numClasses() - 1; $y++) { // For each
                                                                 // class
 
-      double classIndex = y;
-      if (m_Debug) {
-        int ci = (int) classIndex;
-        System.err.println("\n\nClass " + m_Class.value(ci) + "(" + ci + "): "
-          + orderedClasses[y] + "instances\n"
-          + "=====================================\n");
+      $classIndex = $y;
+      if ($this->debug) {
+        echo "\n\nClass " . m_Class.value($classIndex) . "(" . $classIndex . "): "
+          . $orderedClasses[$y] . "instances\n"
+          . "=====================================\n");
       }
 
-      if (Utils.eq(orderedClasses[y], 0.0)) {
-        continue oneClass;
+      // Ignore classes with no members.
+      if ($orderedClasses[$y] == 0) {
+        continue;
       }
 
       // The expected FP/err is the proportion of the class
-      double all = 0;
-      for (int i = y; i < orderedClasses.length; i++) {
-        all += orderedClasses[i];
-      }
-      double expFPRate = orderedClasses[y] / all;
+      $all = array_sum(array_slice($orderedClasses, $y));
+      $expFPRate = $orderedClasses[$y] / $all;
 
-      double classYWeights = 0, totalWeights = 0;
+      $classYWeights = 0; $totalWeights = 0;
       for (int j = 0; j < data.numInstances(); j++) {
         Instance datum = data.getInstance(j);
         totalWeights += datum.weight();
@@ -155,7 +145,7 @@ class PRip implements Learner {
         defDL = RuleStats.dataDL(expFPRate, 0.0, totalWeights, 0.0,
           classYWeights);
       } else {
-        continue oneClass; // Subsumed by previous rules
+        continue; // Subsumed by previous rules
       }
 
       if (Double.isNaN(defDL) || Double.isInfinite(defDL)) {

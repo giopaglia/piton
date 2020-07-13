@@ -40,9 +40,9 @@ class Instances {
   }
   
   function dropAttr($j) {
-    unset($this->attributes[$j]);
+    array_splice($this->attributes, $j, $j+1);
     foreach ($this->data as $i => $row) {
-      unset($this->data[$i][$j]);
+      array_splice($this->data[$i], $j, $j+1);
     }
   }
   function dropOutputAttr() {
@@ -53,8 +53,8 @@ class Instances {
   function removeUselessInsts() {
     for ($x = $this->numInstances() - 1; $x >= 0; $x--) {
       if ($this->inst_classValue($x) === NULL) {
-        unset($this->weights[$x]);
-        unset($this->data[$x]);
+        array_splice($this->weights, $x, $x+1);
+        array_splice($this->data,    $x, $x+1);
       }
     }
   }

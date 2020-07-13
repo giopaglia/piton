@@ -116,13 +116,13 @@
             if ($splitPoint < $mins[$attribute_idx]) {
               $mins[$attribute_idx] = $splitPoint;
             } else {
-              unset($this->antecedents[$i]);
+              array_splice($this->antecedents, $i, $i+1);
             }
           } else {
             if ($splitPoint > $maxs[$attribute_idx]) {
               $maxs[$attribute_idx] = $splitPoint;
             } else {
-              unset($this->antecedents[$i]);
+              array_splice($this->antecedents, $i, $i+1);
             }
           }
         }
