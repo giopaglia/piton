@@ -17,32 +17,31 @@ class Instances {
   function setData($d) { $this->data = $d; }
 
   /** The weights for the data instances */
-  private $weights;
-  function getWeights() { return $this->weights; }
-  function setWeights($w) { $this->weights = $w; }
+  // private $weights;
+  // function getWeights() { return $this->weights; }
+  // function setWeights($w) { $this->weights = $w; }
 
   function __construct($attributes, $data, $weights = NULL) {
     $this->attributes = $attributes;
-    $this->data       = $data;
-    if ($weights == NULL) {
-      $weights = array_fill(0, count($data), 1);
+    foreach ($data as $k => &$inst) {
+      $inst[] = ($weights == NULL ? 1 : $weights[$k]);
     }
-    $this->weights    = $weights;
+    $this->data       = $data;
   }
 
-  function numAttributes() { return count($this->attributes); }
+  function numAttributes() { return count($this->getAttrs()); }
   function numInstances() { return count($this->data); }
-  function getInstance($i) { return $this->data[$i]; }
+  function getInstance($i) { return array_slice($this->data[$i], 0, -1); }
   function pushInstance($inst, $weight = 1)
   {
-    $this->data[]    = $inst;
-    $this->weights[] = $weight;
+    $inst[]       = $weight;
+    $this->data[] = $inst;
   }
   
   function dropAttr($j) {
     array_splice($this->attributes, $j, $j+1);
-    foreach ($this->data as $i => $row) {
-      array_splice($this->data[$i], $j, $j+1);
+    foreach ($this->data as &$inst) {
+      array_splice($inst, $j, $j+1);
     }
   }
   function dropOutputAttr() {
@@ -53,7 +52,6 @@ class Instances {
   function removeUselessInsts() {
     for ($x = $this->numInstances() - 1; $x >= 0; $x--) {
       if ($this->inst_classValue($x) === NULL) {
-        array_splice($this->weights, $x, $x+1);
         array_splice($this->data,    $x, $x+1);
       }
     }
@@ -63,9 +61,9 @@ class Instances {
   {
     echo "Instances->sortByAttr(" . get_var_dump($attr) . ")" . PHP_EOL;
 
-    echo $this->toString($this->data);
+    echo $this->toString();
     echo " => ";
-    $j = array_search($attr, $this->attributes);
+    $j = array_search($attr, $this->getAttrs());
     
     usort($this->data, function ($a,$b) use($j) {
       $A = $a[$j];
@@ -75,7 +73,7 @@ class Instances {
       if ($A == NULL) return 1;
       return ($A < $B) ? -1 : 1;
     });
-    echo $this->toString($this->data);
+    echo $this->toString();
   }
 
   /*
@@ -84,21 +82,71 @@ class Instances {
   
   function inst_valueOfAttr($i, $attr) {
     // TODO maybe at some point this won't be necessary, and I'll directly use attr indices?
-    $j = array_search($attr, $this->attributes);
+    $j = array_search($attr, $this->getAttrs());
     return $this->data[$i][$j];
   }
 
   function inst_isMissing($i, $attr) {
     // TODO maybe at some point this won't be necessary, and I'll directly use attr indices?
-    $j = array_search($attr, $this->attributes);
+    $j = array_search($attr, $this->getAttrs());
     return ($this->data[$i][$j] === NULL);
   }
   
-  function inst_weight($i) { return $this->weights[$i]; }
+  function inst_weight($i) {
+    $inst = $this->data[$i];
+    return $inst[array_key_last($inst)];
+  }
 
   function inst_classValue($i) {
-    $row = $this->data[$i];
-    return $row[0];
+    $inst = $this->data[$i];
+    // Note: assuming the class attribute is the first
+    return $inst[0];
+  }
+
+  function inst_setClassValue($i, $cl) {
+    $inst = &$this->data[$i];
+    // Note: assuming the class attribute is the first
+    $inst[0] = $cl;
+  }
+
+  function getClassAttribute() {
+    // Note: assuming the class attribute is the first
+    return $this->getAttrs()[0];
+  }
+
+  function numClasses() {
+    return $this->getClassAttribute()->numValues();
+  }
+
+  function sortByClassCounts() {
+    $classes = $this->getClassAttribute()->getDomain();
+
+    $class_counts =  array_fill(0,count($classes),0);
+    for ($x = 0; $x < $this->numInstances(); $x++) {
+      $class_counts[$this->inst_classValue($x)]++;
+    }
+
+    // echo $this->toString();
+
+    $indices = range(0, count($classes) - 1);
+    // echo get_var_dump($classes);
+    
+    array_multisort($class_counts, SORT_DESC, $classes, $indices);
+    $class_map = array_flip($indices);
+
+    // TODO check that this approach works with many classes
+    // echo get_var_dump($classes);
+    // echo get_var_dump($indices);
+    // echo get_var_dump($class_map);
+
+    for ($x = 0; $x < $this->numInstances(); $x++) {
+      $cl = $this->inst_classValue($x);
+      $this->inst_setClassValue($x, $class_map[$cl]);
+    }
+
+    echo $this->toString();
+
+    return $class_counts;
   }
 
   /** Save data to file, (dense) ARFF/Weka format */
@@ -110,7 +158,7 @@ class Instances {
     fwrite($f, "@RELATION " . basename($path) . "\n\n");
 
     /* Attributes */
-    foreach($this->attributes as $attr) {
+    foreach($this->getAttrs() as $attr) {
       fwrite($f, "@ATTRIBUTE {$attr->getName()} {$attr->getARFFType()}");
       fwrite($f, "\n");
     }
@@ -123,10 +171,8 @@ class Instances {
     
     /* Data */
     fwrite($f, "\n@DATA\n");
-    foreach (zip($this->data, $this->weights) as $arr) {
-      $row = $arr[0];
-      $weight = $arr[1];
-      fwrite($f, join(",", array_map($getARFFRepr, $row, $this->attributes)) . ", {" . $weight . "}\n");
+    foreach ($this->data as $k => $inst) {
+      fwrite($f, join(",", array_map($getARFFRepr, $this->getInstance($k), $this->getAttrs())) . ", {" . $this->inst_weight($k) . "}\n");
     }
 
     fclose($f);
@@ -137,19 +183,20 @@ class Instances {
    */
   function toString() {
     $out_str = "";
-    foreach ($this->attributes as $att) {
-      $out_str .= $att->toString() . "\t";
+    foreach ($this->getAttrs() as $att) {
+      $out_str .= substr($att->toString(), 0, 7) . "\t";
     }
     $out_str .= "\n";
-    foreach ($this->data as $row) {
-      foreach ($row as $val) {
+    foreach ($this->data as $k => $inst) {
+      foreach ($this->getInstance($k) as $val) {
         if ($val === NULL) {
           $out_str .= "N/A\t";
         }
         else {
-          $out_str .= $val . "\t";
+          $out_str .= "{$val}\t";
         }
       }
+      $out_str .= "{" . $this->inst_weight($k) . "}";
       $out_str .= "\n";
     }
     return $out_str;

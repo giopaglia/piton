@@ -2,6 +2,7 @@
 
 include "Antecedent.php";
 include "Rule.php";
+include "RuleStats.php";
 
 /*
  * Interface for discriminative models

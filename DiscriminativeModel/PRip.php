@@ -4,7 +4,7 @@
  * Interface for learner/optimizers
  */
 interface Learner {
-    function teach(_DiscriminativeModel $model, Instances $data);
+    function teach(_DiscriminativeModel &$model, Instances $data);
 }
 
 /*
@@ -82,8 +82,8 @@ class PRip implements Learner {
    * @param instances the training data
    * @throws Exception if classifier can't be built successfully
    */
-  function teach($model, $data) {
-    echo "PRip->teach([model], [data])" . PHP_EOL;
+  function teach(&$model, $data) {
+    echo "PRip->teach(&[model], [data])" . PHP_EOL;
 
     /* Remove instances with missing class */
     $data->removeUselessInsts();
@@ -91,82 +91,103 @@ class PRip implements Learner {
 
     srand($this->seed);
 
-    $model->resetRules();
+    // $model->resetRules();
+    $ruleset = [];
     
-    /*
     // Sort by class FREQ_ASCEND
-    $classAttr = $this->data->getClassAttribute();
-    $orderedClassCounts = $this->data->getOrderedClassCounts();
     // m_RulesetStats = new ArrayList<RuleStats>();
     // m_Distributions = new ArrayList<double[]>();
 
     // Sort by classes frequency
-    $orderedClasses = ((ClassOrder) m_Filter).getClassCounts();
-    if (m_Debug) {
-      System.err.println("Sorted classes:");
-      for (int x = 0; x < m_Class.numValues(); x++) {
-        System.err.println(x + ": " + m_Class.value(x) + " has "
-          + orderedClasses[x] + " instances.");
+    $orderedClassCounts = $data->sortByClassCounts();
+    $classAttr = $data->getClassAttribute();
+    if ($this->debug) {
+      echo "Sorted classes:\n";
+      for ($x = 0; $x < $classAttr->numValues(); $x++) {
+        echo $x . ": " . $classAttr->reprVal($x) . " has "
+          . $orderedClassCounts[$x] . " instances.\n";
       }
     }
-
+    
     // Iterate from less prevalent class to more frequent one
-    for ($y = 0; $y < $this->data.numClasses() - 1; $y++) { // For each
+    for ($y = 0; $y < $data->numClasses() - 1; $y++) { // For each
                                                                 // class
 
       $classIndex = $y;
       if ($this->debug) {
-        echo "\n\nClass " . m_Class.value($classIndex) . "(" . $classIndex . "): "
-          . $orderedClasses[$y] . "instances\n"
-          . "=====================================\n");
+        echo "\n\nClass " . $classAttr->reprVal($classIndex) . "(" . $classIndex . "): "
+          . $orderedClassCounts[$y] . "instances\n"
+          . "=====================================\n";
       }
 
       // Ignore classes with no members.
-      if ($orderedClasses[$y] == 0) {
-        continue;
+      if ($orderedClassCounts[$y] == 0) {
+        if ($this->debug) {
+          echo "Ignoring class!\n";
+        }
+      continue;
       }
 
       // The expected FP/err is the proportion of the class
-      $all = array_sum(array_slice($orderedClasses, $y));
-      $expFPRate = $orderedClasses[$y] / $all;
+      $all = array_sum(array_slice($orderedClassCounts, $y));
+      $expFPRate = $orderedClassCounts[$y] / $all;
 
       $classYWeights = 0; $totalWeights = 0;
-      for (int j = 0; j < data.numInstances(); j++) {
-        Instance datum = data.getInstance(j);
-        totalWeights += datum.weight();
-        if ((int) datum.classValue() == y) {
-          classYWeights += datum.weight();
+      for ($j = 0; $j < $data->numInstances(); $j++) {
+        $totalWeights += $data->inst_weight($j);
+        if ($data->inst_classValue($j) == $y) {
+          $classYWeights += $data->inst_weight($j);
         }
       }
 
+      if ($this->debug) {
+          echo "\$all: $all!\n";
+          echo "\$expFPRate: $expFPRate!\n";
+          echo "\$classYWeights: $classYWeights!\n";
+          echo "\$totalWeights: $totalWeights!\n";
+      }
+
       // DL of default rule, no theory DL, only data DL
-      double defDL;
-      if (classYWeights > 0) {
-        defDL = RuleStats.dataDL(expFPRate, 0.0, totalWeights, 0.0,
-          classYWeights);
+      $defDL = 0.0;
+      if ($classYWeights > 0) {
+        $defDL = RuleStats::dataDL($expFPRate, 0.0, $totalWeights, 0.0,
+          $classYWeights);
       } else {
         continue; // Subsumed by previous rules
       }
 
-      if (Double.isNaN(defDL) || Double.isInfinite(defDL)) {
-        throw new Exception("Should never happen: " + "defDL NaN or infinite!");
+      if (is_nan($defDL) || is_infinite($defDL)) {
+        throw new Exception("Should never happen: " . "defDL NaN or infinite!");
       }
-      if (m_Debug) {
-        System.err.println("The default DL = " + defDL);
+      if ($this->debug) {
+        echo "The default DL = " . $defDL;
       }
 
-      data = rulesetForOneClass(expFPRate, data, classIndex, defDL);
+      $rules = rulesetForOneClass($data, $expFPRate, $classIndex, $defDL);
+      $ruleset = array_merge($ruleset, $rules);
     }
 
     // Remove redundant numeric tests from the rules
-    for (Rule rule : m_Ruleset) {
-      ((RipperRule)rule).cleanUp(data);
+    if ($this->debug) {
+      echo "Remove redundant numeric tests from the rules\n";
     }
-
+    foreach ($ruleset as &$rule) {
+      if ($this->debug) {
+        echo "rule = " . $rule->toString();
+      }
+      $rule->cleanUp($data);
+      if ($this->debug) {
+        echo "rule = " . $rule->toString();
+      }
+    }
+/*
     // Set the default rule
-    RipperRule defRule = new RipperRule();
-    defRule.setConsequent(data.numClasses() - 1);
-    m_Ruleset.add(defRule);
+    if ($this->debug) {
+      echo "Set the default rule\n";
+    }
+    $defRule = new RipperRule();
+    $defRule->setConsequent($data->numClasses() - 1);
+    $ruleset[] = $defRule;
 
     RuleStats defRuleStat = new RuleStats();
     defRuleStat.setData(data);
@@ -187,12 +208,14 @@ class PRip implements Learner {
     }
 
     // free up memory
-    for (int i = 0; i < m_RulesetStats.size(); i++) {
-      (m_RulesetStats.get(i)).cleanUp();
-    }
-    */
+    // for ($i = 0; $i < m_RulesetStats.size(); i++) {
+    //   (m_RulesetStats.get(i)).cleanUp();
+    // }
+    
+    $model->setRules($ruleset);
+    /**/
   }
-
+  
 }
 
 ?>
