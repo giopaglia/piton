@@ -8,32 +8,32 @@ include "Instances.php";
 */
 abstract class _Antecedent {
   /** The attribute of the antecedent */
-  private $attribute;
+  protected $attribute;
   
   /**
   * The attribute value of the antecedent. For numeric attribute, it represents the operator (<= or >=)
   */
-  private $value;
+  protected $value;
   
   /**
   * The maximum infoGain achieved by this antecedent test in the growing data
   */
-  private $maxInfoGain;
+  protected $maxInfoGain;
   
   /** The accurate rate of this antecedent test on the growing data */
-  private $accuRate;
+  protected $accuRate;
   
   /** The coverage of this antecedent in the growing data */
-  private $cover;
+  protected $cover;
   
   /** The accurate data for this antecedent in the growing data */
-  private $accu;
+  protected $accu;
 
 
   /**
    * Constructor
    */
-  function __construct(Attribute $attribute) {
+  function __construct(_Attribute $attribute) {
     $this->attribute   = $attribute;
     $this->value       = NAN;
     $this->maxInfoGain = 0;
@@ -43,7 +43,7 @@ abstract class _Antecedent {
   }
 
 
-  static function createFromAttribute(Attribute $attribute) {
+  static function createFromAttribute(_Attribute $attribute) {
     switch (true) {
       case $attribute instanceof DiscreteAttribute:
         $antecedent = new DiscreteAntecedent($attribute);
@@ -196,7 +196,7 @@ class DiscreteAntecedent extends _Antecedent {
   /**
    * Constructor
    */
-  function __construct(Attribute $attribute) {
+  function __construct(_Attribute $attribute) {
     assert($attribute instanceof DiscreteAttribute, "DiscreteAntecedent requires a DiscreteAttribute. Got " . get_class($attribute) . " instead.");
     parent::__construct($attribute);
   }
@@ -211,6 +211,8 @@ class DiscreteAntecedent extends _Antecedent {
    * @return the array of data after split
    */
   function splitData(&$data, $defAcRt, $cla) {
+    echo "DiscreteAntecedent->splitData(&[data], defAcRt=$defAcRt, cla=$cla)" . PHP_EOL;
+    echo $data->toString() . PHP_EOL;
 
     $bag = $this->attribute->numValues();
 
@@ -251,6 +253,9 @@ class DiscreteAntecedent extends _Antecedent {
       }
     }
 
+    foreach ($splitData as $k => $s) {
+      echo "splitData[$k] : \n" . $splitData[$k]->toString() . PHP_EOL;
+    }
     return $splitData;
   }
 
@@ -279,7 +284,7 @@ class DiscreteAntecedent extends _Antecedent {
       return "{$this->attribute->getName()} == \"{$this->attribute->getDomain()[$this->value]}\"";
     }
     else {
-      return "DiscreteAntecedent: ({$this->attribute->getName()} == \"{$this->attribute->getDomain()[$this->value]}\") (maxInfoGain={$this->maxInfoGain}, accuRate={$this->accuRate}, cover={$this->cover}, accu={$this->accu})" . PHP_EOL;
+      return "DiscreteAntecedent: ({$this->attribute->getName()} == \"{$this->attribute->getDomain()[$this->value]}\") (maxInfoGain={$this->maxInfoGain}, accuRate={$this->accuRate}, cover={$this->cover}, accu={$this->accu})";
     }
   }
 }
@@ -297,7 +302,7 @@ class ContinuousAntecedent extends _Antecedent {
   /**
    * Constructor
    */
-  function __construct(Attribute $attribute) {
+  function __construct(_Attribute $attribute) {
     assert($attribute instanceof ContinuousAttribute, "ContinuousAntecedent requires a ContinuousAttribute. Got " . get_class($attribute) . " instead.");
     parent::__construct($attribute);
     $this->splitPoint  = NAN;
@@ -314,6 +319,9 @@ class ContinuousAntecedent extends _Antecedent {
    * @return the array of data after split
    */
   function splitData(&$data, $defAcRt, $cla) {
+    echo "ContinuousAntecedent->splitData(&[data], defAcRt=$defAcRt, cla=$cla)" . PHP_EOL;
+    echo $data->toString() . PHP_EOL;
+
     $split = 1; // Current split position
     $prev  = 0; // Previous split position
     $finalSplit = $split; // Final split position
@@ -431,6 +439,9 @@ class ContinuousAntecedent extends _Antecedent {
     $splitData[] = Instances::createFromSlice($data, 0, $finalSplit);
     $splitData[] = Instances::createFromSlice($data, $finalSplit, $total - $finalSplit);
 
+    foreach ($splitData as $k => $s) {
+      echo "splitData[$k] : \n" . $splitData[$k]->toString() . PHP_EOL;
+    }
     return $splitData;
   }
 
@@ -471,7 +482,7 @@ class ContinuousAntecedent extends _Antecedent {
       return "ContinuousAntecedent: ({$this->attribute->getName()}" . (($this->value == 0) ? " <= " : " >= ") .
         // number_format($this->splitPoint, 6)
         number_format($this->splitPoint)
-        . ") (maxInfoGain={$this->maxInfoGain}, accuRate={$this->accuRate}, cover={$this->cover}, accu={$this->accu})" . PHP_EOL;
+        . ") (maxInfoGain={$this->maxInfoGain}, accuRate={$this->accuRate}, cover={$this->cover}, accu={$this->accu})";
     }
   }
 

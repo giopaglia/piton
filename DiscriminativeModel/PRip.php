@@ -287,10 +287,10 @@ class PRip implements Learner {
         if ($this->debug) {
           echo "\nGrowing a rule ...";
         }
-        $oneRule->grow($growData); // Build the rule
+        $oneRule->grow($growData, $this->minNo); // Build the rule
         if ($this->debug) {
           echo "One rule found before pruning:"
-            . $oneRule->toString($classAttr);
+            . $oneRule->toString($this->classAttr);
         }
 
         if ($this->debug) {
@@ -299,16 +299,16 @@ class PRip implements Learner {
         $oneRule->prune($pruneData, false); // Prune the rule
         if ($this->debug) {
           echo "One rule found after pruning:"
-            . $oneRule->toString($classAttr);
+            . $oneRule->toString($this->classAttr);
         }
       } else {
         if ($this->debug) {
           echo "\nNo pruning: growing a rule ...";
         }
-        $oneRule->grow($newData); // Build the rule
+        $oneRule->grow($newData, $this->minNo); // Build the rule
         if ($this->debug) {
           echo "No pruning: one rule found:\n"
-            . $oneRule->toString($classAttr);
+            . $oneRule->toString($this->classAttr);
         }
       }
 
@@ -404,12 +404,12 @@ class PRip implements Learner {
             if ($this->debug) {
               echo "\nGrowing and pruning" + " a new rule ...";
             }
-            newRule.grow(growData);
+            newRule.grow(growData, $this->minNo);
             newRule.prune(pruneData, false);
             finalRule = newRule;
             if ($this->debug) {
               echo "\nNew rule found: "
-                + newRule.toString($classAttr);
+                + newRule.toString($this->classAttr);
             }
           } else {
             RipperRule oldRule = (RipperRule) ruleset.get(position);
@@ -434,7 +434,7 @@ class PRip implements Learner {
             }
             RipperRule replace = new RipperRule();
             replace.setConsequent(classIndex);
-            replace.grow(growData);
+            replace.grow(growData, $this->minNo);
 
             // Remove the pruning data covered by the following
             // rules, then simply compute the error rate of the
@@ -458,7 +458,7 @@ class PRip implements Learner {
                 newGrowData.add(inst);
               }
             }
-            revision.grow(newGrowData);
+            revision.grow(newGrowData, $this->minNo);
             revision.prune(pruneData, true);
 
             double[][] prevRuleStats = new double[position][6];
@@ -486,7 +486,7 @@ class PRip implements Learner {
 
             double repDL = repStat.relativeDL(position, expFPRate, m_CheckErr);
             if ($this->debug) {
-              echo "\nReplace: " + replace.toString($classAttr)
+              echo "\nReplace: " + replace.toString($this->classAttr)
                 + " |dl = " + repDL);
             }
 
@@ -503,7 +503,7 @@ class PRip implements Learner {
             double revDL = revStat.relativeDL(position, expFPRate, m_CheckErr);
 
             if ($this->debug) {
-              echo "Revision: " + revision.toString($classAttr)
+              echo "Revision: " + revision.toString($this->classAttr)
                 + " |dl = " + revDL);
             }
 
@@ -523,7 +523,7 @@ class PRip implements Learner {
                 + "in optmz. stage NaN or " + "infinite!");
             }
             if ($this->debug) {
-              echo "Old rule: " + oldRule.toString($classAttr)
+              echo "Old rule: " + oldRule.toString($this->classAttr)
                 + " |dl = " + oldDL);
             }
 
@@ -574,7 +574,7 @@ class PRip implements Learner {
             echo "\nRuleset so far: ";
             for (int x = 0; x < ruleset.size(); x++) {
               echo x + ": "
-                + ((RipperRule) ruleset.get(x)).toString($classAttr);
+                + ((RipperRule) ruleset.get(x)).toString($this->classAttr);
             }
             echo );
           }
@@ -613,7 +613,7 @@ class PRip implements Learner {
       echo "\nFinal ruleset: ";
       for (int x = 0; x < ruleset.size(); x++) {
         echo x + ": "
-          + ((RipperRule) ruleset.get(x)).toString($classAttr);
+          + ((RipperRule) ruleset.get(x)).toString($this->classAttr);
       }
       echo );
     }

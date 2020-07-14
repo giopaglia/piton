@@ -183,7 +183,7 @@ class RuleStats {
   static function numAllConditions(Instances &$data) {
     echo "RuleStats->numAllConditions(&[data])" . PHP_EOL;
     $total = 0.0;
-    foreach ($data->getAttrs(false) as $attr) {
+    foreach ($data->getAttributes(false) as $attr) {
       // echo $attr->toString() . PHP_EOL;
       switch (true) {
         case $attr instanceof DiscreteAttribute:

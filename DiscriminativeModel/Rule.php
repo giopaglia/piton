@@ -3,13 +3,58 @@
 /*
  * Interface for rules
  */
-interface Rule {
+abstract class Rule {
   /** The internal representation of the class label to be predicted */
-  function getConsequent();
-  function setConsequent($c);
+  protected $consequent;
 
-  function getAntecedents();
-  function setAntecedents($a);
+  /** The vector of antecedents of this rule */
+  protected $antecedents;
+
+  /** Constructor */
+  function __construct() {
+    $this->consequent = -1;
+    $this->antecedents = [];
+  }
+
+  /**
+   * @return mixed
+   */
+  public function getConsequent()
+  {
+      return $this->consequent;
+  }
+
+  /**
+   * @param mixed $consequent
+   *
+   * @return self
+   */
+  public function setConsequent($consequent)
+  {
+      $this->consequent = $consequent;
+
+      return $this;
+  }
+
+  /**
+   * @return mixed
+   */
+  public function getAntecedents()
+  {
+      return $this->antecedents;
+  }
+
+  /**
+   * @param mixed $antecedents
+   *
+   * @return self
+   */
+  public function setAntecedents($antecedents)
+  {
+      $this->antecedents = $antecedents;
+
+      return $this;
+  }
 }
 
 /**
@@ -21,23 +66,7 @@ interface Rule {
  * Prunning (REP) with the metric of accuracy rate p/(p+n) or (TP+TN)/(P+N) is
  * used to prune the rule.
  */
-class RipperRule implements Rule {
-
-  /** The internal representation of the class label to be predicted */
-  private $consequent;
-  function getConsequent() { return $this->consequent; }
-  function setConsequent($c) { $this->consequent = $c; }
-
-  /** The vector of antecedents of this rule */
-  private $antecedents;
-  function getAntecedents() { return $this->antecedents; }
-  function setAntecedents($a) { $this->antecedents = $a; }
-
-  /** Constructor */
-  function __construct() {
-    $this->consequent = NULL;
-    $this->antecedents = NULL;
-  }
+class RipperRule extends Rule {
 
   /**
    * Whether the instance covered by this rule.
@@ -50,7 +79,7 @@ class RipperRule implements Rule {
   function covers(&$data, $i) {
     $isCover = true;
 
-    for ($x = 0; $x < count($this->antecedents); $x++) {
+    for ($x = 0; $x < $this->size(); $x++) {
       if (!$this->antecedents[$x]->covers($data, $i)) {
         $isCover = false;
         break;
@@ -64,13 +93,12 @@ class RipperRule implements Rule {
    * 
    * @return the boolean value indicating whether the rule has antecedents
    */
-  function hasAntds() {
-    if ($this->antecedents === NULL) {
-      return false;
-    }
-    else {
-      return ($this->size() > 0);
-    }
+  function hasAntecedents() {
+    return ($this->antecedents !== NULL && $this->size() > 0);
+  }
+
+  function hasConsequent() {
+    return ($this->consequent !== NULL && $this->consequent !== -1);
   }
 
   /**
@@ -89,8 +117,8 @@ class RipperRule implements Rule {
    * @param data the data in question
    * @return the default accuracy number
    */
-  function computeDefAccu($data) {
-    echo "RipperRule->computeDefAccu(" . get_var_dump($data) . ")" . PHP_EOL;
+  function computeDefAccu(&$data) {
+    echo "RipperRule->computeDefAccu(&[data])" . PHP_EOL;
     $defAccu = 0;
     for ($i = 0; $i < $data->numInstances(); $i++) {
       if ($data->inst_classValue($i) == $this->consequent) {
@@ -101,14 +129,42 @@ class RipperRule implements Rule {
     return $defAccu;
   }
 
+
+  /**
+   * Compute the best information gain for the specified antecedent
+   * 
+   * @param instances the data based on which the infoGain is computed
+   * @param defAcRt the default accuracy rate of data
+   * @param antd the specific antecedent
+   * @return the data covered by the antecedent
+   */
+  private function computeInfoGain(Instances &$data, float $defAcRt,
+    _Antecedent $antd) {
+
+    /*
+     * Split the data into bags. The information gain of each bag is also
+     * calculated in this procedure
+     */
+    $splitData = $antd->splitData($data, $defAcRt, $this->consequent);
+
+    /* Get the bag of data to be used for next antecedents */
+    if ($splitData != NULL) {
+      return $splitData[$antd->getValue()];
+    } else {
+      return NULL;
+    }
+  }
+
   /**
    * Build one rule using the growing data
    * 
    * @param data the growing data used to build the rule
    */
-  function grow(Instances &$growData) {
+  function grow(Instances &$growData, float $minNo) {
     echo "RipperRule->grow(&[growData])" . PHP_EOL;
-    if ($this->consequent === NULL) {
+    echo $this->toString() . PHP_EOL;
+    
+    if (!$this->hasConsequent()) {
       throw new Exception(" Consequent not set yet.");
     }
 
@@ -128,12 +184,11 @@ class RipperRule implements Rule {
     // If there are already antecedents existing
     foreach ($this->antecedents as &$antecedent) {
       if (!($antecedent instanceof ContinuousAntecedent)) {
-        $used[antecedent.getAttr().index()] = true;
+        $used[$antecedent->getAttribute()->getIndex()] = true;
         $numUnused--;
       }
     }
 
-    $maxInfoGain;
     while ($growData->numInstances() > 0
       && $numUnused > 0
       && $defAcRt < 1.0) {
@@ -144,65 +199,149 @@ class RipperRule implements Rule {
        * condition allowed else maxInfoGain = Utils.eq(defAcRt, 1.0) ?
        * defAccu/(double)numAntds : 0.0;
        */
-      $maxInfoGain = 0.0;
 
       /* Build a list of antecedents */
-      Antd oneAntd = NULL;
-      Instances coverData = NULL;
-      Enumeration<Attribute> enumAttr = growData.enumerateAttributes();
+      $maxInfoGain = 0.0;
+      $maxAntd = NULL;
+      $maxCoverData = NULL;
 
       /* Build one condition based on all attributes not used yet */
-      while (enumAttr.hasMoreElements()) {
-        Attribute att = (enumAttr.nextElement());
+      foreach ($growData->getAttributes(false) as $attr) {
 
-        if (m_Debug) {
-          System.err.println("\nOne condition: size = "
-            + growData.sumOfWeights());
-        }
+        echo "\nOne condition: size = " . $growData->sumOfWeights() . PHP_EOL;
 
-        $antd = Antecedent::createFromAttribute(att);
+        $antd = _Antecedent::createFromAttribute($attr);
 
-        if (!used[att.index()]) {
+        if (!$used[$attr->getIndex()]) {
           /*
            * Compute the best information gain for each attribute, it's stored
            * in the antecedent formed by this attribute. This procedure
            * returns the data covered by the antecedent
            */
-          Instances coveredData = computeInfoGain(growData, defAcRt, antd);
-          if (coveredData != NULL) {
-            double infoGain = antd.getMaxInfoGain();
-            if (m_Debug) {
-              System.err.println("Test of \'" + antd.toString()
-                + "\': infoGain = " + infoGain + " | Accuracy = "
-                + antd.getAccuRate() + "=" + antd.getAccu() + "/"
-                + antd.getCover() + " def. accuracy: " + defAcRt);
-            }
+          $coverData = $this->computeInfoGain($growData, $defAcRt, $antd);
+          if ($coverData != NULL) {
+            $infoGain = $antd->getMaxInfoGain();
 
-            if (infoGain > maxInfoGain) {
-              oneAntd = antd;
-              coverData = coveredData;
-              maxInfoGain = infoGain;
+            if ($infoGain > $maxInfoGain) {
+              $maxAntd      = $antd;
+              $maxCoverData = $coverData;
+              $maxInfoGain  = $infoGain;
             }
+            echo "Test of {" . $antd->toString()
+                . "}:\n\tinfoGain = " . $infoGain . " | Accuracy = "
+                . $antd->getAccuRate() . "=" . $antd->getAccu() . "/"
+                . $antd->getCover() . " def. accuracy: $defAcRt"
+                . "\n\tmaxInfoGain = " . $maxInfoGain . PHP_EOL;
+
           }
         }
       }
 
-      if (oneAntd === NULL) {
+      if ($maxAntd === NULL) {
         break; // Cannot find antds
       }
-      if (smaller(oneAntd.getAccu(), m_MinNo)) {
+      if ($maxAntd->getAccu() < $minNo) {
         break;// Too low coverage
       }
 
       // Numeric attributes can be used more than once
-      if (!oneAntd.getAttr().isNumeric()) {
-        used[oneAntd.getAttr().index()] = true;
-        numUnused--;
+      if (!($maxAntd instanceof ContinuousAntecedent)) {
+        $used[$maxAntd->getAttribute()->getIndex()] = true;
+        $numUnused--;
       }
 
-      m_Antds.add(oneAntd);
-      growData = coverData;// Grow data size is shrinking
-      defAcRt = oneAntd.getAccuRate();
+      $this->antecedents[] = $maxAntd;
+      $growData = $maxCoverData;// Grow data size is shrinking
+      $defAcRt = $maxAntd->getAccuRate();
+    }
+    echo $this->toString() . PHP_EOL;
+  }
+
+
+  /**
+   * Prune all the possible final sequences of the rule using the pruning
+   * data. The measure used to prune the rule is based on flag given.
+   * 
+   * @param pruneData the pruning data used to prune the rule
+   * @param useWhole flag to indicate whether use the error rate of the whole
+   *          pruning data instead of the data covered
+   */
+  function prune(Instances &$pruneData, bool $useWhole) {
+    echo "RipperRule->grow(&[growData])" . PHP_EOL;
+    echo $this->toString() . PHP_EOL;
+    
+    $sumOfWeights = $pruneData->sumOfWeights();
+    if (!($sumOfWeights > 0.0)) {
+      return;
+    }
+
+    /* The default accurate # and rate on pruning data */
+    $defAccu = $this->computeDefAccu($pruneData);
+
+    echo "Pruning with " . $defAccu . " positive data out of "
+        . $sumOfWeights . " instances";
+
+    $size = $this->size();
+    if ($size == 0) {
+      return; // Default rule before pruning
+    }
+
+    ...
+    double[] worthRt = new double[size];
+    double[] coverage = new double[size];
+    double[] worthValue = new double[size];
+    for (int w = 0; w < size; w++) {
+      worthRt[w] = coverage[w] = worthValue[w] = 0.0;
+    }
+
+    /* Calculate accuracy parameters for all the antecedents in this rule */
+    double tn = 0.0; // True negative if useWhole
+    for (int x = 0; x < size; x++) {
+      Antd antd = m_Antds.get(x);
+      Instances newData = pruneData;
+      pruneData = new Instances(newData, 0); // Make data empty
+
+      for (int y = 0; y < newData.numInstances(); y++) {
+        Instance ins = newData.getInstance(y);
+
+        if (antd.covers(ins)) { // Covered by this antecedent
+          coverage[x] += ins.weight();
+          pruneData.add(ins); // Add to data for further pruning
+          if ((int) ins.classValue() == (int) m_Consequent) {
+            worthValue[x] += ins.weight();
+          }
+        } else if (useWhole) { // Not covered
+          if ((int) ins.classValue() != (int) m_Consequent) {
+            tn += ins.weight();
+          }
+        }
+      }
+
+      if (useWhole) {
+        worthValue[x] += tn;
+        worthRt[x] = worthValue[x] / $sumOfWeights;
+      } else {
+        worthRt[x] = (worthValue[x] + 1.0) / (coverage[x] + 2.0);
+      }
+    }
+
+    double maxValue = (defAccu + 1.0) / ($sumOfWeights + 2.0);
+    int maxIndex = -1;
+    for (int i = 0; i < worthValue.length; i++) {
+      if (m_Debug) {
+        double denom = useWhole ? $sumOfWeights : coverage[i];
+        System.err.println(i + "(useAccuray? " + !useWhole + "): "
+          + worthRt[i] + "=" + worthValue[i] + "/" + denom);
+      }
+      if (worthRt[i] > maxValue) { // Prefer to the
+        maxValue = worthRt[i]; // shorter rule
+        maxIndex = i;
+      }
+    }
+
+    /* Prune the antecedents according to the accuracy parameters */
+    for (int z = size - 1; z > maxIndex; z--) {
+      m_Antds.remove(z);
     }
   }
 
@@ -216,9 +355,9 @@ class RipperRule implements Rule {
     $mins = array_fill(0,$data->numAttributes(),INF);
     $maxs = array_fill(0,$data->numAttributes(),-INF);
     
-    for ($i = count($this->antecedents) - 1; $i >= 0; $i--) {
+    for ($i = $this->size() - 1; $i >= 0; $i--) {
       // TODO maybe at some point this won't be necessary, and I'll directly use attr indices?
-      $j = array_search($this->antecedents[$i]->getAttr(), $data->getAttributes());
+      $j = $this->antecedents[$i]->getAttribute()->getIndex();
       if ($this->antecedents[$i] instanceof ContinuousAntecedent) {
         $splitPoint = $this->antecedents[$i]->getSplitPoint();
         if ($this->antecedents[$i]->getValue() == 0) {
@@ -239,14 +378,20 @@ class RipperRule implements Rule {
   }
   
   /* Print a textual representation of the antecedent */
-  function toString($classAttr) {
-    if (count($this->antecedents) > 0) {
-      $ants = [];
-      for ($j = 0; $j < count($this->antecedents); $j++) {
-        $ants[] = "(" . $this->antecedents[$j].toString(true) . ")";
+  function toString(_Attribute $classAttr = NULL) {
+    $ants = [];
+    if ($this->hasAntecedents()) {
+      for ($j = 0; $j < $this->size(); $j++) {
+        $ants[] = "(" . $this->antecedents[$j]->toString(true) . ")";
       }
     }
-    $out_str = join($ants, " and ") . " => " . $classAttr->getName() . "=" . classAttr.value((int) m_Consequent);
+
+    if ($classAttr === NULL) {
+      $out_str = "( " . join($ants, " and ") . " ) => [{$this->consequent}]";
+    }
+    else {
+      $out_str = "( " . join($ants, " and ") . " ) => " . $classAttr->getName() . "=" . $classAttr->reprVal($this->consequent);
+    }
 
     return $out_str;
   }

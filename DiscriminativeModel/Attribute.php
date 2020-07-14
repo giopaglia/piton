@@ -6,14 +6,17 @@
 abstract class _Attribute {
 
   /** The name of the attribute */
-  private $name;
+  protected $name;
 
   /** The type of the attribute */
-  private $type;
+  protected $type;
+
+  /** The index of the attribute (useful when dealing with many attributes) */
+  protected $index;
 
   function __construct(string $name, string $type) {
-    $this->name = $name;
-    $this->type = $type;
+    $this->name  = $name;
+    $this->type  = $type;
   }
 
   /** The type of the attribute (ARFF/Weka style)  */
@@ -64,6 +67,27 @@ abstract class _Attribute {
 
       return $this;
   }
+
+  /**
+   * @return mixed
+   */
+  public function getIndex()
+  {
+    assert($this->index !== NULL, "ERROR! Attribute with un-initialized index");
+    return $this->index;
+  }
+
+  /**
+   * @param mixed $index
+   *
+   * @return self
+   */
+  public function setIndex($index)
+  {
+      $this->index = $index;
+
+      return $this;
+  }
 }
 
 /*
@@ -84,7 +108,7 @@ class DiscreteAttribute extends _Attribute {
 
   /* Print a textual representation of a value of the attribute */
   function reprVal($val) {
-    return strval($this->domain[$val]);
+    return $val < 0 || $val === NULL ? $val : strval($this->domain[$val]);
   }
 
   /** The type of the attribute (ARFF/Weka style)  */
@@ -145,6 +169,8 @@ class ContinuousAttribute extends _Attribute {
 
   /* Print a textual representation of a value of the attribute */
   function reprVal($val) {
+    if ($val < 0 || $val === NULL)
+      return $val;
     switch ($this->getARFFType()) {
       case "date \"yyyy-MM-dd\"":
         $date = new DateTime();

@@ -17,8 +17,10 @@ class Instances {
   // function getWeights() { return $this->weights; }
   // function setWeights($w) { $this->weights = $w; }
 
-  function __construct($attributes, $data, $weights = NULL) {
+  function __construct(array $attributes, array $data, $weights = NULL) {
     $this->attributes = $attributes;
+    $this->reindexAttributes();
+
     foreach ($data as $k => &$inst) {
       $inst[] = ($weights === NULL ? 1 : $weights[$k]);
     }
@@ -26,16 +28,25 @@ class Instances {
   }
 
   static function createFromSlice(Instances &$data, int $offset, int $length = NULL) {
-    return new Instances($data->getAttrs(), array_slice($data->getData(), $offset, $length));
+    return new Instances($data->getAttributes(), array_slice($data->getData(), $offset, $length));
   }
 
   static function createEmpty(Instances &$data) {
-    return new Instances($data->getAttrs(), []);
+    return new Instances($data->getAttributes(), []);
   }
 
-  function numAttributes() { return count($this->getAttrs()); }
+  function numAttributes() { return count($this->getAttributes()); }
+  
+  function reindexAttributes() {
+    foreach ($this->attributes as $k => &$attribute) {
+      $attribute->setIndex($k);
+    }
+  }
+
   function numInstances() { return count($this->data); }
+  
   function getInstance($i) { return array_slice($this->data[$i], 0, -1); }
+  
   function pushInstance($inst, $weight = 1)
   {
     $inst[]       = $weight;
@@ -77,7 +88,7 @@ class Instances {
 
     echo $this->toString();
     echo " => ";
-    $j = $this->getAttrIdx($attr);
+    $j = $attr->getIndex();
     
     usort($this->data, function ($a,$b) use($j) {
       $A = $a[$j];
@@ -105,7 +116,7 @@ class Instances {
   
   function inst_valueOfAttr($i, $attr) {
     // TODO maybe at some point this won't be necessary, and I'll directly use attr indices?
-    $j = $this->getAttrIdx($attr);
+    $j = $attr->getIndex();
     return $this->inst_val($i, $j);
   }
 
@@ -124,7 +135,7 @@ class Instances {
 
   function inst_classValue($i) {
     // Note: assuming the class attribute is the first
-    return $this->inst_val($i, 0);
+    return (int) $this->inst_val($i, 0);
   }
 
   function inst_setClassValue($i, $cl) {
@@ -133,13 +144,9 @@ class Instances {
     $inst[0] = $cl;
   }
 
-  function getAttrIdx($attr) {
-    return array_search($attr, $this->getAttrs());
-  }
-
   function getClassAttribute() {
     // Note: assuming the class attribute is the first
-    return $this->getAttrs()[0];
+    return $this->getAttributes()[0];
   }
 
   function numClasses() {
@@ -180,7 +187,7 @@ class Instances {
 
   function numDistinctValues($attr) {
     echo "Instances->numDistinctValues(" . get_var_dump($attr) . ")" . PHP_EOL;
-    $j = $this->getAttrIdx($attr);
+    $j = $attr->getIndex();
     $valCounts = [];
     for ($x = 0; $x < $this->numInstances(); $x++) {
       $val = $this->inst_val($x, $j);
@@ -202,7 +209,7 @@ class Instances {
     fwrite($f, "@RELATION " . basename($path) . "\n\n");
 
     /* Attributes */
-    foreach($this->getAttrs() as $attr) {
+    foreach($this->getAttributes() as $attr) {
       fwrite($f, "@ATTRIBUTE {$attr->getName()} {$attr->getARFFType()}");
       fwrite($f, "\n");
     }
@@ -216,7 +223,7 @@ class Instances {
     /* Data */
     fwrite($f, "\n@DATA\n");
     foreach ($this->data as $k => $inst) {
-      fwrite($f, join(",", array_map($getARFFRepr, $this->getInstance($k), $this->getAttrs())) . ", {" . $this->inst_weight($k) . "}\n");
+      fwrite($f, join(",", array_map($getARFFRepr, $this->getInstance($k), $this->getAttributes())) . ", {" . $this->inst_weight($k) . "}\n");
     }
 
     fclose($f);
@@ -227,7 +234,7 @@ class Instances {
    */
   function toString() {
     $out_str = "";
-    foreach ($this->getAttrs() as $att) {
+    foreach ($this->getAttributes() as $att) {
       $out_str .= substr($att->toString(), 0, 7) . "\t";
     }
     $out_str .= "\n";
@@ -249,7 +256,7 @@ class Instances {
   /**
    * @return mixed
    */
-  public function getAttrs($includeClassAttr = true)
+  public function getAttributes($includeClassAttr = true)
   {
     // Note: assuming the class attribute is the first
     return $includeClassAttr ? $this->attributes : array_slice($this->attributes, 1);
@@ -260,7 +267,7 @@ class Instances {
    *
    * @return self
    */
-  public function setAttrs($attributes)
+  public function setAttributes($attributes)
   {
     $this->attributes = $attributes;
 

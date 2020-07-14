@@ -277,7 +277,7 @@ class DBFit {
     /* For testing, let's use the original data and cut the output column */
     $input_dataframe = clone $dataframe;
     $input_dataframe->dropOutputAttr();
-    $attrs = $dataframe->getAttrs();
+    $attrs = $dataframe->getAttributes();
     //var_dump($attrs);
     // echo "TESTING DiscreteAntecedent & SPLIT DATA" . PHP_EOL;
     // $ant = new DiscreteAntecedent($attrs[2]);
