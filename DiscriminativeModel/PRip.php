@@ -73,7 +73,7 @@ class PRip implements Learner {
   private $numAllConds;
 
   function __construct($random_seed = 1) { // TODO: in the end use seed = NULL.
-    if ($random_seed == NULL) {
+    if ($random_seed === NULL) {
       $random_seed = make_seed();
     }
 
@@ -314,7 +314,7 @@ class PRip implements Learner {
 
       /*
       // Compute the DL of this ruleset
-      if ($rstats == null) { // First rule
+      if ($rstats === null) { // First rule
         $rstats = new RuleStats();
         $rstats->setNumAllConds($this->numAllConds);
         $rstats->setData($newData);

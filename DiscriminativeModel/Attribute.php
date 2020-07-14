@@ -3,57 +3,82 @@
 /*
  * Interface for continuous/discrete attributes
  */
-interface Attribute {
+abstract class _Attribute {
 
   /** The name of the attribute */
-  function getName();
-  function setName($n);
+  private $name;
 
   /** The type of the attribute */
-  function getType();
-  function setType($n);
+  private $type;
+
+  function __construct(string $name, string $type) {
+    $this->name = $name;
+    $this->type = $type;
+  }
 
   /** The type of the attribute (ARFF/Weka style)  */
-  function getARFFType();
+  abstract function getARFFType();
 
   /* Print a textual representation of a value of the attribute */
-  function reprVal($val);
+  abstract function reprVal($val);
 
   /* Print a textual representation of the attribute */
-  function toString();
+  abstract function toString();
+
+  /**
+   * @return mixed
+   */
+  public function getName()
+  {
+      return $this->name;
+  }
+
+  /**
+   * @param mixed $name
+   *
+   * @return self
+   */
+  public function setName($name)
+  {
+      $this->name = $name;
+
+      return $this;
+  }
+
+  /**
+   * @return mixed
+   */
+  public function getType()
+  {
+      return $this->type;
+  }
+
+  /**
+   * @param mixed $type
+   *
+   * @return self
+   */
+  public function setType($type)
+  {
+      $this->type = $type;
+
+      return $this;
+  }
 }
 
 /*
  * Discrete attribute
  */
-class DiscreteAttribute implements Attribute {
+class DiscreteAttribute extends _Attribute {
 
-  /** The name of the attribute */
-  private $name;
-  function getName() { return $this->name; }
-  function setName($n) { $this->name = $n; }
-
-  /** The type of the attribute */
-  private $type;
-  function getType() { return $this->type; }
-  function setType($t) { $this->type = $t; }
-  
-  /** The type of the attribute (ARFF/Weka style)  */
-  function getARFFType() {
-    return "{" . join(",", $this->getDomain()) . "}";
+  function __construct($name, $type, $domain = []) {
+    parent::__construct($name, $type);
+    $this->domain = $domain;
   }
 
   /** Domain: discrete set of values that an instance can show for the attribute */
   private $domain;
-  function getDomain() { return $this->domain; }
-  function setDomain($d) { $this->domain = $d; }
   function pushDomainVal($v) { $this->domain[] = $v; }
-
-  function __construct($name, $type, $domain = []) {
-    $this->name   = $name;
-    $this->type   = $type;
-    $this->domain = $domain;
-  }
 
   function numValues() { return count($this->domain); }
 
@@ -62,9 +87,36 @@ class DiscreteAttribute implements Attribute {
     return strval($this->domain[$val]);
   }
 
+  /** The type of the attribute (ARFF/Weka style)  */
+  function getARFFType() {
+    return "{" . join(",", $this->getDomain()) . "}";
+  }
+  
+
   /* Print a textual representation of the attribute */
   function toString() {
     return $this->getName();
+  }
+
+
+  /**
+   * @return mixed
+   */
+  public function getDomain()
+  {
+      return $this->domain;
+  }
+
+  /**
+   * @param mixed $domain
+   *
+   * @return self
+   */
+  public function setDomain($domain)
+  {
+      $this->domain = $domain;
+
+      return $this;
   }
 }
 
@@ -72,17 +124,7 @@ class DiscreteAttribute implements Attribute {
 /*
  * Continuous attribute
  */
-class ContinuousAttribute implements Attribute {
-
-  /** The name of the attribute */
-  private $name;
-  function getName() { return $this->name; }
-  function setName($n) { $this->name = $n; }
-
-  /** The type of the attribute */
-  private $type;
-  function getType() { return $this->type; }
-  function setType($t) { $this->type = $t; }
+class ContinuousAttribute extends _Attribute {
 
   /** The type of the attribute (ARFF/Weka style)  */
   static $type2ARFFtype = [
@@ -97,10 +139,9 @@ class ContinuousAttribute implements Attribute {
     return self::$type2ARFFtype[$this->getType()];
   }
 
-  function __construct($name, $type) {
-    $this->name   = $name;
-    $this->type   = $type;
-  }
+  // function __construct($name, $type) {
+      // parent::__construct($name, $type);
+  // }
 
   /* Print a textual representation of a value of the attribute */
   function reprVal($val) {

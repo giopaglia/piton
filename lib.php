@@ -1,10 +1,9 @@
 <?php
 
-/* Library of generic utils */
-
 define("PACKAGE_NAME", "DBFit");
-
 define("MODELS_FOLDER", "models");
+
+/* Library of generic utils */
 
 function mysql_set($arr, $map_function = "mysql_quote_str") { return "(" . mysql_list($arr, $map_function) . ")"; }
 function mysql_list($arr, $map_function = "mysql_backtick_str") { return join(", ", array_map($map_function, $arr)); }

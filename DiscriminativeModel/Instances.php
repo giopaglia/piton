@@ -20,7 +20,7 @@ class Instances {
   function __construct($attributes, $data, $weights = NULL) {
     $this->attributes = $attributes;
     foreach ($data as $k => &$inst) {
-      $inst[] = ($weights == NULL ? 1 : $weights[$k]);
+      $inst[] = ($weights === NULL ? 1 : $weights[$k]);
     }
     $this->data = $data;
   }
@@ -61,6 +61,16 @@ class Instances {
     }
   }
 
+  function sumOfWeights() {
+    echo "Instances->sumOfWeights()" . PHP_EOL;
+    $sum = 0;
+    for ($x = 0; $x < $this->numInstances(); $x++) {
+      $sum += $this->inst_weight($x);
+    }
+    echo "\$sum : $sum" . PHP_EOL;
+    return $sum;
+  }
+
   function sortByAttr($attr)
   {
     echo "Instances->sortByAttr(" . get_var_dump($attr) . ")" . PHP_EOL;
@@ -73,8 +83,8 @@ class Instances {
       $A = $a[$j];
       $B = $b[$j];
       if ($A == $B) return 0;
-      if ($B == NULL) return -1;
-      if ($A == NULL) return 1;
+      if ($B === NULL) return -1;
+      if ($A === NULL) return 1;
       return ($A < $B) ? -1 : 1;
     });
     echo $this->toString();
