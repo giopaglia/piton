@@ -67,7 +67,7 @@ class DiscreteAntecedent implements Antecedent {
 
     $splitData = [];
     for ($i = 0; $i < $bag; $i++) {
-      $splitData[] = new Instances($data->getAttrs(), []);
+      $splitData[] = Instances::createEmpty($data);
     }
     $accurate  = array_fill(0,$bag,0);
     $coverage  = array_fill(0,$bag,0);

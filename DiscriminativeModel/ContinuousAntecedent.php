@@ -181,8 +181,8 @@ class ContinuousAntecedent implements Antecedent {
 
     /* Split the data */
     $splitData = [];
-    $splitData[] = new Instances($data->getAttrs(), array_slice($data->getData(), 0, $finalSplit));
-    $splitData[] = new Instances($data->getAttrs(), array_slice($data->getData(), $finalSplit, $total - $finalSplit));
+    $splitData[] = Instances::createFromSlice($data, 0, $finalSplit);
+    $splitData[] = Instances::createFromSlice($data, $finalSplit, $total - $finalSplit);
 
     return $splitData;
   }

@@ -8,13 +8,9 @@
 class Instances {
   /** Metadata for the attributes */
   private $attributes;
-  function getAttrs() { return $this->attributes; }
-  function setAttrs($a) { $this->attributes = $a; }
-
+  
   /** The data table itself */
   private $data;
-  function getData() { return $this->data; }
-  function setData($d) { $this->data = $d; }
 
   /** The weights for the data instances */
   // private $weights;
@@ -26,7 +22,15 @@ class Instances {
     foreach ($data as $k => &$inst) {
       $inst[] = ($weights == NULL ? 1 : $weights[$k]);
     }
-    $this->data       = $data;
+    $this->data = $data;
+  }
+
+  static function createFromSlice(Instances &$data, int $offset, int $length = NULL) {
+    return new Instances($data->getAttrs(), array_slice($data->getData(), $offset, $length));
+  }
+
+  static function createEmpty(Instances &$data) {
+    return new Instances($data->getAttrs(), []);
   }
 
   function numAttributes() { return count($this->getAttrs()); }
@@ -63,7 +67,7 @@ class Instances {
 
     echo $this->toString();
     echo " => ";
-    $j = array_search($attr, $this->getAttrs());
+    $j = $this->getAttrIdx($attr);
     
     usort($this->data, function ($a,$b) use($j) {
       $A = $a[$j];
@@ -76,37 +80,51 @@ class Instances {
     echo $this->toString();
   }
 
+  function randomize()
+  {
+    echo "Instances->randomize()" . PHP_EOL;
+
+    echo $this->toString();
+    shuffle($this->data);
+    echo $this->toString();
+  }
+
   /*
    * Functions for single data instances
    */
   
   function inst_valueOfAttr($i, $attr) {
     // TODO maybe at some point this won't be necessary, and I'll directly use attr indices?
-    $j = array_search($attr, $this->getAttrs());
-    return $this->data[$i][$j];
+    $j = $this->getAttrIdx($attr);
+    return $this->inst_val($i, $j);
   }
 
   function inst_isMissing($i, $attr) {
-    // TODO maybe at some point this won't be necessary, and I'll directly use attr indices?
-    $j = array_search($attr, $this->getAttrs());
-    return ($this->data[$i][$j] === NULL);
+    return ($this->inst_valueOfAttr($i, $attr) === NULL);
   }
   
   function inst_weight($i) {
     $inst = $this->data[$i];
     return $inst[array_key_last($inst)];
   }
+  
+  function inst_val($i, $j) {
+    return $this->data[$i][$j];
+  }
 
   function inst_classValue($i) {
-    $inst = $this->data[$i];
     // Note: assuming the class attribute is the first
-    return $inst[0];
+    return $this->inst_val($i, 0);
   }
 
   function inst_setClassValue($i, $cl) {
     $inst = &$this->data[$i];
     // Note: assuming the class attribute is the first
     $inst[0] = $cl;
+  }
+
+  function getAttrIdx($attr) {
+    return array_search($attr, $this->getAttrs());
   }
 
   function getClassAttribute() {
@@ -118,7 +136,8 @@ class Instances {
     return $this->getClassAttribute()->numValues();
   }
 
-  function sortByClassCounts() {
+  function sortClassesByCount() {
+    echo "Instances->sortClassesByCount()" . PHP_EOL;
     $classes = $this->getClassAttribute()->getDomain();
 
     $class_counts =  array_fill(0,count($classes),0);
@@ -126,15 +145,15 @@ class Instances {
       $class_counts[$this->inst_classValue($x)]++;
     }
 
-    // echo $this->toString();
+    echo $this->toString();
 
     $indices = range(0, count($classes) - 1);
     // echo get_var_dump($classes);
     
+    // TODO check that this approach works with many classes
     array_multisort($class_counts, SORT_DESC, $classes, $indices);
     $class_map = array_flip($indices);
 
-    // TODO check that this approach works with many classes
     // echo get_var_dump($classes);
     // echo get_var_dump($indices);
     // echo get_var_dump($class_map);
@@ -147,6 +166,21 @@ class Instances {
     echo $this->toString();
 
     return $class_counts;
+  }
+
+  function numDistinctValues($attr) {
+    echo "Instances->numDistinctValues(" . get_var_dump($attr) . ")" . PHP_EOL;
+    $j = $this->getAttrIdx($attr);
+    $valCounts = [];
+    for ($x = 0; $x < $this->numInstances(); $x++) {
+      $val = $this->inst_val($x, $j);
+      if (! isset($valCounts[$val])) {
+        $valCounts[$val] = 1;
+      }
+    }
+    // echo "count : " . count($valCounts) .
+    " (" . get_var_dump($valCounts) . ")" . PHP_EOL;
+    return count($valCounts);
   }
 
   /** Save data to file, (dense) ARFF/Weka format */
@@ -202,14 +236,49 @@ class Instances {
     return $out_str;
   }
 
+  /**
+   * @return mixed
+   */
+  public function getAttrs($includeClassAttr = true)
+  {
+    // Note: assuming the class attribute is the first
+    return $includeClassAttr ? $this->attributes : array_slice($this->attributes, 1);
+  }
+
+  /**
+   * @param mixed $attributes
+   *
+   * @return self
+   */
+  public function setAttrs($attributes)
+  {
+    $this->attributes = $attributes;
+
+    return $this;
+  }
+
+  /**
+   * @return mixed
+   */
+  public function getData()
+  {
+    return $this->data;
+  }
+
+  /**
+   * @param mixed $data
+   *
+   * @return self
+   */
+  public function setData($data)
+  {
+    $this->data = $data;
+
+    return $this;
+  }
 }
 
-//$instance->valueOfAttr($attribute)
-//$instance->isMissing($attribute)
-//$instance->weight() // I guess this is 1?
-//$instance->classValue() // Value of the attribute to predict
-
-
+/*
 /**
  * A single data instance.
  * Some attributes are in the form of class labels (categorical attributes).
@@ -223,18 +292,14 @@ class Instance extends ArrayObject {
     $this->inst = $inst;
   }
 
+  //valueOfAttr($attribute)
+  //isMissing($attribute)
+  //weight() // I guess this is 1?
+  //classValue() // Value of the attribute to predict
+
   function valueOfAttr($att) {  }
   function isMissing($att) {  }
   function weight($att) { return 1; } // TODO extend so that we can have different weights
-  function classValue() { ... }
-
-//$instance->valueOfAttr($attribute)
-//$instance->isMissing($attribute)
-//$instance->weight() // I guess this is 1?
-//$instance->classValue() // Value of the attribute to predict
-
-}
-*/
-
-
+  function classValue() { ... 
+ */
 ?>

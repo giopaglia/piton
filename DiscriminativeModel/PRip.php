@@ -35,6 +35,8 @@ interface Learner {
  */
 class PRip implements Learner {
 
+  /*** Options that are useful during the training stage */
+
   /** The limit of description length surplus in ruleset generation */
   static private $MAX_DL_SURPLUS = 64.0;
 
@@ -50,7 +52,7 @@ class PRip implements Learner {
   /** The number of folds to split data into Grow and Prune for IREP
     * (One fold is used as pruning set.)
     */
-  private $folds;
+  private $numFolds;
 
   /** Minimal weights of instance weights within a split */
   private $minNo;
@@ -61,18 +63,30 @@ class PRip implements Learner {
   /** Whether use pruning, i.e. the data is clean or not */
   private $usePruning;
 
+
+  /*** Other useful members  */
+
+  /** class attribute */
+  private $classAttr;
+
+  /** # of all the possible conditions in a rule */
+  private $numAllConds;
+
   function __construct($random_seed = 1) { // TODO: in the end use seed = NULL.
     if ($random_seed == NULL) {
       $random_seed = make_seed();
     }
 
-    $this->debug = false;
+    $this->debug = true;
     $this->optimizations = 2;
     $this->seed = $random_seed;
-    $this->folds = 3;
+    $this->numFolds = 3;
     $this->minNo = 2.0;
     $this->checkErr = true;
     $this->usePruning = true;
+
+    $this->classAttr = NULL;
+    $this->numAllConds = NULL;
   }
 
   /**
@@ -93,19 +107,23 @@ class PRip implements Learner {
 
     // $model->resetRules();
     $ruleset = [];
+    $this->numAllConds = RuleStats::numAllConditions($data);
+    if ($this->debug) {
+      echo "Number of all possible conditions = " . $this->numAllConds . PHP_EOL;
+    }
     
     // Sort by class FREQ_ASCEND
     // m_RulesetStats = new ArrayList<RuleStats>();
     // m_Distributions = new ArrayList<double[]>();
 
     // Sort by classes frequency
-    $orderedClassCounts = $data->sortByClassCounts();
-    $classAttr = $data->getClassAttribute();
+    $orderedClassCounts = $data->sortClassesByCount();
+    $this->classAttr = $data->getClassAttribute();
     if ($this->debug) {
       echo "Sorted classes:\n";
-      for ($x = 0; $x < $classAttr->numValues(); $x++) {
-        echo $x . ": " . $classAttr->reprVal($x) . " has "
-          . $orderedClassCounts[$x] . " instances.\n";
+      for ($x = 0; $x < $this->classAttr->numValues(); $x++) {
+        echo $x . ": " . $this->classAttr->reprVal($x) . " has "
+          . $orderedClassCounts[$x] . " instances." . PHP_EOL;
       }
     }
     
@@ -115,8 +133,9 @@ class PRip implements Learner {
 
       $classIndex = $y;
       if ($this->debug) {
-        echo "\n\nClass " . $classAttr->reprVal($classIndex) . "(" . $classIndex . "): "
-          . $orderedClassCounts[$y] . "instances\n"
+        echo "\n\n=====================================\n"
+          . "Class " . $this->classAttr->reprVal($classIndex) . "(" . $classIndex . "): "
+          . $orderedClassCounts[$y] . " instances\n"
           . "=====================================\n";
       }
 
@@ -160,11 +179,11 @@ class PRip implements Learner {
         throw new Exception("Should never happen: " . "defDL NaN or infinite!");
       }
       if ($this->debug) {
-        echo "The default DL = " . $defDL;
+        echo "The default DL = $defDL\n";
       }
 
-      $rules = rulesetForOneClass($data, $expFPRate, $classIndex, $defDL);
-      $ruleset = array_merge($ruleset, $rules);
+      $new_rules = $this->rulesetForOneClass($data, $expFPRate, $classIndex, $defDL);
+      $ruleset = array_merge($ruleset, $new_rules);
     }
 
     // Remove redundant numeric tests from the rules
@@ -180,7 +199,7 @@ class PRip implements Learner {
         echo "rule = " . $rule->toString();
       }
     }
-/*
+    /*
     // Set the default rule
     if ($this->debug) {
       echo "Set the default rule\n";
@@ -191,7 +210,7 @@ class PRip implements Learner {
 
     RuleStats defRuleStat = new RuleStats();
     defRuleStat.setData(data);
-    defRuleStat.setNumAllConds(m_Total);
+    defRuleStat.setNumAllConds($this->numAllConds);
     defRuleStat.addAndUpdate(defRule);
     m_RulesetStats.add(defRuleStat);
 
@@ -216,6 +235,398 @@ class PRip implements Learner {
     /**/
   }
   
+  /**
+   * Build a ruleset for the given class according to the given data
+   * 
+   * @param expFPRate the expected FP/(FP+FN) used in DL calculation
+   * @param data the given data
+   * @param classIndex the given class index
+   * @param defDL the default DL in the data
+   */
+  protected function rulesetForOneClass(Instances &$data, float $expFPRate,
+    float $classIndex, float $defDL) {
+    echo "PRip->rulesetForOneClass(&[model], &[data], expFPRate=$expFPRate, classIndex=$classIndex, defDL=$defDL)" . PHP_EOL;
+
+    $newData = $data;
+    $growData;
+    $pruneData;
+    
+    $stop = false;
+    $ruleset = [];
+
+    $dl = $defDL;
+    $minDL = $defDL;
+    $rstats = null;
+    $rst;
+
+    // Check whether data have positive examples
+    $defHasPositive = true; // No longer used
+    $hasPositive = $defHasPositive;
+
+    /********************** Building stage ***********************/
+    if ($this->debug) {
+      echo "\n*** Building stage ***\n";
+    }
+
+    // Generate new rules until stopping criteria is met
+    while ((!$stop) && $hasPositive) {
+      $oneRule = new RipperRule();
+      $oneRule->setConsequent($classIndex); // Must set first
+      if ($this->usePruning) {
+        /* Split data into Grow and Prune */
+
+        // We should have stratified the data, but ripper seems
+        // to have a bug that makes it not to do so. In order
+        // to simulate it more precisely, we do the same thing.
+        // newData.randomize(m_Random);
+        $newData = RuleStats::stratify($newData, $this->numFolds);
+        list($growData, $pruneData) = RuleStats::partition($newData, $this->numFolds);
+        // growData=newData.trainCV($this->numFolds, $this->numFolds-1);
+        // pruneData=newData.testCV($this->numFolds, $this->numFolds-1);
+
+        if ($this->debug) {
+          echo "\nGrowing a rule ...";
+        }
+        $oneRule->grow($growData); // Build the rule
+        if ($this->debug) {
+          echo "One rule found before pruning:"
+            . $oneRule->toString($classAttr);
+        }
+
+        if ($this->debug) {
+          echo "\nPruning the rule ...";
+        }
+        $oneRule->prune($pruneData, false); // Prune the rule
+        if ($this->debug) {
+          echo "One rule found after pruning:"
+            . $oneRule->toString($classAttr);
+        }
+      } else {
+        if ($this->debug) {
+          echo "\nNo pruning: growing a rule ...";
+        }
+        $oneRule->grow($newData); // Build the rule
+        if ($this->debug) {
+          echo "No pruning: one rule found:\n"
+            . $oneRule->toString($classAttr);
+        }
+      }
+
+      /*
+      // Compute the DL of this ruleset
+      if ($rstats == null) { // First rule
+        $rstats = new RuleStats();
+        $rstats->setNumAllConds($this->numAllConds);
+        $rstats->setData($newData);
+      }
+
+      ...
+      rstats.addAndUpdate(oneRule);
+      int last = rstats.getRuleset().size() - 1; // Index of last rule
+      dl += rstats.relativeDL(last, expFPRate, m_CheckErr);
+
+      if (Double.isNaN(dl) || Double.isInfinite(dl)) {
+        throw new Exception("Should never happen: dl in "
+          + "building stage NaN or infinite!");
+      }
+      if ($this->debug) {
+        echo "Before optimization(" + last + "): the dl = " + dl
+          + " | best: " + minDL);
+      }
+
+      if (dl < minDL) {
+        minDL = dl; // The best dl so far
+      }
+
+      rst = rstats.getSimpleStats(last);
+      if ($this->debug) {
+        echo "The rule covers: " + rst[0] + " | pos = " + rst[2]
+          + " | neg = " + rst[4] + "\nThe rule doesn't cover: " + rst[1]
+          + " | pos = " + rst[5]);
+      }
+
+      stop = checkStop(rst, minDL, dl);
+
+      if (!stop) {
+        ruleset.add(oneRule); // Accepted
+        newData = rstats.getFiltered(last)[1];// Data not covered
+        hasPositive = greater(rst[5], 0.0); // Positives remaining?
+        if ($this->debug) {
+          echo "One rule added: has positive? " + hasPositive);
+        }
+      } else {
+        if ($this->debug) {
+          echo "Quit rule";
+        }
+        rstats.removeLast(); // Remove last to be re-used
+      }
+      */
+    }// while !stop
+
+    /******************** Optimization stage *******************
+    RuleStats finalRulesetStat = null;
+    if ($this->usePruning) {
+      for (int z = 0; z < m_Optimizations; z++) {
+        if ($this->debug) {
+          echo "\n*** Optimization: run #" + z + " ***";
+        }
+
+        newData = data;
+        finalRulesetStat = new RuleStats();
+        finalRulesetStat.setData(newData);
+        finalRulesetStat.setNumAllConds($this->numAllConds);
+        int position = 0;
+        stop = false;
+        boolean isResidual = false;
+        hasPositive = defHasPositive;
+        dl = minDL = defDL;
+
+        oneRule: while (!stop && hasPositive) {
+
+          isResidual = (position >= ruleset.size()); // Cover residual positive
+                                                     // examples
+          // Re-do shuffling and stratification
+          // newData.randomize(m_Random);
+          $newData = RuleStats::stratify($newData, $this->numFolds);
+          list($growData, $pruneData) = RuleStats::partition($newData, $this->numFolds);
+          // growData=newData.trainCV($this->numFolds, $this->numFolds-1);
+          // pruneData=newData.testCV($this->numFolds, $this->numFolds-1);
+          RipperRule finalRule;
+
+          if ($this->debug) {
+            echo "\nRule #" + position + "| isResidual?"
+              + isResidual + "| data size: " + newData.sumOfWeights());
+          }
+
+          if (isResidual) {
+            RipperRule newRule = new RipperRule();
+            newRule.setConsequent(classIndex);
+            if ($this->debug) {
+              echo "\nGrowing and pruning" + " a new rule ...";
+            }
+            newRule.grow(growData);
+            newRule.prune(pruneData, false);
+            finalRule = newRule;
+            if ($this->debug) {
+              echo "\nNew rule found: "
+                + newRule.toString($classAttr);
+            }
+          } else {
+            RipperRule oldRule = (RipperRule) ruleset.get(position);
+            boolean covers = false;
+            // Test coverage of the next old rule
+            for (int i = 0; i < newData.numInstances(); i++) {
+              if (oldRule.covers(newData.getInstance(i))) {
+                covers = true;
+                break;
+              }
+            }
+
+            if (!covers) {// Null coverage, no variants can be generated
+              finalRulesetStat.addAndUpdate(oldRule);
+              position++;
+              continue oneRule;
+            }
+
+            // 2 variants
+            if ($this->debug) {
+              echo "\nGrowing and pruning" + " Replace ...";
+            }
+            RipperRule replace = new RipperRule();
+            replace.setConsequent(classIndex);
+            replace.grow(growData);
+
+            // Remove the pruning data covered by the following
+            // rules, then simply compute the error rate of the
+            // current rule to prune it. According to Ripper,
+            // it's equivalent to computing the error of the
+            // whole ruleset -- is it true?
+            pruneData = RuleStats.rmCoveredBySuccessives(pruneData, ruleset,
+              position);
+            replace.prune(pruneData, true);
+
+            if ($this->debug) {
+              echo "\nGrowing and pruning" + " Revision ...";
+            }
+            RipperRule revision = (RipperRule) oldRule.copy();
+
+            // For revision, first rm the data covered by the old rule
+            Instances newGrowData = new Instances(growData, 0);
+            for (int b = 0; b < growData.numInstances(); b++) {
+              Instance inst = growData.getInstance(b);
+              if (revision.covers(inst)) {
+                newGrowData.add(inst);
+              }
+            }
+            revision.grow(newGrowData);
+            revision.prune(pruneData, true);
+
+            double[][] prevRuleStats = new double[position][6];
+            for (int c = 0; c < position; c++) {
+              prevRuleStats[c] = finalRulesetStat.getSimpleStats(c);
+            }
+
+            // Now compare the relative DL of variants
+            ArrayList<Rule> tempRules = new ArrayList<Rule>(ruleset.size());
+            for (Rule r : ruleset) {
+              tempRules.add((Rule) r.copy());
+            }
+            tempRules.set(position, replace);
+
+            RuleStats repStat = new RuleStats(data, tempRules);
+            repStat.setNumAllConds($this->numAllConds);
+            repStat.countData(position, newData, prevRuleStats);
+            // repStat.countData();
+            rst = repStat.getSimpleStats(position);
+            if ($this->debug) {
+              echo "Replace rule covers: " + rst[0] + " | pos = "
+                + rst[2] + " | neg = " + rst[4] + "\nThe rule doesn't cover: "
+                + rst[1] + " | pos = " + rst[5]);
+            }
+
+            double repDL = repStat.relativeDL(position, expFPRate, m_CheckErr);
+            if ($this->debug) {
+              echo "\nReplace: " + replace.toString($classAttr)
+                + " |dl = " + repDL);
+            }
+
+            if (Double.isNaN(repDL) || Double.isInfinite(repDL)) {
+              throw new Exception("Should never happen: repDL"
+                + "in optmz. stage NaN or " + "infinite!");
+            }
+
+            tempRules.set(position, revision);
+            RuleStats revStat = new RuleStats(data, tempRules);
+            revStat.setNumAllConds($this->numAllConds);
+            revStat.countData(position, newData, prevRuleStats);
+            // revStat.countData();
+            double revDL = revStat.relativeDL(position, expFPRate, m_CheckErr);
+
+            if ($this->debug) {
+              echo "Revision: " + revision.toString($classAttr)
+                + " |dl = " + revDL);
+            }
+
+            if (Double.isNaN(revDL) || Double.isInfinite(revDL)) {
+              throw new Exception("Should never happen: revDL"
+                + "in optmz. stage NaN or " + "infinite!");
+            }
+
+            rstats = new RuleStats(data, ruleset);
+            rstats.setNumAllConds($this->numAllConds);
+            rstats.countData(position, newData, prevRuleStats);
+            // rstats.countData();
+            double oldDL = rstats.relativeDL(position, expFPRate, m_CheckErr);
+
+            if (Double.isNaN(oldDL) || Double.isInfinite(oldDL)) {
+              throw new Exception("Should never happen: oldDL"
+                + "in optmz. stage NaN or " + "infinite!");
+            }
+            if ($this->debug) {
+              echo "Old rule: " + oldRule.toString($classAttr)
+                + " |dl = " + oldDL);
+            }
+
+            if ($this->debug) {
+              echo "\nrepDL: " + repDL + "\nrevDL: " + revDL
+                + "\noldDL: " + oldDL);
+            }
+
+            if ((oldDL <= revDL) && (oldDL <= repDL)) {
+              finalRule = oldRule; // Old the best
+            } else if (revDL <= repDL) {
+              finalRule = revision; // Revision the best
+            } else {
+              finalRule = replace; // Replace the best
+            }
+          }
+
+          finalRulesetStat.addAndUpdate(finalRule);
+          rst = finalRulesetStat.getSimpleStats(position);
+
+          if (isResidual) {
+
+            dl += finalRulesetStat.relativeDL(position, expFPRate, m_CheckErr);
+            if ($this->debug) {
+              echo "After optimization: the dl" + "=" + dl
+                + " | best: " + minDL);
+            }
+
+            if (dl < minDL) {
+              minDL = dl; // The best dl so far
+            }
+
+            stop = checkStop(rst, minDL, dl);
+            if (!stop) {
+              ruleset.add(finalRule); // Accepted
+            } else {
+              finalRulesetStat.removeLast(); // Remove last to be re-used
+              position--;
+            }
+          } else {
+            ruleset.set(position, finalRule); // Accepted
+          }
+
+          if ($this->debug) {
+            echo "The rule covers: " + rst[0] + " | pos = "
+              + rst[2] + " | neg = " + rst[4] + "\nThe rule doesn't cover: "
+              + rst[1] + " | pos = " + rst[5]);
+            echo "\nRuleset so far: ";
+            for (int x = 0; x < ruleset.size(); x++) {
+              echo x + ": "
+                + ((RipperRule) ruleset.get(x)).toString($classAttr);
+            }
+            echo );
+          }
+
+          // Data not covered
+          if (finalRulesetStat.getRulesetSize() > 0) {
+            newData = finalRulesetStat.getFiltered(position)[1];
+          }
+          hasPositive = greater(rst[5], 0.0); // Positives remaining?
+          position++;
+        } // while !stop && hasPositive
+
+        if (ruleset.size() > (position + 1)) { // Hasn't gone through yet
+          for (int k = position + 1; k < ruleset.size(); k++) {
+            finalRulesetStat.addAndUpdate(ruleset.get(k));
+          }
+        }
+        if ($this->debug) {
+          echo "\nDeleting rules to decrease"
+            + " DL of the whole ruleset ...");
+        }
+        finalRulesetStat.reduceDL(expFPRate, m_CheckErr);
+        if ($this->debug) {
+          int del = ruleset.size() - finalRulesetStat.getRulesetSize();
+          echo del + " rules are deleted"
+            + " after DL reduction procedure");
+        }
+        ruleset = finalRulesetStat.getRuleset();
+        rstats = finalRulesetStat;
+
+      } // For each run of optimization
+    } // if pruning is used
+
+    // Concatenate the ruleset for this class to the whole ruleset
+    if ($this->debug) {
+      echo "\nFinal ruleset: ";
+      for (int x = 0; x < ruleset.size(); x++) {
+        echo x + ": "
+          + ((RipperRule) ruleset.get(x)).toString($classAttr);
+      }
+      echo );
+    }
+
+    m_Ruleset.addAll(ruleset);
+
+    if (ruleset.size() > 0) {
+      return rstats.getFiltered(ruleset.size() - 1)[1]; // Data not
+    } else {
+      return data;
+    }
+  */
+  }
 }
 
 ?>
