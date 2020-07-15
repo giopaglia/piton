@@ -9,6 +9,7 @@ function mysql_set($arr, $map_function = "mysql_quote_str") { return "(" . mysql
 function mysql_list($arr, $map_function = "mysql_backtick_str") { return join(", ", array_map($map_function, $arr)); }
 function mysql_quote_str($str) { return "'$str'"; }
 function mysql_backtick_str($str) { return "`$str`"; }
+function noop($str) { return $str; }
 
 function get_var_dump($a)  { ob_start(); var_dump($a); return ob_get_clean(); }
 function die_var_dump($a)  { die(get_var_dump($a)); }
@@ -28,6 +29,10 @@ function array_list($arr, $delimiter = ", ") {
     $out_str .= (isAssoc($arr) ? "$i => " : "") . $s . ($i!==count($arr)-1 ? $delimiter : "");
   }
   return $out_str;
+}
+
+function listify(&$v) {
+  $v = (is_array($v) ? $v : [$v]);
 }
 
 # Source: https://stackoverflow.com/a/173479/5646732

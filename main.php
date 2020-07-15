@@ -16,23 +16,21 @@ $db = getDBConnection();
 $model_type = "RuleBased";
 $learning_method = "RIPPER";
 
-
+/*
 $table_names = ["patients"];
-$column = ["ID", "Gender", ["BirthDate", "YearsSince", "Age"], "Sillyness"];
+$columns = ["ID", "Gender", ["BirthDate", "YearsSince", "Age"], "Sillyness"];
 $join_criterion = NULL;
 $output_column_name = "Sillyness";
 
 $db_fit = new DBFit($db);
 $db_fit->setModelType($model_type);
 $db_fit->setTableNames($table_names);
-$db_fit->setColumns($column);
+$db_fit->setColumns($columns);
 $db_fit->setJoinCriterion($join_criterion);
 $db_fit->setOutputColumnName($output_column_name);
 $db_fit->setModelType($model_type);
 $db_fit->setLearningMethod($learning_method);
 $db_fit->test_all_capabilities();
-
-exit();
 
 /* // TODO
 $db_fit = new DBFit($db);
@@ -43,31 +41,42 @@ $db_fit->setOutputColumnName($output_column_name);
 $db_fit->setModelType($model_type);
 $db_fit->setLearningMethod($learning_method);
 $db_fit->test_all_capabilities();
+//
+exit();
 */
 
+/*
 
 $table_names = ["covid19_italy_province"];
-$column = [["Date", "DaysSince", "DaysAgo"] , ["ProvinceCode", "ForceCategorical"], "Date", "TotalPositiveCases"];
+$columns = [["Date", "DaysSince", "DaysAgo"] , ["ProvinceCode", "ForceCategorical"], "Date", "TotalPositiveCases"];
 $join_criterion = NULL;
-$output_column_name = "TotalPositiveCases";
+$output_column_name = "ProvinceCode";
 
 $db_fit = new DBFit($db);
 $db_fit->setModelType($model_type);
 $db_fit->setTableNames($table_names);
-$db_fit->setColumns($column);
+$db_fit->setColumns($columns);
 $db_fit->setJoinCriterion($join_criterion);
 $db_fit->setOutputColumnName($output_column_name);
-$db_fit->setLimit(1000);
+$db_fit->setLimit(10);
 $db_fit->setModelType($model_type);
 $db_fit->setLearningMethod($learning_method);
 $db_fit->test_all_capabilities();
 
 exit();
-
+*/
 
 $table_names = ["patients", "reports"];
-$column = ["patients.Gender", "patients.ID", "patients.BirthDate", "patients.Sillyness",
-         "reports.Date", "reports.PatientState", "reports.PatientHeartbeatMeasure", "reports.PatientID"];
+$columns = [
+	"patients.Gender",
+	"patients.ID",
+	["patients.BirthDate", "MonthsSince", "MonthAge"],
+	"patients.Sillyness",
+  "reports.Date",
+  ["reports.PatientState", NULL, "State"],
+  ["reports.PatientHeartbeatMeasure", NULL, "Heartbeat"],
+  ["reports.PatientID", NULL, "ID"]
+];
 $join_criterion = ["patients.ID = reports.PatientID"];
 $output_column_name = "patients.Sillyness";
 
@@ -75,7 +84,7 @@ $output_column_name = "patients.Sillyness";
 $db_fit = new DBFit($db);
 $db_fit->setModelType($model_type);
 $db_fit->setTableNames($table_names);
-$db_fit->setColumns($column);
+$db_fit->setColumns($columns);
 $db_fit->setJoinCriterion($join_criterion);
 $db_fit->setOutputColumnName($output_column_name);
 $db_fit->setModelType($model_type);

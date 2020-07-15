@@ -3,18 +3,26 @@
 @RELATION tmp
 
 @ATTRIBUTE Sillyness {Silly,NotSilly}
-@ATTRIBUTE ID numeric
 @ATTRIBUTE Gender {M,F,Other}
-@ATTRIBUTE Age numeric
+@ATTRIBUTE ID numeric
+@ATTRIBUTE MonthAge numeric
+@ATTRIBUTE Date numeric
+@ATTRIBUTE State {Awake,Asleep}
+@ATTRIBUTE Heartbeat numeric
+@ATTRIBUTE ID numeric
 
 @DATA
-NotSilly,1,M,0, {1}
-NotSilly,2,Other,27, {1}
-Silly,3,?,56, {1}
-Silly,4,F,47, {1}
-NotSilly,5,M,40, {1}
-NotSilly,6,?,38, {1}
-Silly,7,M,57, {1}
-Silly,8,Other,20, {1}
-NotSilly,9,F,19, {1}
-?,10,F,?, {1}
+Silly,?,3,5,14,Asleep,140,3, {1}
+Silly,?,3,5,3667,Awake,180,3, {1}
+NotSilly,M,1,11,3363,Awake,180,1, {1}
+NotSilly,Other,2,11,1260,Asleep,122,2, {1}
+NotSilly,Other,2,11,2693,Awake,203,2, {1}
+NotSilly,Other,2,11,2356,Awake,403,2, {1}
+Silly,F,4,6,318,Asleep,203,4, {1}
+Silly,F,4,6,2997,Asleep,215,4, {1}
+NotSilly,M,5,0,3667,Asleep,205,5, {1}
+NotSilly,?,6,6,2328,Awake,200,6, {1}
+Silly,M,7,8,1536,Awake,155,7, {1}
+Silly,M,7,8,2356,Asleep,170,7, {1}
+Silly,Other,8,6,1079,Awake,170,8, {1}
+NotSilly,F,9,5,561,Awake,190,9, {1}

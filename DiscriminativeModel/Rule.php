@@ -182,7 +182,7 @@ class RipperRule extends _Rule {
     $numUnused = count($used);
 
     // If there are already antecedents existing
-    foreach ($this->antecedents as &$antecedent) {
+    foreach ($this->antecedents as $antecedent) {
       if (!($antecedent instanceof ContinuousAntecedent)) {
         $used[$antecedent->getAttribute()->getIndex()] = true;
         $numUnused--;
@@ -355,26 +355,29 @@ class RipperRule extends _Rule {
    * @param data an instance object that contains the appropriate header information for the attributes.
    */
   function cleanUp(&$data) {
-    echo "RipperRule->cleanUp(" . get_var_dump($data) . ")" . PHP_EOL;
+    echo "RipperRule->cleanUp(&[data])" . PHP_EOL;
+    echo "Rule: " . $this->toString() . PHP_EOL;
+    echo "Data: " . $data->toString() . PHP_EOL;
+
     $mins = array_fill(0,$data->numAttributes(),INF);
     $maxs = array_fill(0,$data->numAttributes(),-INF);
     
     for ($i = $this->size() - 1; $i >= 0; $i--) {
-      // TODO maybe at some point this won't be necessary, and I'll directly use attr indices?
+      var_dump($this->antecedents);
       $j = $this->antecedents[$i]->getAttribute()->getIndex();
       if ($this->antecedents[$i] instanceof ContinuousAntecedent) {
         $splitPoint = $this->antecedents[$i]->getSplitPoint();
         if ($this->antecedents[$i]->getValue() == 0) {
-          if ($splitPoint < $mins[$attribute_idx]) {
-            $mins[$attribute_idx] = $splitPoint;
+          if ($splitPoint < $mins[$j]) {
+            $mins[$j] = $splitPoint;
           } else {
-            array_splice($this->antecedents, $i, $i+1);
+            array_splice($this->antecedents, $i, 1);
           }
         } else {
-          if ($splitPoint > $maxs[$attribute_idx]) {
-            $maxs[$attribute_idx] = $splitPoint;
+          if ($splitPoint > $maxs[$j]) {
+            $maxs[$j] = $splitPoint;
           } else {
-            array_splice($this->antecedents, $i, $i+1);
+            array_splice($this->antecedents, $i, 1);
           }
         }
       }

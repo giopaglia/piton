@@ -421,7 +421,7 @@ class RuleStats {
     $tdl += $this->subsetDL($this->numAllConds, $k, $k / $this->numAllConds);
     // System.out.println("!!!theory: "+MDL_THEORY_WEIGHT * REDUNDANCY_FACTOR *
     // tdl);
-    return $this->MDL_THEORY_WEIGHT * $this->REDUNDANCY_FACTOR * $tdl;
+    return $this->MDL_THEORY_WEIGHT * self::$REDUNDANCY_FACTOR * $tdl;
   }
   
   /**

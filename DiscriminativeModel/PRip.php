@@ -180,7 +180,7 @@ class PRip implements Learner {
         throw new Exception("Should never happen: " . "defDL NaN or infinite!");
       }
       if ($this->debug) {
-        echo "The default DL = $defDL\n";
+        echo "The default DL = $defDL" . PHP_EOL;
       }
 
       $data = $this->rulesetForOneClass($data, $expFPRate, $classIndex, $defDL);
@@ -188,21 +188,21 @@ class PRip implements Learner {
 
     // Remove redundant numeric tests from the rules
     if ($this->debug) {
-      echo "Remove redundant numeric tests from the rules\n";
+      echo "Remove redundant numeric tests from the rules" . PHP_EOL;
     }
-    foreach ($this->ruleset as &$rule) {
+    foreach ($this->ruleset as $rule) {
       if ($this->debug) {
-        echo "rule = " . $rule->toString();
+        echo "rule = " . $rule->toString() . PHP_EOL;
       }
       $rule->cleanUp($data);
       if ($this->debug) {
-        echo "rule = " . $rule->toString();
+        echo "rule = " . $rule->toString() . PHP_EOL;
       }
     }
     
     // Set the default rule
     if ($this->debug) {
-      echo "Set the default rule\n";
+      echo "Set the default rule" . PHP_EOL;
     }
     $defRule = new RipperRule();
     $defRule->setConsequent($data->numClasses() - 1);
@@ -226,10 +226,15 @@ class PRip implements Learner {
     }
 
     // free up memory
-    foreach ($this->rulesetStats as &$ruleStat) {
+    foreach ($this->rulesetStats as $ruleStat) {
       $ruleStat->cleanUp();
     }
     
+    echo "Ultimately, here are the extracted rules: " . PHP_EOL;
+    var_dump($this->ruleset);
+    foreach ($this->ruleset as $x => $rule) {
+      echo $x . ": " . $rule->toString($this->classAttr) . PHP_EOL;
+    }
     /**/
     $model->setRules($this->ruleset);
   }
@@ -610,9 +615,9 @@ class PRip implements Learner {
 
     // Concatenate the ruleset for this class to the whole ruleset
     if ($this->debug) {
-      echo "\nFinal ruleset: [";
+      echo "\nRuleset: [" . PHP_EOL;
       foreach ($ruleset as $x => $rule) {
-        echo $x . " : " . $rule->toString($this->classAttr);
+        echo $x . " : " . $rule->toString($this->classAttr) . PHP_EOL;
       }
       echo "]" . PHP_EOL;
     }
@@ -621,14 +626,14 @@ class PRip implements Learner {
     $this->rulesetStats[] = $rstats;
 
     if ($this->debug) {
-      echo "\nCurrent ruleset: [";
+      echo "\nCurrent ruleset: [" . PHP_EOL;
       foreach ($this->ruleset as $x => $rule) {
-        echo $x . ": " . $rule->toString($this->classAttr);
+        echo $x . ": " . $rule->toString($this->classAttr) . PHP_EOL;
       }
       echo "]" . PHP_EOL;
-      echo "Current rulesetStats: [";
+      echo "Current rulesetStats: [" . PHP_EOL;
       foreach ($this->rulesetStats as $x => $ruleStat) {
-        echo $x . ": " . $ruleStat->toString($this->classAttr);
+        echo $x . ": " . $ruleStat->toString($this->classAttr) . PHP_EOL;
       }
       echo "]" . PHP_EOL;
     }

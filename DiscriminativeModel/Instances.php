@@ -21,6 +21,10 @@ class Instances {
     $this->attributes = $attributes;
     $this->reindexAttributes();
 
+    if(!($this->getClassAttribute() instanceof DiscreteAttribute)) {
+      die("ERROR! Class attribute (here \"{$this->getClassAttribute()->toString()}\") can only be nominal (i.e categorical).");
+    }
+
     foreach ($data as $k => &$inst) {
       $inst[] = ($weights === NULL ? 1 : $weights[$k]);
     }
@@ -54,9 +58,9 @@ class Instances {
   }
   
   function dropAttr($j) {
-    array_splice($this->attributes, $j, $j+1);
+    array_splice($this->attributes, $j, 1);
     foreach ($this->data as &$inst) {
-      array_splice($inst, $j, $j+1);
+      array_splice($inst, $j, 1);
     }
   }
   function dropOutputAttr() {
@@ -67,7 +71,7 @@ class Instances {
   function removeUselessInsts() {
     for ($x = $this->numInstances() - 1; $x >= 0; $x--) {
       if ($this->inst_classValue($x) === NULL) {
-        array_splice($this->data,    $x, $x+1);
+        array_splice($this->data,    $x, 1);
       }
     }
   }
@@ -115,7 +119,6 @@ class Instances {
    */
   
   function inst_valueOfAttr($i, $attr) {
-    // TODO maybe at some point this won't be necessary, and I'll directly use attr indices?
     $j = $attr->getIndex();
     return $this->inst_val($i, $j);
   }
@@ -241,25 +244,29 @@ class Instances {
       }
       $out_str .= "Data{{$this->numInstances()}} instances; [" . join(",", $atts_str) . "]}";
     } else {
-      $out_str .= "=====================================\n";
+      $out_str .= "\n";
+      $out_str .= str_repeat("======|=", $this->numAttributes()+1) . "|\n";
+      $out_str .= "";
       foreach ($this->getAttributes() as $att) {
         $out_str .= substr($att->toString(), 0, 7) . "\t";
       }
+      $out_str .= "weight";
       $out_str .= "\n";
-      $out_str .= "=====================================\n";
+      $out_str .= str_repeat("======|=", $this->numAttributes()+1) . "|\n";
       foreach ($this->data as $k => $inst) {
         foreach ($this->getInstance($k) as $val) {
           if ($val === NULL) {
-            $out_str .= "N/A\t";
+            $x = "N/A";
           }
           else {
-            $out_str .= "{$val}\t";
+            $x = "{$val}";
           }
+          $out_str .= str_pad($x, 7, " ", STR_PAD_BOTH) . "\t";
         }
         $out_str .= "{" . $this->inst_weight($k) . "}";
         $out_str .= "\n";
       }
-      $out_str .= "=====================================\n";
+      $out_str .= str_repeat("======|=", $this->numAttributes()+1) . "|\n";
     }
     return $out_str;
   }

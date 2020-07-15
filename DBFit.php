@@ -45,7 +45,7 @@ class DBFit {
     , "YearsSince" => "int"
     ]
   , "date" => [
-      "" => "date"
+      "" => "int"
     , "DaysSince" => "int"
     , "MonthsSince" => "int"
     , "YearsSince" => "int"
@@ -67,22 +67,36 @@ class DBFit {
     echo "DBFit->read_data()" . PHP_EOL;
 
     /* Checks */
+    // And move output column such that it's the FIRST column
     $output_col_in_columns = false;
-    foreach ($this->columns as $col) {
-    	if (self::getColumnName($col) == $this->output_column_name)
+    foreach ($this->columns as $k => $col) {
+    	if (self::getColumnName($col) == $this->output_column_name) {
     		$output_col_in_columns = true;
+        array_splice($this->columns, $k, 1);
+        array_unshift($this->columns, $col);
+        break;
+      }
     }
-	  assert($output_col_in_columns, "\$output_column_name must be in \$columns");
+	  if (!($output_col_in_columns)) {
+      die("ERROR! The output column name (here \"{$this->output_column_name}\") must be in columns");
+    }
+
+    if (count($this->table_names)) {
+      foreach ($this->columns as $column) {
+        if (!preg_match("/.*\..*/i", self::getColumnName($column))) {
+          die("ERROR! When reading more than one table, " .
+              "please specify column names in their 'table_name.column_name' form");
+        }
+      }
+    }
     
-    // Move output column such that it's the FIRST column
-    if (($k = array_search($this->output_column_name, $this->columns)) !== false) {
-      array_splice($this->columns, $k, $k+1);
-      array_unshift($this->columns, $this->output_column_name);
-    };
 
     /* Obtain column types & derive attributes */
     $attributes = [];
-    $sql = "SHOW COLUMNS FROM " . mysql_list($this->table_names) . " WHERE FIELD IN " . mysql_set(array_map(["self", "getColumnName"], $this->columns));
+    $mysql_columns = [];
+    $sql = "SELECT * FROM `information_schema`.`columns` WHERE `table_name` IN "
+          . mysql_set($this->table_names) . " ";
+    $type_col = "COLUMN_TYPE";
     echo "SQL: $sql" . PHP_EOL;
     $stmt = $this->db->prepare($sql);
     $stmt->execute();
@@ -94,18 +108,20 @@ class DBFit {
       // echo get_var_dump($row) . PHP_EOL;
       $raw_mysql_columns[] = $row;
     }
-    //var_dump($raw_mysql_columns);
-    $mysql_columns = [];
+    // var_dump($raw_mysql_columns);
+    
     foreach ($this->columns as $column) {
       $mysql_column = NULL;
       foreach ($raw_mysql_columns as $col) {
-        if ($col["Field"] == self::getColumnName($column)) {
+        if (in_array(self::getColumnName($column),
+            [$col["TABLE_NAME"].".".$col["COLUMN_NAME"], $col["COLUMN_NAME"]])) {
           $mysql_column = $col;
-          $mysql_columns[] = $mysql_column;
           break;
         }
       }
-      assert($mysql_column !== NULL, "Couldn't retrieve information about column \"" . self::getColumnName($column) . "\"");
+      if ($mysql_column === NULL) {
+        die("Couldn't retrieve information about column \"" . self::getColumnName($column) . "\"");
+      }
       // TODO figure out, where does "boolean" go? Should end up creating a discrete attr w/ 2 classes.
       $attr_name = self::getColumnAttrName($column);
 
@@ -113,17 +129,18 @@ class DBFit {
         case self::getColumnTreatment($column) == "ForceCategorical":
           $attribute = new DiscreteAttribute($attr_name, "enum");
           break;
-        case in_array($mysql_column["Type"], ["int", "float", "double", "real", "date", "datetime"]):
-          $attribute = new ContinuousAttribute($attr_name, self::getColumnAttrType($mysql_column["Type"], $column));
+        case in_array($mysql_column[$type_col], ["int", "float", "double", "real", "date", "datetime"]):
+          $attribute = new ContinuousAttribute($attr_name, self::getColumnAttrType($mysql_column[$type_col], $column));
           break;
-        case self::isEnumType($mysql_column["Type"]):
-          $domain_arr_str = (preg_replace("/enum\((.*)\)/i", "[$1]", $mysql_column["Type"]));
+        case self::isEnumType($mysql_column[$type_col]):
+          $domain_arr_str = (preg_replace("/enum\((.*)\)/i", "[$1]", $mysql_column[$type_col]));
           eval("\$domain_arr = " . $domain_arr_str . ";");
           $attribute = new DiscreteAttribute($attr_name, "enum", $domain_arr);
           break;
         default:
-          die("Unknown field type: " . $mysql_column["Type"]);
+          die("Unknown field type: " . $mysql_column[$type_col]);
       }
+      $mysql_columns[] = $mysql_column;
       $attributes[] = $attribute;
     }
 
@@ -131,13 +148,23 @@ class DBFit {
     $data = [];
     $cols_attrs = zip($attributes, $mysql_columns, $this->columns);
     // var_dump($cols_attrs);
-    $sql = "SELECT " . mysql_list(array_map(["self", "getColumnName"], $this->columns)) . " FROM " . mysql_list($this->table_names);
+    $sql = "SELECT " . mysql_list(array_map(["self", "getColumnName"], $this->columns)
+          , "noop") . " FROM " . mysql_list($this->table_names);
     
     if ($this->limit !== NULL) {
       $sql .= " LIMIT {$this->limit}";
     }
 
-    // TODO: Use $join_criterion to introduce WHERE and (INNER) JOIN.
+    if ($this->join_criterion != NULL) {
+      listify($this->join_criterion);
+      $sql .= " WHERE 1";
+      foreach ($this->join_criterion as $criterion) {
+        $sql .= " AND $criterion";
+        // TODO if is equality of two columns, drop one of the columns/attributes
+        // if(preg_match("/.*[\s\w]=[\s\w].*/i", $criterion)) {}
+      }
+    }
+
     echo "SQL: $sql" . PHP_EOL;
     $stmt = $this->db->prepare($sql);
     $stmt->execute();
@@ -151,7 +178,8 @@ class DBFit {
         $ms_column = $arr[1];
         $column    = $arr[2];
 
-        $raw_val = $raw_row[self::getColumnName($column)];
+        // echo self::getColumnName($column, true);
+        $raw_val = $raw_row[self::getColumnName($column, true)];
         
         // Default value (the original, raw one)
         $val = $raw_val;
@@ -169,19 +197,18 @@ class DBFit {
               }
             }
           }
-          else if (in_array($ms_column["Type"], ["date", "datetime"])) {
+          else if (in_array($ms_column[$type_col], ["date", "datetime"])) {
             $type_to_format = [
               "date"     => "Y-m-d"
             , "datetime" => "Y-m-d H:i:s"
             ];
-            $date = DateTime::createFromFormat($type_to_format[$ms_column["Type"]], $raw_val);
+            $date = DateTime::createFromFormat($type_to_format[$ms_column[$type_col]], $raw_val);
             assert($date !== false, "Incorrect date string \"$raw_val\"");
 
             switch (self::getColumnTreatment($column)) {
               case NULL:
-                // By default, consider the timestamp
-                $val = $date->getTimestamp();
-                break;
+                // By default, use DaysSince
+                // break;
               case "DaysSince":
                 $today = new DateTime("now");
                 $val = intval($date->diff($today)->format("%R%a"));
@@ -310,14 +337,16 @@ class DBFit {
   }
 
 
-  static function getColumnName($col) {
-    return !is_array($col) ? $col : $col[0];
+  static function getColumnName($col, $force_no_table_name = false) {
+    $n = !is_array($col) ? $col : $col[0];
+    return $force_no_table_name ? explode(".", $n)[1] : $n;
   }
   static function getColumnTreatment($col) {
     return !is_array($col) ? NULL : $col[1];
   }
   static function getColumnAttrName($col) {
-    return !is_array($col) || !array_key_exists(2, $col) ? self::getColumnName($col) : $col[2];
+    return !is_array($col) || !array_key_exists(2, $col) ?
+        self::getColumnName($col, true) : $col[2];
   }
 
   static function getColumnAttrType($mysql_type, $col) {
