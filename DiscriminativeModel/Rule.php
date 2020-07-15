@@ -3,7 +3,7 @@
 /*
  * Interface for rules
  */
-abstract class Rule {
+abstract class _Rule {
   /** The internal representation of the class label to be predicted */
   protected $consequent;
 
@@ -66,7 +66,7 @@ abstract class Rule {
  * Prunning (REP) with the metric of accuracy rate p/(p+n) or (TP+TN)/(P+N) is
  * used to prune the rule.
  */
-class RipperRule extends Rule {
+class RipperRule extends _Rule {
 
   /**
    * Whether the instance covered by this rule.
@@ -286,63 +286,58 @@ class RipperRule extends Rule {
       return; // Default rule before pruning
     }
 
-    ...
-    double[] worthRt = new double[size];
-    double[] coverage = new double[size];
-    double[] worthValue = new double[size];
-    for (int w = 0; w < size; w++) {
-      worthRt[w] = coverage[w] = worthValue[w] = 0.0;
-    }
+    $worthRt    = array_fill(0, $size, 0.0);
+    $coverage   = array_fill(0, $size, 0.0);
+    $worthValue = array_fill(0, $size, 0.0);
 
     /* Calculate accuracy parameters for all the antecedents in this rule */
-    double tn = 0.0; // True negative if useWhole
-    for (int x = 0; x < size; x++) {
-      Antd antd = m_Antds.get(x);
-      Instances newData = pruneData;
-      pruneData = new Instances(newData, 0); // Make data empty
+    $tn = 0.0; // True negative if useWhole
+    foreach ($this->antecedents as $x => $antd) {
+      $newData = clone $pruneData;
+      $pruneData = Instances::createEmpty($newData); // Make data empty
 
-      for (int y = 0; y < newData.numInstances(); y++) {
-        Instance ins = newData.getInstance(y);
+      for ($y = 0; $y < $newData->numInstances(); $y++) {
+        if ($antd->covers($newData, $y)) { // Covered by this antecedent
+          $classValue = $newData->inst_classValue($y);
+          $weight     = $newData->inst_weight($y);
 
-        if (antd.covers(ins)) { // Covered by this antecedent
-          coverage[x] += ins.weight();
-          pruneData.add(ins); // Add to data for further pruning
-          if ((int) ins.classValue() == (int) m_Consequent) {
-            worthValue[x] += ins.weight();
+          $coverage[$x] += $weight;
+          $pruneData->pushInstance($newData->getInstance($y)); // Add to data for further pruning
+          if ($classValue == $this->consequent) {
+            $worthValue[$x] += $weight;
           }
-        } else if (useWhole) { // Not covered
-          if ((int) ins.classValue() != (int) m_Consequent) {
-            tn += ins.weight();
+        } else if ($useWhole) { // Not covered
+          if ($classValue != $this->consequent) {
+            $tn += $weight;
           }
         }
       }
 
-      if (useWhole) {
-        worthValue[x] += tn;
-        worthRt[x] = worthValue[x] / $sumOfWeights;
+      if ($useWhole) {
+        $worthValue[$x] += $tn;
+        $worthRt[$x] = $worthValue[$x] / $sumOfWeights;
       } else {
-        worthRt[x] = (worthValue[x] + 1.0) / (coverage[x] + 2.0);
+        $worthRt[$x] = ($worthValue[$x] + 1.0) / ($coverage[$x] + 2.0);
       }
     }
 
-    double maxValue = (defAccu + 1.0) / ($sumOfWeights + 2.0);
-    int maxIndex = -1;
-    for (int i = 0; i < worthValue.length; i++) {
-      if (m_Debug) {
-        double denom = useWhole ? $sumOfWeights : coverage[i];
-        System.err.println(i + "(useAccuray? " + !useWhole + "): "
-          + worthRt[i] + "=" + worthValue[i] + "/" + denom);
-      }
-      if (worthRt[i] > maxValue) { // Prefer to the
-        maxValue = worthRt[i]; // shorter rule
-        maxIndex = i;
+    $maxValue = ($defAccu + 1.0) / ($sumOfWeights + 2.0);
+    $maxIndex = -1;
+    for ($i = 0; $i < $size; $i++) {
+      echo $i . "(useAccuracy? " . !$useWhole . "): "
+        . $worthRt[$i] . "=" . $worthValue[$i] . "/" . ($useWhole ? $sumOfWeights : $coverage[$i]);
+      // Prefer to the shorter rule
+      if ($worthRt[$i] > $maxValue) {
+        $maxValue = $worthRt[$i];
+        $maxIndex = $i;
       }
     }
 
     /* Prune the antecedents according to the accuracy parameters */
-    for (int z = size - 1; z > maxIndex; z--) {
-      m_Antds.remove(z);
+    for ($z = $size - 1; $z > $maxIndex; $z--) {
+      array_splice($this->antecedents, $z, 1);
     }
+    // TODO array_splice($this->antecedents, $maxIndex + 1);
   }
 
   /**

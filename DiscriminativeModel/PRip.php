@@ -211,7 +211,7 @@ class PRip implements Learner {
     RuleStats defRuleStat = new RuleStats();
     defRuleStat.setData(data);
     defRuleStat.setNumAllConds($this->numAllConds);
-    defRuleStat.addAndUpdate(defRule);
+    defRuleStat.pushRule(defRule);
     m_RulesetStats.add(defRuleStat);
 
     for (int z = 0; z < m_RulesetStats.size(); z++) {
@@ -312,7 +312,6 @@ class PRip implements Learner {
         }
       }
 
-      /*
       // Compute the DL of this ruleset
       if ($rstats === null) { // First rule
         $rstats = new RuleStats();
@@ -320,47 +319,46 @@ class PRip implements Learner {
         $rstats->setData($newData);
       }
 
-      ...
-      rstats.addAndUpdate(oneRule);
-      int last = rstats.getRuleset().size() - 1; // Index of last rule
-      dl += rstats.relativeDL(last, expFPRate, m_CheckErr);
+      $rstats->pushRule($oneRule);
+      $last = $rstats->getRulesetSize() - 1; // Index of last rule
 
-      if (Double.isNaN(dl) || Double.isInfinite(dl)) {
+      $dl += $rstats->relativeDL($last, $expFPRate, $this->checkErr);
+
+      if (is_nan($dl) || is_infinite($dl)) {
         throw new Exception("Should never happen: dl in "
-          + "building stage NaN or infinite!");
+          . "building stage NaN or infinite!");
       }
       if ($this->debug) {
-        echo "Before optimization(" + last + "): the dl = " + dl
-          + " | best: " + minDL);
+        echo "Before optimization(" . $last . "): the dl = " . $dl
+          . " | best: " . $minDL;
       }
 
-      if (dl < minDL) {
-        minDL = dl; // The best dl so far
+      if ($dl < $minDL) {
+        $minDL = $dl; // The best dl so far
       }
 
-      rst = rstats.getSimpleStats(last);
+      $rst = $rstats->getSimpleStats($last);
       if ($this->debug) {
-        echo "The rule covers: " + rst[0] + " | pos = " + rst[2]
-          + " | neg = " + rst[4] + "\nThe rule doesn't cover: " + rst[1]
-          + " | pos = " + rst[5]);
+        echo "The rule covers: " . $rst[0] . " | pos = " . $rst[2]
+          . " | neg = " . $rst[4] . "\nThe rule doesn't cover: " . $rst[1]
+          . " | pos = " . $rst[5];
       }
 
-      stop = checkStop(rst, minDL, dl);
+      $stop = $this->checkStop($rst, $minDL, $dl);
 
-      if (!stop) {
-        ruleset.add(oneRule); // Accepted
-        newData = rstats.getFiltered(last)[1];// Data not covered
-        hasPositive = greater(rst[5], 0.0); // Positives remaining?
+      if (!$stop) {
+        $ruleset[] = $oneRule; // Accepted
+        $newData = $rstats->getFiltered($last)[1];// Data not covered
+        $hasPositive = $rst[5] > 0.0; // Positives remaining?
         if ($this->debug) {
-          echo "One rule added: has positive? " + hasPositive);
+          echo "One rule added: has positive? " . $hasPositive;
         }
       } else {
         if ($this->debug) {
           echo "Quit rule";
         }
-        rstats.removeLast(); // Remove last to be re-used
+        $rstats->popRule(); // Remove last to be re-used
       }
-      */
     }// while !stop
 
     /******************** Optimization stage *******************
@@ -423,7 +421,7 @@ class PRip implements Learner {
             }
 
             if (!covers) {// Null coverage, no variants can be generated
-              finalRulesetStat.addAndUpdate(oldRule);
+              finalRulesetStat.pushRule(oldRule);
               position++;
               continue oneRule;
             }
@@ -484,7 +482,7 @@ class PRip implements Learner {
                 + rst[1] + " | pos = " + rst[5]);
             }
 
-            double repDL = repStat.relativeDL(position, expFPRate, m_CheckErr);
+            double repDL = repStat.relativeDL(position, expFPRate, $this->checkErr);
             if ($this->debug) {
               echo "\nReplace: " + replace.toString($this->classAttr)
                 + " |dl = " + repDL);
@@ -500,7 +498,7 @@ class PRip implements Learner {
             revStat.setNumAllConds($this->numAllConds);
             revStat.countData(position, newData, prevRuleStats);
             // revStat.countData();
-            double revDL = revStat.relativeDL(position, expFPRate, m_CheckErr);
+            double revDL = revStat.relativeDL(position, expFPRate, $this->checkErr);
 
             if ($this->debug) {
               echo "Revision: " + revision.toString($this->classAttr)
@@ -516,7 +514,7 @@ class PRip implements Learner {
             rstats.setNumAllConds($this->numAllConds);
             rstats.countData(position, newData, prevRuleStats);
             // rstats.countData();
-            double oldDL = rstats.relativeDL(position, expFPRate, m_CheckErr);
+            double oldDL = rstats.relativeDL(position, expFPRate, $this->checkErr);
 
             if (Double.isNaN(oldDL) || Double.isInfinite(oldDL)) {
               throw new Exception("Should never happen: oldDL"
@@ -541,12 +539,12 @@ class PRip implements Learner {
             }
           }
 
-          finalRulesetStat.addAndUpdate(finalRule);
+          finalRulesetStat.pushRule(finalRule);
           rst = finalRulesetStat.getSimpleStats(position);
 
           if (isResidual) {
 
-            dl += finalRulesetStat.relativeDL(position, expFPRate, m_CheckErr);
+            dl += finalRulesetStat.relativeDL(position, expFPRate, $this->checkErr);
             if ($this->debug) {
               echo "After optimization: the dl" + "=" + dl
                 + " | best: " + minDL);
@@ -589,14 +587,14 @@ class PRip implements Learner {
 
         if (ruleset.size() > (position + 1)) { // Hasn't gone through yet
           for (int k = position + 1; k < ruleset.size(); k++) {
-            finalRulesetStat.addAndUpdate(ruleset.get(k));
+            finalRulesetStat.pushRule(ruleset.get(k));
           }
         }
         if ($this->debug) {
           echo "\nDeleting rules to decrease"
             + " DL of the whole ruleset ...");
         }
-        finalRulesetStat.reduceDL(expFPRate, m_CheckErr);
+        finalRulesetStat.reduceDL(expFPRate, $this->checkErr);
         if ($this->debug) {
           int del = ruleset.size() - finalRulesetStat.getRulesetSize();
           echo del + " rules are deleted"
@@ -626,6 +624,49 @@ class PRip implements Learner {
       return data;
     }
   */
+ 
+  return $ruleset;
+  }
+
+
+  /**
+   * Check whether the stopping criterion meets
+   * 
+   * @param rst the statistic of the ruleset
+   * @param minDL the min description length so far
+   * @param dl the current description length of the ruleset
+   * @return true if stop criterion meets, false otherwise
+   */
+  function checkStop($rst, $minDL, $dl) {
+
+    if ($dl > $minDL + self::$MAX_DL_SURPLUS) {
+      if ($this->debug) {
+        echo "DL too large: " . $dl . " | " . $minDL . PHP_EOL;
+      }
+      return true;
+    }
+    else if (!($rst[2] > 0.0)) {// Covered positives
+      if ($this->debug) {
+        echo "Too few positives." . PHP_EOL;
+      }
+      return true;
+    }
+    else if (($rst[4] / $rst[0]) >= 0.5) {// Err rate
+      if ($this->checkErr) {
+        if ($this->debug) {
+          echo "Error too large: " . $rst[4] . "/" . $rst[0] . PHP_EOL;
+        }
+        return true;
+      } else {
+        return false;
+      }
+    }
+    else {// Not stops
+      if ($this->debug) {
+        echo "Continue.";
+      }
+      return false;
+    }
   }
 }
 

@@ -26,22 +26,13 @@ $db_fit = new DBFit($db);
 $db_fit->setModelType($model_type);
 $db_fit->setTableNames($table_names);
 $db_fit->setColumns($column);
-//$db_fit->setJoinCriterion($join_criterion);
-$db_fit->setOutputColumnName($output_column_name);
-$db_fit->setModelType($model_type);
-$db_fit->setLearningMethod($learning_method);
-$db_fit->test_all_capabilities();
-
-
-$db_fit = new DBFit($db);
-$db_fit->setModelType($model_type);
-$db_fit->setTableNames($table_names);
-$db_fit->setColumns($column);
 $db_fit->setJoinCriterion($join_criterion);
 $db_fit->setOutputColumnName($output_column_name);
 $db_fit->setModelType($model_type);
 $db_fit->setLearningMethod($learning_method);
 $db_fit->test_all_capabilities();
+
+exit();
 
 /* // TODO
 $db_fit = new DBFit($db);
