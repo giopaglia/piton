@@ -12,6 +12,30 @@ function mysql_backtick_str($str) { return "`$str`"; }
 
 function get_var_dump($a)  { ob_start(); var_dump($a); return ob_get_clean(); }
 function die_var_dump($a)  { die(get_var_dump($a)); }
+function get_arr_dump($arr, $delimiter = ", ") {
+  return "[" . array_list($arr) . "]";
+}
+function array_list($arr, $delimiter = ", ") {
+  $out_str = "";
+  foreach ($arr as $i => $val) {
+    if (method_exists($val, "toString")) {
+      $s = $val->toString();
+    } else if (is_array($val)) {
+      $s = get_arr_dump($val);
+    } else {
+      $s = strval($val);
+    }
+    $out_str .= (isAssoc($arr) ? "$i => " : "") . $s . ($i!==count($arr)-1 ? $delimiter : "");
+  }
+  return $out_str;
+}
+
+# Source: https://stackoverflow.com/a/173479/5646732
+function isAssoc(array $arr)
+{
+  if(array() === $arr) return false;
+  return array_keys($arr) !== range(0, count($arr) - 1);
+}
 
 # Source: https://www.php.net/manual/en/debugger.php#118058
 function console_log($data){
@@ -19,6 +43,29 @@ function console_log($data){
   echo 'console.log('. json_encode( $data ) .')';
   echo '</script>';
 }
+
+
+/**
+* Normalizes the doubles in the array by their sum.
+* 
+* @param doubles the array of double
+* @exception IllegalArgumentException if sum is Zero or NaN
+*/
+function normalize(&$arr) {
+  $s = array_sum($arr);
+
+  if (is_nan($s)) {
+    throw new IllegalArgumentException("Can't normalize array. Sum is NaN.");
+  }
+  if ($s == 0) {
+    // Maybe this should just be a return.
+    throw new IllegalArgumentException("Can't normalize array. Sum is zero.");
+  }
+  foreach ($arr as &$v) {
+    $v /= $s;
+  }
+}
+
 
 # Source: https://stackoverflow.com/a/1091219
 function join_paths() {

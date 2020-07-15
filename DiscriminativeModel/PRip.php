@@ -44,7 +44,7 @@ class PRip implements Learner {
   private $debug;
 
   /** Number of runs of optimizations */
-  private $optimizations;
+  private $numOptimizations;
 
   /** Randomization seed */
   private $seed;
@@ -78,7 +78,7 @@ class PRip implements Learner {
     }
 
     $this->debug = true;
-    $this->optimizations = 2;
+    $this->numOptimizations = 2;
     $this->seed = $random_seed;
     $this->numFolds = 3;
     $this->minNo = 2.0;
@@ -105,15 +105,16 @@ class PRip implements Learner {
 
     srand($this->seed);
 
-    // $model->resetRules();
-    $ruleset = [];
+    $model->resetRules();
+    $this->ruleset = [];
+    $this->rulesetStats = [];
     $this->numAllConds = RuleStats::numAllConditions($data);
+
     if ($this->debug) {
       echo "Number of all possible conditions = " . $this->numAllConds . PHP_EOL;
     }
     
     // Sort by class FREQ_ASCEND
-    // m_RulesetStats = new ArrayList<RuleStats>();
     // m_Distributions = new ArrayList<double[]>();
 
     // Sort by classes frequency
@@ -182,15 +183,14 @@ class PRip implements Learner {
         echo "The default DL = $defDL\n";
       }
 
-      $new_rules = $this->rulesetForOneClass($data, $expFPRate, $classIndex, $defDL);
-      $ruleset = array_merge($ruleset, $new_rules);
+      $data = $this->rulesetForOneClass($data, $expFPRate, $classIndex, $defDL);
     }
 
     // Remove redundant numeric tests from the rules
     if ($this->debug) {
       echo "Remove redundant numeric tests from the rules\n";
     }
-    foreach ($ruleset as &$rule) {
+    foreach ($this->ruleset as &$rule) {
       if ($this->debug) {
         echo "rule = " . $rule->toString();
       }
@@ -199,40 +199,39 @@ class PRip implements Learner {
         echo "rule = " . $rule->toString();
       }
     }
-    /*
+    
     // Set the default rule
     if ($this->debug) {
       echo "Set the default rule\n";
     }
     $defRule = new RipperRule();
     $defRule->setConsequent($data->numClasses() - 1);
-    $ruleset[] = $defRule;
+    $this->ruleset[] = $defRule;
 
-    RuleStats defRuleStat = new RuleStats();
-    defRuleStat.setData(data);
-    defRuleStat.setNumAllConds($this->numAllConds);
-    defRuleStat.pushRule(defRule);
-    m_RulesetStats.add(defRuleStat);
+    $defRuleStat = new RuleStats();
+    $defRuleStat->setData($data);
+    $defRuleStat->setNumAllConds($this->numAllConds);
+    $defRuleStat->pushRule($defRule);
+    $this->rulesetStats[] = $defRuleStat;
 
-    for (int z = 0; z < m_RulesetStats.size(); z++) {
-      RuleStats oneClass = m_RulesetStats.get(z);
-      for (int xyz = 0; xyz < oneClass.getRulesetSize(); xyz++) {
-        double[] classDist = oneClass.getDistributions(xyz);
-        Utils.normalize(classDist);
-        if (classDist != null) {
-          m_Distributions.add(((ClassOrder) m_Filter)
-            .distributionsByOriginalIndex(classDist));
-        }
+    foreach ($this->rulesetStats as $ruleStat) {
+      for ($i_r = 0; $i_r < $ruleStat->getRulesetSize(); $i_r++) {
+        $classDist = $ruleStat->getDistributions($i_r);
+        normalize($classDist);
+        // if ($classDist !== NULL) {
+        //   m_Distributions.add(((ClassOrder) m_Filter)
+        //     .distributionsByOriginalIndex($classDist));
+        // }
       }
     }
 
     // free up memory
-    // for ($i = 0; $i < m_RulesetStats.size(); i++) {
-    //   (m_RulesetStats.get(i)).cleanUp();
-    // }
+    foreach ($this->rulesetStats as &$ruleStat) {
+      $ruleStat->cleanUp();
+    }
     
-    $model->setRules($ruleset);
     /**/
+    $model->setRules($this->ruleset);
   }
   
   /**
@@ -285,30 +284,30 @@ class PRip implements Learner {
         // pruneData=newData.testCV($this->numFolds, $this->numFolds-1);
 
         if ($this->debug) {
-          echo "\nGrowing a rule ...";
+          echo "\nGrowing rule ...";
         }
         $oneRule->grow($growData, $this->minNo); // Build the rule
         if ($this->debug) {
           echo "One rule found before pruning:"
-            . $oneRule->toString($this->classAttr);
+            . $oneRule->toString($this->classAttr) . PHP_EOL;
         }
 
         if ($this->debug) {
-          echo "\nPruning the rule ...";
+          echo "\nPruning rule ..." . PHP_EOL;
         }
         $oneRule->prune($pruneData, false); // Prune the rule
         if ($this->debug) {
-          echo "One rule found after pruning:"
-            . $oneRule->toString($this->classAttr);
+          echo  PHP_EOL ."One rule found after pruning: "
+            . $oneRule->toString($this->classAttr) . PHP_EOL;
         }
       } else {
         if ($this->debug) {
-          echo "\nNo pruning: growing a rule ...";
+          echo "\nNo pruning: growing a rule ..." . PHP_EOL;
         }
         $oneRule->grow($newData, $this->minNo); // Build the rule
         if ($this->debug) {
           echo "No pruning: one rule found:\n"
-            . $oneRule->toString($this->classAttr);
+            . $oneRule->toString($this->classAttr) . PHP_EOL;
         }
       }
 
@@ -320,6 +319,7 @@ class PRip implements Learner {
       }
 
       $rstats->pushRule($oneRule);
+      echo $rstats->toString() . PHP_EOL;
       $last = $rstats->getRulesetSize() - 1; // Index of last rule
 
       $dl += $rstats->relativeDL($last, $expFPRate, $this->checkErr);
@@ -330,7 +330,7 @@ class PRip implements Learner {
       }
       if ($this->debug) {
         echo "Before optimization(" . $last . "): the dl = " . $dl
-          . " | best: " . $minDL;
+          . " | best: " . $minDL . PHP_EOL;
       }
 
       if ($dl < $minDL) {
@@ -341,7 +341,7 @@ class PRip implements Learner {
       if ($this->debug) {
         echo "The rule covers: " . $rst[0] . " | pos = " . $rst[2]
           . " | neg = " . $rst[4] . "\nThe rule doesn't cover: " . $rst[1]
-          . " | pos = " . $rst[5];
+          . " | pos = " . $rst[5] . PHP_EOL;
       }
 
       $stop = $this->checkStop($rst, $minDL, $dl);
@@ -351,28 +351,29 @@ class PRip implements Learner {
         $newData = $rstats->getFiltered($last)[1];// Data not covered
         $hasPositive = $rst[5] > 0.0; // Positives remaining?
         if ($this->debug) {
-          echo "One rule added: has positive? " . $hasPositive;
+          echo "One rule added: has positive? " . $hasPositive . PHP_EOL;
         }
       } else {
         if ($this->debug) {
-          echo "Quit rule";
+          echo "Quit rule" . PHP_EOL;
         }
         $rstats->popRule(); // Remove last to be re-used
       }
     }// while !stop
 
-    /******************** Optimization stage *******************
-    RuleStats finalRulesetStat = null;
+    /******************** Optimization stage *******************/
     if ($this->usePruning) {
-      for (int z = 0; z < m_Optimizations; z++) {
+      $finalRulesetStat = NULL;
+      for ($z = 0; $z < $this->numOptimizations; $z++) {
         if ($this->debug) {
-          echo "\n*** Optimization: run #" + z + " ***";
+          echo "\n*** Optimization: run #" . $z . " ***" . PHP_EOL;
         }
-
-        newData = data;
-        finalRulesetStat = new RuleStats();
-        finalRulesetStat.setData(newData);
-        finalRulesetStat.setNumAllConds($this->numAllConds);
+        echo "TODO" . PHP_EOL;
+        /*
+        $newData = $data;
+        $finalRulesetStat = new RuleStats();
+        $finalRulesetStat.setData($newData);
+        $finalRulesetStat.setNumAllConds($this->numAllConds);
         int position = 0;
         stop = false;
         boolean isResidual = false;
@@ -602,30 +603,43 @@ class PRip implements Learner {
         }
         ruleset = finalRulesetStat.getRuleset();
         rstats = finalRulesetStat;
-
+        */
+       
       } // For each run of optimization
     } // if pruning is used
 
     // Concatenate the ruleset for this class to the whole ruleset
     if ($this->debug) {
-      echo "\nFinal ruleset: ";
-      for (int x = 0; x < ruleset.size(); x++) {
-        echo x + ": "
-          + ((RipperRule) ruleset.get(x)).toString($this->classAttr);
+      echo "\nFinal ruleset: [";
+      foreach ($ruleset as $x => $rule) {
+        echo $x . " : " . $rule->toString($this->classAttr);
       }
-      echo );
+      echo "]" . PHP_EOL;
     }
 
-    m_Ruleset.addAll(ruleset);
+    $this->ruleset = array_merge($this->ruleset, $ruleset);
+    $this->rulesetStats[] = $rstats;
 
-    if (ruleset.size() > 0) {
-      return rstats.getFiltered(ruleset.size() - 1)[1]; // Data not
+    if ($this->debug) {
+      echo "\nCurrent ruleset: [";
+      foreach ($this->ruleset as $x => $rule) {
+        echo $x . ": " . $rule->toString($this->classAttr);
+      }
+      echo "]" . PHP_EOL;
+      echo "Current rulesetStats: [";
+      foreach ($this->rulesetStats as $x => $ruleStat) {
+        echo $x . ": " . $ruleStat->toString($this->classAttr);
+      }
+      echo "]" . PHP_EOL;
+    }
+
+    if (count($ruleset) > 0) {
+      // Data not covered
+      return $rstats->getFiltered(count($ruleset) - 1)[1];
     } else {
-      return data;
+      return $data;
     }
-  */
- 
-  return $ruleset;
+
   }
 
 

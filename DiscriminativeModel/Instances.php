@@ -84,7 +84,7 @@ class Instances {
 
   function sortByAttr($attr)
   {
-    echo "Instances->sortByAttr(" . get_var_dump($attr) . ")" . PHP_EOL;
+    echo "Instances->sortByAttr(" . $attr->toString() . ")" . PHP_EOL;
 
     echo $this->toString();
     echo " => ";
@@ -103,11 +103,11 @@ class Instances {
 
   function randomize()
   {
-    echo "Instances->randomize()" . PHP_EOL;
+    echo "[ Instances->randomize() ]" . PHP_EOL;
 
-    echo $this->toString();
+    // echo $this->toString();
     shuffle($this->data);
-    echo $this->toString();
+    // echo $this->toString();
   }
 
   /*
@@ -186,7 +186,7 @@ class Instances {
   }
 
   function numDistinctValues($attr) {
-    echo "Instances->numDistinctValues(" . get_var_dump($attr) . ")" . PHP_EOL;
+    echo "Instances->numDistinctValues(" . $attr->toString() . ")" . PHP_EOL;
     $j = $attr->getIndex();
     $valCounts = [];
     for ($x = 0; $x < $this->numInstances(); $x++) {
@@ -232,23 +232,34 @@ class Instances {
   /**
    * Print a textual representation of the instances
    */
-  function toString() {
+  function toString($short = false) {
     $out_str = "";
-    foreach ($this->getAttributes() as $att) {
-      $out_str .= substr($att->toString(), 0, 7) . "\t";
-    }
-    $out_str .= "\n";
-    foreach ($this->data as $k => $inst) {
-      foreach ($this->getInstance($k) as $val) {
-        if ($val === NULL) {
-          $out_str .= "N/A\t";
-        }
-        else {
-          $out_str .= "{$val}\t";
-        }
+    if ($short) {
+      $atts_str = [];
+      foreach ($this->getAttributes() as $att) {
+        $atts_str[] = substr($att->toString(), 0, 7);
       }
-      $out_str .= "{" . $this->inst_weight($k) . "}";
+      $out_str .= "Data{{$this->numInstances()}} instances; [" . join(",", $atts_str) . "]}";
+    } else {
+      $out_str .= "=====================================\n";
+      foreach ($this->getAttributes() as $att) {
+        $out_str .= substr($att->toString(), 0, 7) . "\t";
+      }
       $out_str .= "\n";
+      $out_str .= "=====================================\n";
+      foreach ($this->data as $k => $inst) {
+        foreach ($this->getInstance($k) as $val) {
+          if ($val === NULL) {
+            $out_str .= "N/A\t";
+          }
+          else {
+            $out_str .= "{$val}\t";
+          }
+        }
+        $out_str .= "{" . $this->inst_weight($k) . "}";
+        $out_str .= "\n";
+      }
+      $out_str .= "=====================================\n";
     }
     return $out_str;
   }

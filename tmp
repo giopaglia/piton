@@ -8,13 +8,13 @@
 @ATTRIBUTE Age numeric
 
 @DATA
-Silly,1,M,0, {1}
+NotSilly,1,M,0, {1}
 NotSilly,2,Other,27, {1}
 Silly,3,?,56, {1}
-NotSilly,4,F,47, {1}
+Silly,4,F,47, {1}
 NotSilly,5,M,40, {1}
-Silly,6,?,38, {1}
+NotSilly,6,?,38, {1}
 Silly,7,M,57, {1}
-NotSilly,8,Other,20, {1}
+Silly,8,Other,20, {1}
 NotSilly,9,F,19, {1}
 ?,10,F,?, {1}

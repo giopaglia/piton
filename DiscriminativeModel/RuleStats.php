@@ -55,6 +55,14 @@ class RuleStats {
   }
 
   /**
+   * Frees up memory after classifier has been built.
+   */
+  function cleanUp() {
+    $this->data = NULL;
+    $this->filtered = NULL;
+  }
+
+  /**
    * Get the simple stats of one rule, including 6 parameters: 0: coverage;
    * 1:uncoverage; 2: true positive; 3: true negatives; 4: false positives; 5:
    * false negatives
@@ -86,6 +94,20 @@ class RuleStats {
 
   function getRulesetSize() {
     return count($this->getRuleset());
+  }
+
+  /**
+   * Get the class distribution predicted by the rule in given position
+   * 
+   * @param index the position index of the rule
+   * @return the class distributions
+   */
+  function getDistributions(int $index) {
+    if (($this->distributions !== NULL)
+    && ($index < $this->getRulesetSize())) {
+      return $this->distributions[$index];
+    }
+    return NULL;
   }
 
   /**
@@ -266,8 +288,8 @@ class RuleStats {
     $filtered = self::computeSimpleStats($rule, $data, $stats, $classCounts);
 
     echo "filtered : { 0 => " . $filtered[0]->toString() . "\n 1 => " . $filtered[1]->toString() . " }" . PHP_EOL;
-    echo "stats : " . get_var_dump($stats) . "" . PHP_EOL;
-    echo "classCounts : " . get_var_dump($classCounts) . "" . PHP_EOL;
+    echo "stats : " . get_arr_dump($stats) . "" . PHP_EOL;
+    echo "classCounts : " . get_arr_dump($classCounts) . "" . PHP_EOL;
 
     if ($this->ruleset === NULL) {
       $this->ruleset = [];
@@ -296,6 +318,7 @@ class RuleStats {
    * failed
    */
   function popRule() {
+    echo "RuleStats->popRule()" . PHP_EOL;
     array_pop($this->ruleset);
     array_pop($this->filtered);
     array_pop($this->simpleStats);
@@ -579,6 +602,20 @@ class RuleStats {
     } else {
       return NAN;
     }
+  }
+
+  function toString() {
+    $out_str = "RuleStats(size {$this->getRulesetSize()}){";
+
+    $out_str .=   "Data: " . $this->data->toString(true);
+    $out_str .= ", \nnumAllConds: " . $this->numAllConds;
+    $out_str .= ", \nruleset: " . get_arr_dump($this->ruleset);
+    $out_str .= ", \nfiltered: " . get_arr_dump($this->filtered);
+    $out_str .= ", \nsimpleStats: " . get_arr_dump($this->simpleStats);
+    $out_str .= ", \ndistributions: " . get_arr_dump($this->distributions);
+    $out_str .= "}";
+
+    return $out_str;
   }
 
   /**
