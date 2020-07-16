@@ -18,6 +18,14 @@ class Instances {
   // function setWeights($w) { $this->weights = $w; }
 
   function __construct(array $attributes, array $data, $weights = NULL) {
+    foreach ($data as $i => $row) {
+      if(!(count($attributes) == count($row))) {
+        die("ERROR! Malformed data encountered when build Instances(). "
+          . "Need exactly " . count($attributes) . " columns, but "
+          . count($row) . " were found (on row $i)." );
+      }
+    }
+
     $this->attributes = $attributes;
     $this->reindexAttributes();
 
@@ -31,12 +39,16 @@ class Instances {
     $this->data = $data;
   }
 
-  static function createFromSlice(Instances &$data, int $offset, int $length = NULL) {
-    return new Instances($data->getAttributes(), array_slice($data->getData(), $offset, $length));
+  static function createFromSlice(Instances &$insts, int $offset, int $length = NULL) {
+    $data = $insts->getInstances();
+    $weights = $insts->getWeights();
+    $newData = array_slice($data, $offset, $length);
+    $newWeights = array_slice($weights, $offset, $length);
+    return new Instances($insts->getAttributes(), $newData, $newWeights);
   }
 
-  static function createEmpty(Instances &$data) {
-    return new Instances($data->getAttributes(), []);
+  static function createEmpty(Instances &$insts) {
+    return new Instances($insts->getAttributes(), []);
   }
 
   function numAttributes() { return count($this->getAttributes()); }
@@ -50,6 +62,21 @@ class Instances {
   function numInstances() { return count($this->data); }
   
   function getInstance($i) { return array_slice($this->data[$i], 0, -1); }
+  function getInstances() {
+    $data = [];
+    for ($x = 0; $x < $this->numInstances(); $x++) {
+      $data[] = $this->getInstance($x);
+    }
+    return $data;
+  }
+
+  function getWeights() {
+    $weights = [];
+    for ($x = 0; $x < $this->numInstances(); $x++) {
+      $weights[] = $this->inst_weight($x);
+    }
+    return $weights;
+  }
   
   function pushInstance($inst, $weight = 1)
   {
@@ -78,12 +105,7 @@ class Instances {
 
   function sumOfWeights() {
     echo "Instances->sumOfWeights()" . PHP_EOL;
-    $sum = 0;
-    for ($x = 0; $x < $this->numInstances(); $x++) {
-      $sum += $this->inst_weight($x);
-    }
-    echo "\$sum : $sum" . PHP_EOL;
-    return $sum;
+    return array_sum($this->getWeights());
   }
 
   function sortByAttr($attr)
@@ -150,6 +172,14 @@ class Instances {
   function getClassAttribute() {
     // Note: assuming the class attribute is the first
     return $this->getAttributes()[0];
+  }
+
+  function getClassValues() {
+    $output_vals = [];
+    for ($x = 0; $x < $this->numInstances(); $x++) {
+      $output_vals[] = $this->inst_classValue($x);
+    }
+    return $output_vals;
   }
 
   function numClasses() {
@@ -280,37 +310,6 @@ class Instances {
     return $includeClassAttr ? $this->attributes : array_slice($this->attributes, 1);
   }
 
-  /**
-   * @param mixed $attributes
-   *
-   * @return self
-   */
-  public function setAttributes($attributes)
-  {
-    $this->attributes = $attributes;
-
-    return $this;
-  }
-
-  /**
-   * @return mixed
-   */
-  public function getData()
-  {
-    return $this->data;
-  }
-
-  /**
-   * @param mixed $data
-   *
-   * @return self
-   */
-  public function setData($data)
-  {
-    $this->data = $data;
-
-    return $this;
-  }
 }
 
 /*

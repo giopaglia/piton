@@ -346,7 +346,7 @@ class RipperRule extends _Rule {
       array_splice($this->antecedents, $z, 1);
     }
     var_dump($this->antecedents);
-    // TODO array_splice($this->antecedents, $maxIndex + 1);
+    // TODO easier? array_splice($this->antecedents, $maxIndex + 1);
   }
 
   /**

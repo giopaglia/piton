@@ -374,6 +374,11 @@ class PRip implements Learner {
           echo "\n*** Optimization: run #" . $z . " ***" . PHP_EOL;
         }
         echo "TODO" . PHP_EOL;
+        echo "test on big dataset, one that has text" . PHP_EOL;
+        echo "do text thing" . PHP_EOL;
+        echo "do model predict, evaluate" . PHP_EOL;
+        echo "do model save" . PHP_EOL;
+
         /*
         $newData = $data;
         $finalRulesetStat = new RuleStats();

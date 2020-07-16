@@ -237,8 +237,8 @@ class RuleStats {
     $splits = $data->numInstances() * ($numFolds - 1) / $numFolds;
 
     $rt[0] = Instances::createFromSlice($data, 0, $splits);
-    $rt[1] = Instances::createFromSlice($data, $splits, $data->numInstances() - $splits);
     echo "rt[0] : " . $rt[0]->toString() . PHP_EOL;
+    $rt[1] = Instances::createFromSlice($data, $splits, $data->numInstances() - $splits);
     echo "rt[1] : " . $rt[1]->toString() . PHP_EOL;
 
     return $rt;

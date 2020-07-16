@@ -1,6 +1,7 @@
 <?php
 
 
+include "PorterStemmer.php";
 include "DiscriminativeModel/RuleBasedModel.php";
 include "DiscriminativeModel/PRip.php";
 
@@ -55,7 +56,7 @@ class DBFit {
   , "real"    => ["" => "float"]
   , "double"  => ["" => "double"]
   , "boolean" => ["" => "bool"]
-  , "enum" => ["" => "enum"]
+  , "enum"    => ["" => "enum"]
   ];
 
   function __construct($db) {
@@ -93,7 +94,6 @@ class DBFit {
 
     /* Obtain column types & derive attributes */
     $attributes = [];
-    $mysql_columns = [];
     $sql = "SELECT * FROM `information_schema`.`columns` WHERE `table_name` IN "
           . mysql_set($this->table_names) . " ";
     $type_col = "COLUMN_TYPE";
@@ -110,7 +110,7 @@ class DBFit {
     }
     // var_dump($raw_mysql_columns);
     
-    foreach ($this->columns as $column) {
+    foreach ($this->columns as &$column) {
       $mysql_column = NULL;
       foreach ($raw_mysql_columns as $col) {
         if (in_array(self::getColumnName($column),
@@ -126,7 +126,7 @@ class DBFit {
       $attr_name = self::getColumnAttrName($column);
 
       switch(true) {
-        case self::getColumnTreatment($column) == "ForceCategorical":
+        case self::getColumnTreatmentType($column) == "ForceCategorical":
           $attribute = new DiscreteAttribute($attr_name, "enum");
           break;
         case in_array($mysql_column[$type_col], ["int", "float", "double", "real", "date", "datetime"]):
@@ -137,34 +137,83 @@ class DBFit {
           eval("\$domain_arr = " . $domain_arr_str . ";");
           $attribute = new DiscreteAttribute($attr_name, "enum", $domain_arr);
           break;
+        case self::isTextType($mysql_column[$type_col]):
+          switch(self::getColumnTreatmentType($column)) {
+            case "BinaryBagOfWords":
+              if ( is_numeric(self::getColumnTreatmentArg($column, 0))) {
+                $k = self::getColumnTreatmentArg($column, 0);
+
+                // Find $k most frequent words
+                $word_counts = [];
+                $sql = $this->getSQLSelectQuery(self::getColumnName($column));
+                echo "SQL: $sql" . PHP_EOL;
+                $stmt = $this->db->prepare($sql);
+                $stmt->execute();
+                
+                if (!isset($this->stop_words)) {
+                  $lang = "en";
+                  $this->stop_words = explode("\n", file_get_contents($lang . "-stopwords.txt"));
+                }
+
+                foreach ($stmt->get_result() as $raw_row) {
+                  $text = $raw_row[self::getColumnName($column, true)];
+                  
+                  $words = self::text2words($text);
+
+                  foreach ($words as $word) {
+                    if (!isset($word_counts[$word]))
+                      $word_counts[$word] = 0;
+                    $word_counts[$word] += 1;
+                  }
+                }
+                // var_dump($word_counts);
+                
+                $dict = [];
+                // TODO optimize this?
+                foreach (range(0, $k-1) as $i) {
+                  $max_count = max($word_counts);
+                  $max_word = array_search($max_count, $word_counts);
+                  $dict[] = $max_word;
+                  unset($word_counts[$max_word]);
+                }
+                // var_dump($dict);
+              }
+              else if (is_array(self::getColumnTreatmentArg($column, 0))) {
+                $dict = self::getColumnTreatmentArg($column, 0);
+              }
+              else {
+                die("Please specify a dictionary size for bag-of-words processing column '{self::getColumnName($column)}'.");
+              }
+
+              // Binary attributes indicating the presence of each word
+              $attribute = [];
+              foreach ($dict as $word) {
+                $attribute[] = new DiscreteAttribute("'$word' in $attr_name",
+                  "word_presence", ["✘", "✔"]);
+              }
+
+              self::setColumnTreatmentArg($column, 0, $dict);
+              break;
+            default:
+              die("Unknown treatment for text column: " . self::getColumnName($column));
+              break;
+          }
+          break;
         default:
-          die("Unknown field type: " . $mysql_column[$type_col]);
+          die("Unknown column type: " . $mysql_column[$type_col]);
+          break;
       }
-      $mysql_columns[] = $mysql_column;
+      $column[$type_col] = $mysql_column[$type_col];
+
       $attributes[] = $attribute;
     }
 
     /* Obtain data */
     $data = [];
-    $cols_attrs = zip($attributes, $mysql_columns, $this->columns);
+    $cols_attrs = zip($attributes, $this->columns);
     // var_dump($cols_attrs);
-    $sql = "SELECT " . mysql_list(array_map(["self", "getColumnName"], $this->columns)
-          , "noop") . " FROM " . mysql_list($this->table_names);
     
-    if ($this->limit !== NULL) {
-      $sql .= " LIMIT {$this->limit}";
-    }
-
-    if ($this->join_criterion != NULL) {
-      listify($this->join_criterion);
-      $sql .= " WHERE 1";
-      foreach ($this->join_criterion as $criterion) {
-        $sql .= " AND $criterion";
-        // TODO if is equality of two columns, drop one of the columns/attributes
-        // if(preg_match("/.*[\s\w]=[\s\w].*/i", $criterion)) {}
-      }
-    }
-
+    $sql = $this->getSQLSelectQuery(array_map(["self", "getColumnName"], $this->columns));
     echo "SQL: $sql" . PHP_EOL;
     $stmt = $this->db->prepare($sql);
     $stmt->execute();
@@ -175,68 +224,93 @@ class DBFit {
       $row = [];
       foreach ($cols_attrs as $arr) {
         $attribute = $arr[0];
-        $ms_column = $arr[1];
-        $column    = $arr[2];
+        $column    = $arr[1];
 
         // echo self::getColumnName($column, true);
         $raw_val = $raw_row[self::getColumnName($column, true)];
         
-        // Default value (the original, raw one)
-        $val = $raw_val;
+        switch (true) {
+          case self::getColumnTreatmentType($column) == "BinaryBagOfWords":
 
-        if ($raw_val !== NULL) {
-          if ($attribute instanceof DiscreteAttribute) {
-            $val = array_search($raw_val, $attribute->getDomain());
-            if ($val === false) {
-              if (self::getColumnTreatment($column) == "ForceCategorical"){
-                $attribute->pushDomainVal($raw_val);
+            $dict = self::getColumnTreatmentArg($column, 0);
+            // var_dump($dict);
+            foreach ($dict as $word) {
+              $val = in_array($word, self::text2words($raw_val));
+              $row[] = $val;
+            }
+            break;
+           
+          default:
+            // Default value (the original, raw one)
+            $val = $raw_val;
+
+            if ($raw_val !== NULL) {
+              if ($attribute instanceof DiscreteAttribute) {
                 $val = array_search($raw_val, $attribute->getDomain());
+                if ($val === false) {
+                  if (self::getColumnTreatmentType($column) == "ForceCategorical") {
+                    $attribute->pushDomainVal($raw_val);
+                    $val = array_search($raw_val, $attribute->getDomain());
+                  }
+                  else {
+                    die("Something's off. Couldn't find element \"" . get_var_dump($raw_val) . "\" in domain of attribute {$attribute->getName()}. " . serialize($attribute));
+                  }
+                }
               }
-              else {
-                die("Something's off. Couldn't find element \"" . get_var_dump($raw_val) . "\" in domain of attribute {$attribute->getName()}. " . serialize($attribute));
+              else if (in_array($column[$type_col], ["date", "datetime"])) {
+                $type_to_format = [
+                  "date"     => "Y-m-d"
+                , "datetime" => "Y-m-d H:i:s"
+                ];
+                $date = DateTime::createFromFormat($type_to_format[$column[$type_col]], $raw_val);
+                assert($date !== false, "Incorrect date string \"$raw_val\"");
+
+                switch (self::getColumnTreatmentType($column)) {
+                  case NULL:
+                    // By default, use DaysSince
+                    // break;
+                  case "DaysSince":
+                    $today = new DateTime("now");
+                    $val = intval($date->diff($today)->format("%R%a"));
+                    break;
+                  case "MonthsSince":
+                    $today = new DateTime("now");
+                    $val = intval($date->diff($today)->format("%R%m"));
+                    break;
+                  case "YearsSince":
+                    $today = new DateTime("now");
+                    $val = intval($date->diff($today)->format("%R%y"));
+                    break;
+                  default:
+                    die("Unknown treatment for $column[$type_col] column '{$this->getColumnTreatmentType($column)}'");
+                    break;
+                };
               }
             }
-          }
-          else if (in_array($ms_column[$type_col], ["date", "datetime"])) {
-            $type_to_format = [
-              "date"     => "Y-m-d"
-            , "datetime" => "Y-m-d H:i:s"
-            ];
-            $date = DateTime::createFromFormat($type_to_format[$ms_column[$type_col]], $raw_val);
-            assert($date !== false, "Incorrect date string \"$raw_val\"");
-
-            switch (self::getColumnTreatment($column)) {
-              case NULL:
-                // By default, use DaysSince
-                // break;
-              case "DaysSince":
-                $today = new DateTime("now");
-                $val = intval($date->diff($today)->format("%R%a"));
-                break;
-              case "MonthsSince":
-                $today = new DateTime("now");
-                $val = intval($date->diff($today)->format("%R%m"));
-                break;
-              case "YearsSince":
-                $today = new DateTime("now");
-                $val = intval($date->diff($today)->format("%R%y"));
-                break;
-              default:
-                die("TODO {$this->getColumnTreatment($column)}");
-                break;
-            };
-          }
+            $row[] = $val;
+            break;
         }
-
-        $row[] = $val;
-      }
+      } // Foreach value in row
       $data[] = $row;
-    
-    }
+    } // Foreach row
     // echo count($data) . " rows retrieved" . PHP_EOL;
     // echo get_var_dump($data);
     
-    $dataframe = new Instances($attributes, $data);
+    $final_attributes = [];
+
+    foreach ($attributes as $attribute) {
+      if ($attribute instanceof _Attribute) {
+        $final_attributes[] = $attribute;
+      } else if (is_array($attribute)) {
+        foreach ($attribute as $attr) {
+          $final_attributes[] = $attr;
+        }
+      } else {
+        die("Unknown attribute encountered. Must debug code.");
+      }
+    }
+
+    $dataframe = new Instances($final_attributes, $data);
     
     $dataframe->save_ARFF("tmp");
 
@@ -290,9 +364,23 @@ class DBFit {
 
   // Use the model for predicting
   function predict($input_data) {
-    echo "DBFit->predict(".serialize($input_data).")" . PHP_EOL;
+    echo "DBFit->predict(" . $input_data->toString(true) . ")" . PHP_EOL;
     assert($this->model instanceof _DiscriminativeModel, "Error! Model is not initialized");
     return $this->model->predict($input_data);
+  }
+
+  // Test the model
+  function test($test_data) {
+    echo "DBFit->test(" . $test_data->toString(true) . ")" . PHP_EOL;
+
+    $ground_truths = $test_data->getClassValues();
+    $test_data->dropOutputAttr();
+    $predictions = $this->predict($test_data);
+    
+    echo "\$ground_truths : " . get_var_dump($ground_truths) . PHP_EOL;
+    echo "\$predictions : " . get_var_dump($predictions) . PHP_EOL;
+
+    // TODO compute confusion matrix, etc. using $predictions $ground_truths
   }
 
   /* DEBUG-ONLY - Test capabilities */
@@ -302,8 +390,6 @@ class DBFit {
     $dataframe = $this->read_data();
 
     /* For testing, let's use the original data and cut the output column */
-    $input_dataframe = clone $dataframe;
-    $input_dataframe->dropOutputAttr();
     $attrs = $dataframe->getAttributes();
     //var_dump($attrs);
     // echo "TESTING DiscreteAntecedent & SPLIT DATA" . PHP_EOL;
@@ -330,7 +416,8 @@ class DBFit {
     echo PHP_EOL;
     
     $this->update_model();
-    $this->predict($input_dataframe);
+    $input_dataframe = clone $dataframe;
+    $this->test($input_dataframe);
     // $this->load_model();
     // $this->predict($input_dataframe);
     
@@ -341,8 +428,21 @@ class DBFit {
     $n = !is_array($col) ? $col : $col[0];
     return $force_no_table_name ? explode(".", $n)[1] : $n;
   }
-  static function getColumnTreatment($col) {
-    return !is_array($col) ? NULL : $col[1];
+  static function &getColumnTreatment(&$col) {
+    $x = !is_array($col) ? NULL : $col[1];
+    return $x;
+  }
+  static function getColumnTreatmentType($col) {
+    $tr = self::getColumnTreatment($col);
+    return !is_array($tr) ? $tr : $tr[0];
+  }
+  static function getColumnTreatmentArg($col, $i) {
+    $tr = self::getColumnTreatment($col);
+    return !is_array($tr) ? NULL : $tr[1+$i];
+  }
+  static function setColumnTreatmentArg(&$col, $i, $val) {
+    // TODO $tr = &self::getColumnTreatment($col);
+    $col[1][1+$i] = $val;
   }
   static function getColumnAttrName($col) {
     return !is_array($col) || !array_key_exists(2, $col) ?
@@ -353,193 +453,242 @@ class DBFit {
     if (self::isEnumType($mysql_type)) {
       return "enum";
     }
-    return self::$col2attr_type[$mysql_type][self::getColumnTreatment($col)];
+    else if (self::isTextType($mysql_type)) {
+      return "text";
+    } else {
+      return self::$col2attr_type[$mysql_type][self::getColumnTreatmentType($col)];
+    }
   }
 
   static function isEnumType($mysql_type) {
     return preg_match("/enum.*/i", $mysql_type);
   }
 
+  static function isTextType($mysql_type) {
+    return preg_match("/varchar.*/i", $mysql_type);
+  }
 
-    /**
-     * @return mixed
-     */
-    public function getModel()
-    {
-        return $this->model;
+
+  function getSQLSelectQuery($cols) {
+    listify($cols);
+    $sql = "SELECT " . mysql_list($cols, "noop") . " FROM " . mysql_list($this->table_names);
+    if ($this->limit !== NULL) {
+      $sql .= " LIMIT {$this->limit}";
     }
 
-    /**
-     * @param mixed $model
-     *
-     * @return self
-     */
-    public function setModel($model)
-    {
-        $this->model = $model;
-
-        return $this;
+    if ($this->join_criterion != NULL) {
+      listify($this->join_criterion);
+      $sql .= " WHERE 1";
+      foreach ($this->join_criterion as $criterion) {
+        $sql .= " AND $criterion";
+        // TODO if is equality of two columns, drop one of the columns/attributes
+        // if(preg_match("/.*[\s\w]=[\s\w].*/i", $criterion)) {}
+      }
     }
+    return $sql;
+  }
 
-    /**
-     * @return mixed
-     */
-    public function getDb()
-    {
-        return $this->db;
-    }
 
-    /**
-     * @param mixed $db
-     *
-     * @return self
-     */
-    public function setDb($db)
-    {
-        $this->db = $db;
+  function text2words($text) {
+    $text = strtolower($text);
+    
+    # to keep letters only (remove punctuation and such)
+    $text = preg_replace('/[^a-z]+/i', '_', $text);
+    
+    # tokenize
+    $words = array_filter(explode("_", $text));
 
-        return $this;
-    }
+    # remove stopwords
+    $words = array_diff($words, $this->stop_words);
 
-    /**
-     * @return mixed
-     */
-    public function getTableNames()
-    {
-        return $this->table_names;
-    }
+    # lemmatize
+    // TODO lemmatize($text)
 
-    /**
-     * @param mixed $table_names
-     *
-     * @return self
-     */
-    public function setTableNames($table_names)
-    {
-        $this->table_names = $table_names;
+    # stem
+    $words = array_map(["PorterStemmer", "Stem"], $words);
+    
+    return $words;
+  }
 
-        return $this;
-    }
+  /**
+   * @return mixed
+   */
+  public function getModel()
+  {
+      return $this->model;
+  }
 
-    /**
-     * @return mixed
-     */
-    public function getJoinCriterion()
-    {
-        return $this->join_criterion;
-    }
+  /**
+   * @param mixed $model
+   *
+   * @return self
+   */
+  public function setModel($model)
+  {
+      $this->model = $model;
 
-    /**
-     * @param mixed $join_criterion
-     *
-     * @return self
-     */
-    public function setJoinCriterion($join_criterion)
-    {
-        $this->join_criterion = $join_criterion;
+      return $this;
+  }
 
-        return $this;
-    }
+  /**
+   * @return mixed
+   */
+  public function getDb()
+  {
+      return $this->db;
+  }
 
-    /**
-     * @return mixed
-     */
-    public function getColumns()
-    {
-        return $this->columns;
-    }
+  /**
+   * @param mixed $db
+   *
+   * @return self
+   */
+  public function setDb($db)
+  {
+      $this->db = $db;
 
-    /**
-     * @param mixed $columns
-     *
-     * @return self
-     */
-    public function setColumns($columns)
-    {
-        $this->columns = $columns;
+      return $this;
+  }
 
-        return $this;
-    }
+  /**
+   * @return mixed
+   */
+  public function getTableNames()
+  {
+      return $this->table_names;
+  }
 
-    /**
-     * @return mixed
-     */
-    public function getOutputColumnName()
-    {
-        return $this->output_column_name;
-    }
+  /**
+   * @param mixed $table_names
+   *
+   * @return self
+   */
+  public function setTableNames($table_names)
+  {
+      $this->table_names = $table_names;
 
-    /**
-     * @param mixed $output_column_name
-     *
-     * @return self
-     */
-    public function setOutputColumnName($output_column_name)
-    {
-        $this->output_column_name = $output_column_name;
+      return $this;
+  }
 
-        return $this;
-    }
+  /**
+   * @return mixed
+   */
+  public function getJoinCriterion()
+  {
+      return $this->join_criterion;
+  }
 
-    /**
-     * @return mixed
-     */
-    public function getLimit()
-    {
-        return $this->limit;
-    }
+  /**
+   * @param mixed $join_criterion
+   *
+   * @return self
+   */
+  public function setJoinCriterion($join_criterion)
+  {
+      $this->join_criterion = $join_criterion;
 
-    /**
-     * @param mixed $limit
-     *
-     * @return self
-     */
-    public function setLimit($limit)
-    {
-        $this->limit = $limit;
+      return $this;
+  }
 
-        return $this;
-    }
+  /**
+   * @return mixed
+   */
+  public function getColumns()
+  {
+      return $this->columns;
+  }
 
-    /**
-     * @return mixed
-     */
-    public function getModelType()
-    {
-        return $this->model_type;
-    }
+  /**
+   * @param mixed $columns
+   *
+   * @return self
+   */
+  public function setColumns($columns)
+  {
+      $this->columns = $columns;
 
-    /**
-     * @param mixed $model_type
-     *
-     * @return self
-     */
-    public function setModelType($model_type)
-    {
-        $this->model_type = $model_type;
+      return $this;
+  }
 
-        return $this;
-    }
+  /**
+   * @return mixed
+   */
+  public function getOutputColumnName()
+  {
+      return $this->output_column_name;
+  }
 
-    /**
-     * @return mixed
-     */
-    public function getLearningMethod()
-    {
-        return $this->learning_method;
-    }
+  /**
+   * @param mixed $output_column_name
+   *
+   * @return self
+   */
+  public function setOutputColumnName($output_column_name)
+  {
+      $this->output_column_name = $output_column_name;
 
-    /**
-     * @param mixed $learning_method
-     *
-     * @return self
-     */
-    public function setLearningMethod($learning_method)
-    {
-        $this->learning_method = $learning_method;
+      return $this;
+  }
 
-        return $this;
-    }
+  /**
+   * @return mixed
+   */
+  public function getLimit()
+  {
+      return $this->limit;
+  }
+
+  /**
+   * @param mixed $limit
+   *
+   * @return self
+   */
+  public function setLimit($limit)
+  {
+      $this->limit = $limit;
+
+      return $this;
+  }
+
+  /**
+   * @return mixed
+   */
+  public function getModelType()
+  {
+      return $this->model_type;
+  }
+
+  /**
+   * @param mixed $model_type
+   *
+   * @return self
+   */
+  public function setModelType($model_type)
+  {
+      $this->model_type = $model_type;
+
+      return $this;
+  }
+
+  /**
+   * @return mixed
+   */
+  public function getLearningMethod()
+  {
+      return $this->learning_method;
+  }
+
+  /**
+   * @param mixed $learning_method
+   *
+   * @return self
+   */
+  public function setLearningMethod($learning_method)
+  {
+      $this->learning_method = $learning_method;
+
+      return $this;
+  }
 }
 
 ?>
