@@ -208,10 +208,8 @@ class PRip implements Learner {
     $defRule->setConsequent($data->numClasses() - 1);
     $this->ruleset[] = $defRule;
 
-    $defRuleStat = new RuleStats();
-    $defRuleStat->setData($data);
+    $defRuleStat = new RuleStats($data, [$defRule]);
     $defRuleStat->setNumAllConds($this->numAllConds);
-    $defRuleStat->pushRule($defRule);
     $this->rulesetStats[] = $defRuleStat;
 
     foreach ($this->rulesetStats as $ruleStat) {
@@ -255,11 +253,10 @@ class PRip implements Learner {
     $growData;
     $pruneData;
     
-    $stop = false;
     $ruleset = [];
+    $stop = false;
+    $dl = $minDL = $defDL;
 
-    $dl = $defDL;
-    $minDL = $defDL;
     $rstats = null;
     $rst;
 
@@ -318,9 +315,8 @@ class PRip implements Learner {
 
       // Compute the DL of this ruleset
       if ($rstats === null) { // First rule
-        $rstats = new RuleStats();
+        $rstats = new RuleStats($newData);
         $rstats->setNumAllConds($this->numAllConds);
-        $rstats->setData($newData);
       }
 
       $rstats->pushRule($oneRule);
@@ -364,35 +360,29 @@ class PRip implements Learner {
         }
         $rstats->popRule(); // Remove last to be re-used
       }
-    }// while !stop
+    }// while !$stop
 
     /******************** Optimization stage *******************/
     if ($this->usePruning) {
       $finalRulesetStat = NULL;
       for ($z = 0; $z < $this->numOptimizations; $z++) {
         if ($this->debug) {
-          echo "\n*** Optimization: run #" . $z . " ***" . PHP_EOL;
+          echo "\n*** Optimization: run #$z/{$this->numOptimizations} ***" . PHP_EOL;
         }
-        echo "TODO" . PHP_EOL;
-        echo "test on big dataset, one that has text" . PHP_EOL;
-        echo "do text thing" . PHP_EOL;
-        echo "do model predict, evaluate" . PHP_EOL;
-        echo "do model save" . PHP_EOL;
-
-        /*
         $newData = $data;
-        $finalRulesetStat = new RuleStats();
-        $finalRulesetStat.setData($newData);
-        $finalRulesetStat.setNumAllConds($this->numAllConds);
-        int position = 0;
-        stop = false;
-        boolean isResidual = false;
-        hasPositive = defHasPositive;
-        dl = minDL = defDL;
+        $finalRulesetStat = new RuleStats($newData);
+        $finalRulesetStat->setNumAllConds($this->numAllConds);
 
-        oneRule: while (!stop && hasPositive) {
+        $stop = false;
+        $dl = $minDL = $defDL;
+        $i_ruleToOpt = 0;
+        
+        $isResidual = false;
+        $hasPositive = $defHasPositive;
 
-          isResidual = (position >= ruleset.size()); // Cover residual positive
+        while (!$stop && $hasPositive) {
+
+          $isResidual = ($i_ruleToOpt >= count($ruleset)); // Cover residual positive
                                                      // examples
           // Re-do shuffling and stratification
           // newData.randomize(m_Random);
@@ -400,220 +390,206 @@ class PRip implements Learner {
           list($growData, $pruneData) = RuleStats::partition($newData, $this->numFolds);
           // growData=newData.trainCV($this->numFolds, $this->numFolds-1);
           // pruneData=newData.testCV($this->numFolds, $this->numFolds-1);
-          RipperRule finalRule;
+          $finalRule = NULL;
 
           if ($this->debug) {
-            echo "\nRule #" + position + "| isResidual?"
-              + isResidual + "| data size: " + newData.sumOfWeights());
+            echo "\nRule #" . $i_ruleToOpt . "| isResidual?"
+              . $isResidual . "| data size: " . $newData->sumOfWeights() . PHP_EOL;
           }
 
-          if (isResidual) {
-            RipperRule newRule = new RipperRule();
-            newRule.setConsequent(classIndex);
+          if ($isResidual) {
+            $newRule = new RipperRule();
+            $newRule->setConsequent($classIndex);
             if ($this->debug) {
-              echo "\nGrowing and pruning" + " a new rule ...";
+              echo "\nGrowing and pruning" . " a new rule ..." . PHP_EOL;
             }
-            newRule.grow(growData, $this->minNo);
-            newRule.prune(pruneData, false);
-            finalRule = newRule;
+            $newRule->grow($growData, $this->minNo);
+            $newRule->prune($pruneData, false);
+            $finalRule = $newRule;
             if ($this->debug) {
               echo "\nNew rule found: "
-                + newRule.toString($this->classAttr);
+                . $finalRule->toString($this->classAttr) . PHP_EOL;
             }
           } else {
-            RipperRule oldRule = (RipperRule) ruleset.get(position);
-            boolean covers = false;
+            $oldRule = $ruleset[$i_ruleToOpt];
             // Test coverage of the next old rule
-            for (int i = 0; i < newData.numInstances(); i++) {
-              if (oldRule.covers(newData.getInstance(i))) {
-                covers = true;
-                break;
-              }
-            }
+            $covers = $oldRule->coversAll($newData);
 
-            if (!covers) {// Null coverage, no variants can be generated
-              finalRulesetStat.pushRule(oldRule);
-              position++;
-              continue oneRule;
+            if (!$covers) {// Null coverage, no variants can be generated
+              $finalRulesetStat->pushRule($oldRule);
+              # TODO move this ++ to the beginning of the while and fix stuff accordingly
+              $i_ruleToOpt++;
+              continue;
             }
 
             // 2 variants
             if ($this->debug) {
-              echo "\nGrowing and pruning" + " Replace ...";
+              echo "\nGrowing and pruning" . " Replace ..." . PHP_EOL;
             }
-            RipperRule replace = new RipperRule();
-            replace.setConsequent(classIndex);
-            replace.grow(growData, $this->minNo);
+            $replace = new RipperRule();
+            $replace->setConsequent($classIndex);
+            $replace->grow($growData, $this->minNo);
 
             // Remove the pruning data covered by the following
             // rules, then simply compute the error rate of the
             // current rule to prune it. According to Ripper,
             // it's equivalent to computing the error of the
             // whole ruleset -- is it true?
-            pruneData = RuleStats.rmCoveredBySuccessives(pruneData, ruleset,
-              position);
-            replace.prune(pruneData, true);
+            $pruneData = RuleStats::rmCoveredBySuccessives($pruneData, $ruleset,
+              $i_ruleToOpt);
+            $replace->prune($pruneData, true);
 
             if ($this->debug) {
-              echo "\nGrowing and pruning" + " Revision ...";
+              echo "\nGrowing and pruning" . " Revision ..." . PHP_EOL;
             }
-            RipperRule revision = (RipperRule) oldRule.copy();
+            $revision = clone $oldRule;
 
-            // For revision, first rm the data covered by the old rule
-            Instances newGrowData = new Instances(growData, 0);
-            for (int b = 0; b < growData.numInstances(); b++) {
-              Instance inst = growData.getInstance(b);
-              if (revision.covers(inst)) {
-                newGrowData.add(inst);
+            // For revision, first remove the data covered by the old rule
+            $newGrowData = Instances::createEmpty($growData);
+            /* Split data */
+            for ($b = 0; $b < $growData->numInstances(); $b++) {
+              $inst = $growData->getInstance($b);
+              if ($revision->covers($inst)) { // TODO isn't this an error?
+                $newGrowData->pushInstance($inst);
               }
             }
-            revision.grow(newGrowData, $this->minNo);
-            revision.prune(pruneData, true);
+            $revision->grow($newGrowData, $this->minNo);
+            $revision->prune($pruneData, true);
 
-            double[][] prevRuleStats = new double[position][6];
-            for (int c = 0; c < position; c++) {
-              prevRuleStats[c] = finalRulesetStat.getSimpleStats(c);
+            $prevRuleStats = [];
+            for ($c = 0; $c < $i_ruleToOpt; $c++) {
+              $prevRuleStats[$c] = $finalRulesetStat->getSimpleStats($c);
             }
 
             // Now compare the relative DL of variants
-            ArrayList<Rule> tempRules = new ArrayList<Rule>(ruleset.size());
-            for (Rule r : ruleset) {
-              tempRules.add((Rule) r.copy());
-            }
-            tempRules.set(position, replace);
+            $tempRules = array_map("clone", $ruleset);
+            $tempRules[$i_ruleToOpt] = $replace;
 
-            RuleStats repStat = new RuleStats(data, tempRules);
-            repStat.setNumAllConds($this->numAllConds);
-            repStat.countData(position, newData, prevRuleStats);
-            // repStat.countData();
-            rst = repStat.getSimpleStats(position);
+            $repStat = new RuleStats($data, $tempRules);
+            $repStat->setNumAllConds($this->numAllConds);
+            $repStat->countData($i_ruleToOpt, $newData, $prevRuleStats);
+            $rst = $repStat->getSimpleStats($i_ruleToOpt);
             if ($this->debug) {
-              echo "Replace rule covers: " + rst[0] + " | pos = "
-                + rst[2] + " | neg = " + rst[4] + "\nThe rule doesn't cover: "
-                + rst[1] + " | pos = " + rst[5]);
+              echo "Replace rule covers: " . $rst[0] . " | pos = "
+                . $rst[2] . " | neg = " . $rst[4] . "\nThe rule doesn't cover: "
+                . $rst[1] . " | pos = " . $rst[5] . PHP_EOL;
             }
 
-            double repDL = repStat.relativeDL(position, expFPRate, $this->checkErr);
+            $repDL = $repStat->relativeDL($i_ruleToOpt, $expFPRate, $this->checkErr);
             if ($this->debug) {
-              echo "\nReplace: " + replace.toString($this->classAttr)
-                + " |dl = " + repDL);
+              echo "\nReplace: " . $replace->toString($this->classAttr)
+                . " |dl = " . $repDL . PHP_EOL;
             }
 
-            if (Double.isNaN(repDL) || Double.isInfinite(repDL)) {
+            if (is_nan($repDL) || is_infinite($repDL)) {
               throw new Exception("Should never happen: repDL"
-                + "in optmz. stage NaN or " + "infinite!");
+                . "in optmz. stage NaN or " . "infinite!");
             }
 
-            tempRules.set(position, revision);
-            RuleStats revStat = new RuleStats(data, tempRules);
-            revStat.setNumAllConds($this->numAllConds);
-            revStat.countData(position, newData, prevRuleStats);
-            // revStat.countData();
-            double revDL = revStat.relativeDL(position, expFPRate, $this->checkErr);
+            $tempRules[$i_ruleToOpt] = $revision;
+            $revStat = new RuleStats($data, $tempRules);
+            $revStat->setNumAllConds($this->numAllConds);
+            $revStat->countData($i_ruleToOpt, $newData, $prevRuleStats);
+            $revDL = $revStat->relativeDL($i_ruleToOpt, $expFPRate, $this->checkErr);
 
             if ($this->debug) {
-              echo "Revision: " + revision.toString($this->classAttr)
-                + " |dl = " + revDL);
+              echo "Revision: " . $revision->toString($this->classAttr)
+                . " | dl = " . $revDL . PHP_EOL;
             }
 
-            if (Double.isNaN(revDL) || Double.isInfinite(revDL)) {
+            if (is_nan($revDL) || is_infinite($revDL)) {
               throw new Exception("Should never happen: revDL"
-                + "in optmz. stage NaN or " + "infinite!");
+                . "in optmz. stage NaN or " . "infinite!");
             }
 
-            rstats = new RuleStats(data, ruleset);
-            rstats.setNumAllConds($this->numAllConds);
-            rstats.countData(position, newData, prevRuleStats);
-            // rstats.countData();
-            double oldDL = rstats.relativeDL(position, expFPRate, $this->checkErr);
+            $rstats = new RuleStats($data, $ruleset);
+            $rstats->setNumAllConds($this->numAllConds);
+            $rstats->countData($i_ruleToOpt, $newData, $prevRuleStats);
+            $oldDL = $rstats->relativeDL($i_ruleToOpt, $expFPRate, $this->checkErr);
 
-            if (Double.isNaN(oldDL) || Double.isInfinite(oldDL)) {
+            if (is_nan($oldDL) || is_infinite($oldDL)) {
               throw new Exception("Should never happen: oldDL"
-                + "in optmz. stage NaN or " + "infinite!");
+                . "in optmz. stage NaN or " . "infinite!");
             }
             if ($this->debug) {
-              echo "Old rule: " + oldRule.toString($this->classAttr)
-                + " |dl = " + oldDL);
+              echo "Old rule: " . $oldRule->toString($this->classAttr)
+                . " |dl = " . $oldDL . PHP_EOL;
             }
 
             if ($this->debug) {
-              echo "\nrepDL: " + repDL + "\nrevDL: " + revDL
-                + "\noldDL: " + oldDL);
+              echo "\nrepDL: " . $repDL . "\nrevDL: " . $revDL
+                . "\noldDL: " . $oldDL . PHP_EOL;
             }
 
-            if ((oldDL <= revDL) && (oldDL <= repDL)) {
-              finalRule = oldRule; // Old the best
-            } else if (revDL <= repDL) {
-              finalRule = revision; // Revision the best
+            if (($oldDL <= $revDL) && ($oldDL <= $repDL)) {
+              $finalRule = $oldRule; // Old is best
+            } else if ($revDL <= $repDL) {
+              $finalRule = $revision; // Revision is best
             } else {
-              finalRule = replace; // Replace the best
+              $finalRule = $replace; // Replace is best
             }
           }
 
-          finalRulesetStat.pushRule(finalRule);
-          rst = finalRulesetStat.getSimpleStats(position);
+          $finalRulesetStat->pushRule($finalRule);
+          $rst = $finalRulesetStat->getSimpleStats($i_ruleToOpt);
 
-          if (isResidual) {
+          if ($isResidual) {
 
-            dl += finalRulesetStat.relativeDL(position, expFPRate, $this->checkErr);
+            $dl += $finalRulesetStat->relativeDL($i_ruleToOpt, $expFPRate, $this->checkErr);
             if ($this->debug) {
-              echo "After optimization: the dl" + "=" + dl
-                + " | best: " + minDL);
+              echo "After optimization: the dl" . "=" . $dl
+                . " | best: " . $minDL . PHP_EOL;
             }
 
-            if (dl < minDL) {
-              minDL = dl; // The best dl so far
+            if ($dl < $minDL) {
+              $minDL = $dl; // The best dl so far
             }
 
-            stop = checkStop(rst, minDL, dl);
-            if (!stop) {
-              ruleset.add(finalRule); // Accepted
+            $stop = $this->checkStop($rst, $minDL, $dl);
+            if (!$stop) {
+              $ruleset[] = $finalRule; // Accepted
             } else {
-              finalRulesetStat.removeLast(); // Remove last to be re-used
-              position--;
+              $finalRulesetStat->popRule(); // Remove last to be re-used
+              $i_ruleToOpt--;
             }
           } else {
-            ruleset.set(position, finalRule); // Accepted
+            $ruleset[$i_ruleToOpt] = $finalRule; // Accepted
           }
 
           if ($this->debug) {
-            echo "The rule covers: " + rst[0] + " | pos = "
-              + rst[2] + " | neg = " + rst[4] + "\nThe rule doesn't cover: "
-              + rst[1] + " | pos = " + rst[5]);
-            echo "\nRuleset so far: ";
-            for (int x = 0; x < ruleset.size(); x++) {
-              echo x + ": "
-                + ((RipperRule) ruleset.get(x)).toString($this->classAttr);
+            echo "The rule covers: " . $rst[0] . " | pos = "
+              . $rst[2] . " | neg = " . $rst[4] . "\nThe rule doesn't cover: "
+              . $rst[1] . " | pos = " . $rst[5] . PHP_EOL;
+            echo "\nRuleset so far: [" . PHP_EOL;
+            foreach ($ruleset as $x => $rule) {
+              echo $x . ": " . $rule->toString($this->classAttr) . PHP_EOL;
             }
-            echo );
+            echo "]" . PHP_EOL;
           }
 
           // Data not covered
-          if (finalRulesetStat.getRulesetSize() > 0) {
-            newData = finalRulesetStat.getFiltered(position)[1];
+          if ($finalRulesetStat->getRulesetSize() > 0) {
+            $newData = $finalRulesetStat->getFiltered($i_ruleToOpt)[1];
           }
-          hasPositive = greater(rst[5], 0.0); // Positives remaining?
-          position++;
-        } // while !stop && hasPositive
+          $hasPositive = $rst[5] > 0.0; // Positives remaining?
+          $i_ruleToOpt++;
+        } // while !$stop && $hasPositive
 
-        if (ruleset.size() > (position + 1)) { // Hasn't gone through yet
-          for (int k = position + 1; k < ruleset.size(); k++) {
-            finalRulesetStat.pushRule(ruleset.get(k));
+        if (count($ruleset) > ($i_ruleToOpt + 1)) { // Hasn't gone through yet
+          for ($k = $i_ruleToOpt + 1; $k < count($ruleset); $k++) {
+            $finalRulesetStat->pushRule($ruleset[$k]);
           }
         }
         if ($this->debug) {
-          echo "\nDeleting rules to decrease"
-            + " DL of the whole ruleset ...");
+          echo "\nDeleting rules to decrease DL of the whole ruleset ...";
         }
-        finalRulesetStat.reduceDL(expFPRate, $this->checkErr);
+        $finalRulesetStat->reduceDL($expFPRate, $this->checkErr);
         if ($this->debug) {
-          int del = ruleset.size() - finalRulesetStat.getRulesetSize();
-          echo del + " rules are deleted"
-            + " after DL reduction procedure");
+          $del = count($ruleset) - $finalRulesetStat->getRulesetSize();
+          echo $del . " rules were deleted after DL reduction procedure";
         }
-        ruleset = finalRulesetStat.getRuleset();
-        rstats = finalRulesetStat;
-        */
+        $ruleset = $finalRulesetStat->getRuleset();
+        $rstats = $finalRulesetStat;
        
       } // For each run of optimization
     } // if pruning is used

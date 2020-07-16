@@ -12,35 +12,9 @@ include "DBFit.php";
  ****************************************************/
 
 $db = getDBConnection();
-
 $model_type = "RuleBased";
 $learning_method = "RIPPER";
 
-$table_names = ["winery"];
-$columns = [
-	["winery.country", "ForceCategorical"],
-	["winery.description", ["BinaryBagOfWords", 14]],
-];
-$join_criterion = [];
-$output_column_name = "winery.country";
-
-
-$db_fit = new DBFit($db);
-$db_fit->setModelType($model_type);
-$db_fit->setTableNames($table_names);
-$db_fit->setColumns($columns);
-$db_fit->setJoinCriterion($join_criterion);
-$db_fit->setLimit(100);
-$db_fit->setOutputColumnName($output_column_name);
-$db_fit->setModelType($model_type);
-$db_fit->setLearningMethod($learning_method);
-$db_fit->test_all_capabilities();
-
-echo "All good" . PHP_EOL;
-
-exit();
-
-/*
 $table_names = ["patients"];
 $columns = ["ID", "Gender", ["BirthDate", "YearsSince", "Age"], "Sillyness"];
 $join_criterion = NULL;
@@ -68,6 +42,29 @@ $db_fit->test_all_capabilities();
 //
 exit();
 */
+
+$table_names = ["winery"];
+$columns = [
+	["winery.country", "ForceCategorical"],
+	["winery.description", ["BinaryBagOfWords", 14]],
+];
+$join_criterion = [];
+$output_column_name = "winery.country";
+
+$db_fit = new DBFit($db);
+$db_fit->setModelType($model_type);
+$db_fit->setTableNames($table_names);
+$db_fit->setColumns($columns);
+$db_fit->setJoinCriterion($join_criterion);
+$db_fit->setLimit(100);
+$db_fit->setOutputColumnName($output_column_name);
+$db_fit->setModelType($model_type);
+$db_fit->setLearningMethod($learning_method);
+$db_fit->test_all_capabilities();
+
+echo "All good" . PHP_EOL;
+
+exit();
 
 /*
 

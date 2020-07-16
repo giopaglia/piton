@@ -88,6 +88,18 @@ class RipperRule extends _Rule {
     return $isCover;
   }
 
+  function coversAll(&$data) {
+    $isCover = true;
+
+    for ($i = 0; $i < $data->numInstances(); $i++) {
+      if (!$this->covers($data, $i)) {
+        $isCover = false;
+        break;
+      }
+    }
+    return $isCover;
+  }
+
   /**
    * Whether this rule has antecedents, i.e. whether it is a default rule
    * 
@@ -384,6 +396,11 @@ class RipperRule extends _Rule {
     }
   }
   
+  function __clone()
+  {
+      $this->antecedents = array_map("clone", $this->antecedents);
+  }
+
   /* Print a textual representation of the antecedent */
   function toString(_Attribute $classAttr = NULL) {
     $ants = [];

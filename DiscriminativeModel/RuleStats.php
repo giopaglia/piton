@@ -44,14 +44,18 @@ class RuleStats {
   private $distributions;
 
   /** Constructor */
-  function __construct() {
-    $this->data = NULL;
-    $this->numAllConds = NULL;
+  function __construct($data = NULL, $rules = [], $numAllConds = NULL) {
+    $this->data = $data;
+    $this->numAllConds = $numAllConds;
 
     $this->ruleset = NULL;
     $this->filtered = NULL;
     $this->simpleStats = NULL;
     $this->distributions = NULL;
+
+    foreach ($rules as $rule) {
+      $this->pushRule($rule);
+    }
   }
 
   /**
@@ -167,6 +171,128 @@ class RuleStats {
     return $rt;
   }
 
+
+  /**
+   * Try to reduce the DL of the ruleset by testing removing the rules one by
+   * one in reverse order and update all the stats
+   * 
+   * @param expFPRate expected FP/(FP+FN), used in dataDL calculation
+   * @param checkErr whether check if error rate >= 0.5
+   */
+  function reduceDL(float $expFPRate, bool $checkErr) {
+
+    $needUpdate = false;
+    $rulesetStat = array_fill(0, 6, 0.0); // 6 statistics parameters
+    for ($j = 0; $j < $this->getRulesetSize(); $j++) {
+      // Covered stats are cumulative
+      $rulesetStat[0] += $this->simpleStats[$j][0];
+      $rulesetStat[2] += $this->simpleStats[$j][2];
+      $rulesetStat[4] += $this->simpleStats[$j][4];
+      if ($j == $this->getRulesetSize() - 1) { // Last rule
+        $rulesetStat[1] = $this->simpleStats[$j][1];
+        $rulesetStat[3] = $this->simpleStats[$j][3];
+        $rulesetStat[5] = $this->simpleStats[$j][5];
+      }
+    }
+
+    // Potential
+    for ($k = $this->getRulesetSize() - 1; $k >= 0; $k--) {
+
+      $ruleStat = $this->simpleStats[$k];
+
+      // rulesetStat updated
+      $ifDeleted = self::potential($k, $expFPRate, $rulesetStat, $ruleStat,
+        $checkErr);
+      if (!is_nan($ifDeleted)) {
+        /*
+         * System.err.println("!!!deleted ("+k+"): save "+ifDeleted
+         * +" | "+rulesetStat[0] +" | "+rulesetStat[1] +" | "+rulesetStat[4]
+         * +" | "+rulesetStat[5]);
+         */
+
+        if ($k == ($this->getRulesetSize() - 1)) {
+          $this->popRule();
+        } else {
+          array_splice($this->ruleset, $k, 1);
+          $needUpdate = true;
+        }
+      }
+    }
+
+    if ($needUpdate) {
+      $this->filtered = NULL;
+      $this->simpleStats = NULL;
+      $this->reCountData();
+    }
+  }
+
+  /**
+   * Filter the data according to the ruleset and compute the basic stats:
+   * coverage/uncoverage, true/false positive/negatives of each rule
+   */
+  function reCountData() {
+    if (($this->filtered !== NULL) || ($this->ruleset === NULL) || ($this->data === NULL)) {
+      return;
+    }
+
+    $size = $this->getRulesetSize();
+    $this->filtered = [];
+    $this->simpleStats = [];
+    $this->distributions = [];
+    $data = clone $this->data;
+
+    for ($i = 0; $i < $size; $i++) {
+      $stats = array_fill(0, 6, 0.0); // 6 statistics parameters
+      $classCounts = array_fill(0, $this->data->getClassAttribute()->numValues(), 0.0);
+      $filtered = self::computeSimpleStats($i, $data, $stats, $classCounts);
+      $this->filtered[] = $filtered;
+      $this->simpleStats[] = $stats;
+      $this->distributions[] = $classCounts;
+      $data = $filtered[1]; // Data not covered
+    }
+  }
+
+  /**
+   * Count data from the position index in the ruleset assuming that given data
+   * are not covered by the rules in position 0...(index-1), and the statistics
+   * of these rules are provided.<br>
+   * This procedure is typically useful when a temporary object of RuleStats is
+   * constructed in order to efficiently calculate the relative DL of rule in
+   * position index, thus all other stuff is not needed.
+   * 
+   * @param index the given position
+   * @param uncovered the data not covered by rules before index
+   * @param prevRuleStats the provided stats of previous rules
+   */
+  function countData(int $index, Instances $uncovered, array $prevRuleStats) {
+    if (($this->filtered !== NULL) || ($this->ruleset === NULL)) {
+      return;
+    }
+
+    $size = $this->getRulesetSize();
+    $this->filtered = [];
+    $this->simpleStats = [];
+    $this->distributions = [];
+    $data = [Instances::createEmpty($this->data), $uncovered];
+
+
+    for ($i = 0; $i < $index; $i++) {
+      if ($i + 1 == $index) {
+        $this->filtered[] = $data;
+      } else {
+        $this->filtered[] = NULL; // Stuff sth.
+      }
+      $this->simpleStats[] = $prevRuleStats[$i];
+    }
+
+    for ($j = $index; $j < size; $j++) {
+      $stats = array_fill(0, 6, 0.0); // 6 statistics parameters
+      $filtered = self::computeSimpleStats($j, $data[1], $stats, NULL);
+      $this->filtered[] = $filtered;
+      $this->simpleStats[] = $stats;
+      $data = $filtered; // Data not covered
+    }
+  }
 
   /**
    * Stratify the given data into the given number of bags based on the class
@@ -323,6 +449,39 @@ class RuleStats {
     array_pop($this->filtered);
     array_pop($this->simpleStats);
     array_pop($this->distributions);
+  }
+
+
+  /**
+   * Static utility function to count the data covered by the rules after the
+   * given index in the given rules, and then remove them. It returns the data
+   * not covered by the successive rules.
+   * 
+   * @param data the data to be processed
+   * @param rules the ruleset
+   * @param index the given index
+   * @return the data after processing
+   */
+  static function rmCoveredBySuccessives(Instances &$data,
+    array $rules, int $index) {
+    $data_out = Instances::createEmpty($data);
+
+    for ($i = 0; $i < $data->numInstances(); $i++) {
+      $covered = false;
+
+      for ($j = $index + 1; $j < count($rules); $j++) {
+        $rule = $rules[$j];
+        if ($rule->covers($data, $i)) {
+          $covered = true;
+          break;
+        }
+      }
+
+      if (!$covered) {
+        $data_out->pushInstance($data->getInstance($i));
+      }
+    }
+    return $data_out;
   }
 
   /**
@@ -567,7 +726,7 @@ class RuleStats {
    * @param checkErr whether check if error rate >= 0.5
    * @return the potential DL that could be decreased
    */
-  static function potential(int $index, float $expFPOverErr, array $rulesetStat,
+  function potential(int $index, float $expFPOverErr, array $rulesetStat,
     array $ruleStat, bool $checkErr) {
     // System.out.println("!!!inside potential: ");
     // Restore the stats if deleted

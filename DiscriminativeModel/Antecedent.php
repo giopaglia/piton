@@ -66,6 +66,10 @@ abstract class _Antecedent {
   /* Print a textual representation of the antecedent */
   abstract function toString();
 
+  function __clone()
+  {
+    $this->attribute = clone $this->attribute;
+  }
 
   /**
    * @return mixed

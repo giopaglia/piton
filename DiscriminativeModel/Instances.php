@@ -71,6 +71,7 @@ class Instances {
   }
 
   function getWeights() {
+    // return array_column($this->data, $this->numAttributes());
     $weights = [];
     for ($x = 0; $x < $this->numInstances(); $x++) {
       $weights[] = $this->inst_weight($x);
@@ -261,6 +262,13 @@ class Instances {
 
     fclose($f);
   }
+
+
+  // function __clone()
+  // {
+  //   $this->attributes = clone $this->attributes;
+  //   $this->data       = clone $this->data;
+  // }
 
   /**
    * Print a textual representation of the instances

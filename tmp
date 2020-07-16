@@ -2,21 +2,21 @@
 
 @RELATION tmp
 
-@ATTRIBUTE country {Italy,Portugal,US,Spain,France,Germany,Argentina,Chile,Australia,Austria}
-@ATTRIBUTE 'flavor' in description {✘,✔}
-@ATTRIBUTE 'wine' in description {✘,✔}
-@ATTRIBUTE 'aroma' in description {✘,✔}
-@ATTRIBUTE 'fruit' in description {✘,✔}
-@ATTRIBUTE 'palat' in description {✘,✔}
-@ATTRIBUTE 'note' in description {✘,✔}
-@ATTRIBUTE 'oak' in description {✘,✔}
-@ATTRIBUTE 'drink' in description {✘,✔}
-@ATTRIBUTE 'acid' in description {✘,✔}
-@ATTRIBUTE 'ripe' in description {✘,✔}
-@ATTRIBUTE 'finish' in description {✘,✔}
-@ATTRIBUTE 'tannin' in description {✘,✔}
-@ATTRIBUTE 'berri' in description {✘,✔}
-@ATTRIBUTE 'red' in description {✘,✔}
+@ATTRIBUTE winery.country {Italy,Portugal,US,Spain,France,Germany,Argentina,Chile,Australia,Austria}
+@ATTRIBUTE 'flavor' in winery.description {✘,✔}
+@ATTRIBUTE 'wine' in winery.description {✘,✔}
+@ATTRIBUTE 'aroma' in winery.description {✘,✔}
+@ATTRIBUTE 'fruit' in winery.description {✘,✔}
+@ATTRIBUTE 'palat' in winery.description {✘,✔}
+@ATTRIBUTE 'note' in winery.description {✘,✔}
+@ATTRIBUTE 'oak' in winery.description {✘,✔}
+@ATTRIBUTE 'drink' in winery.description {✘,✔}
+@ATTRIBUTE 'acid' in winery.description {✘,✔}
+@ATTRIBUTE 'ripe' in winery.description {✘,✔}
+@ATTRIBUTE 'finish' in winery.description {✘,✔}
+@ATTRIBUTE 'tannin' in winery.description {✘,✔}
+@ATTRIBUTE 'berri' in winery.description {✘,✔}
+@ATTRIBUTE 'red' in winery.description {✘,✔}
 
 @DATA
 Italy,✘,✘,✔,✔,✔,✘,✘,✘,✔,✘,✘,✘,✘,✘, {1}

@@ -70,10 +70,10 @@ class DBFit {
     /* Checks */
     // And move output column such that it's the FIRST column
     $output_col_in_columns = false;
-    foreach ($this->columns as $k => $col) {
-    	if (self::getColumnName($col) == $this->output_column_name) {
+    foreach ($this->columns as $i_col => $col) {
+    	if ($this->getColumnName($i_col) == $this->output_column_name) {
     		$output_col_in_columns = true;
-        array_splice($this->columns, $k, 1);
+        array_splice($this->columns, $i_col, 1);
         array_unshift($this->columns, $col);
         break;
       }
@@ -82,9 +82,9 @@ class DBFit {
       die("ERROR! The output column name (here \"{$this->output_column_name}\") must be in columns");
     }
 
-    if (count($this->table_names)) {
-      foreach ($this->columns as $column) {
-        if (!preg_match("/.*\..*/i", self::getColumnName($column))) {
+    if (count($this->table_names) > 1) {
+      foreach ($this->columns as $i_col => $col) {
+        if (!preg_match("/.*\..*/i", $this->getColumnName($i_col))) {
           die("ERROR! When reading more than one table, " .
               "please specify column names in their 'table_name.column_name' form");
         }
@@ -96,7 +96,6 @@ class DBFit {
     $attributes = [];
     $sql = "SELECT * FROM `information_schema`.`columns` WHERE `table_name` IN "
           . mysql_set($this->table_names) . " ";
-    $type_col = "COLUMN_TYPE";
     echo "SQL: $sql" . PHP_EOL;
     $stmt = $this->db->prepare($sql);
     $stmt->execute();
@@ -109,43 +108,47 @@ class DBFit {
       $raw_mysql_columns[] = $row;
     }
     // var_dump($raw_mysql_columns);
+    // var_dump($this->columns);
     
-    foreach ($this->columns as &$column) {
+    
+    foreach ($this->columns as $i_col => $column) {
       $mysql_column = NULL;
       foreach ($raw_mysql_columns as $col) {
-        if (in_array(self::getColumnName($column),
+        if (in_array($this->getColumnName($i_col),
             [$col["TABLE_NAME"].".".$col["COLUMN_NAME"], $col["COLUMN_NAME"]])) {
           $mysql_column = $col;
           break;
         }
       }
       if ($mysql_column === NULL) {
-        die("Couldn't retrieve information about column \"" . self::getColumnName($column) . "\"");
+        die("Couldn't retrieve information about column \"" . $this->getColumnName($i_col) . "\"");
       }
-      // TODO figure out, where does "boolean" go? Should end up creating a discrete attr w/ 2 classes.
-      $attr_name = self::getColumnAttrName($column);
+      $this->setColumnMySQLType($i_col, $mysql_column["COLUMN_TYPE"]);
+
+      // TODO where does "boolean" go? Should end up creating a discrete attr w/ 2 classes.
+      $attr_name = $this->getColumnAttrName($i_col);
 
       switch(true) {
-        case self::getColumnTreatmentType($column) == "ForceCategorical":
+        case $this->getColumnTreatmentType($i_col) == "ForceCategorical":
           $attribute = new DiscreteAttribute($attr_name, "enum");
           break;
-        case in_array($mysql_column[$type_col], ["int", "float", "double", "real", "date", "datetime"]):
-          $attribute = new ContinuousAttribute($attr_name, self::getColumnAttrType($mysql_column[$type_col], $column));
+        case in_array($this->getColumnMySQLType($i_col), ["int", "float", "double", "real", "date", "datetime"]):
+          $attribute = new ContinuousAttribute($attr_name, $this->getColumnAttrType($i_col));
           break;
-        case self::isEnumType($mysql_column[$type_col]):
-          $domain_arr_str = (preg_replace("/enum\((.*)\)/i", "[$1]", $mysql_column[$type_col]));
+        case self::isEnumType($this->getColumnMySQLType($i_col)):
+          $domain_arr_str = (preg_replace("/enum\((.*)\)/i", "[$1]", $this->getColumnMySQLType($i_col)));
           eval("\$domain_arr = " . $domain_arr_str . ";");
           $attribute = new DiscreteAttribute($attr_name, "enum", $domain_arr);
           break;
-        case self::isTextType($mysql_column[$type_col]):
-          switch(self::getColumnTreatmentType($column)) {
+        case self::isTextType($this->getColumnMySQLType($i_col)):
+          switch($this->getColumnTreatmentType($i_col)) {
             case "BinaryBagOfWords":
-              if ( is_numeric(self::getColumnTreatmentArg($column, 0))) {
-                $k = self::getColumnTreatmentArg($column, 0);
+              if ( is_numeric($this->getColumnTreatmentArg($i_col, 0))) {
+                $k = $this->getColumnTreatmentArg($i_col, 0);
 
                 // Find $k most frequent words
                 $word_counts = [];
-                $sql = $this->getSQLSelectQuery(self::getColumnName($column));
+                $sql = $this->getSQLSelectQuery($this->getColumnName($i_col));
                 echo "SQL: $sql" . PHP_EOL;
                 $stmt = $this->db->prepare($sql);
                 $stmt->execute();
@@ -156,7 +159,7 @@ class DBFit {
                 }
 
                 foreach ($stmt->get_result() as $raw_row) {
-                  $text = $raw_row[self::getColumnName($column, true)];
+                  $text = $raw_row[$this->getColumnName($i_col, true)];
                   
                   $words = self::text2words($text);
 
@@ -178,11 +181,12 @@ class DBFit {
                 }
                 // var_dump($dict);
               }
-              else if (is_array(self::getColumnTreatmentArg($column, 0))) {
-                $dict = self::getColumnTreatmentArg($column, 0);
+              else if (is_array($this->getColumnTreatmentArg($i_col, 0))) {
+                $dict = $this->getColumnTreatmentArg($i_col, 0);
               }
               else {
-                die("Please specify a dictionary size for bag-of-words processing column '{self::getColumnName($column)}'.");
+                die("Please specify a dictionary size for bag-of-words processing column '"
+                   . $this->getColumnName($i_col) . "'.");
               }
 
               // Binary attributes indicating the presence of each word
@@ -192,18 +196,17 @@ class DBFit {
                   "word_presence", ["✘", "✔"]);
               }
 
-              self::setColumnTreatmentArg($column, 0, $dict);
+              $this->setColumnTreatmentArg($i_col, 0, $dict);
               break;
             default:
-              die("Unknown treatment for text column: " . self::getColumnName($column));
+              die("Unknown treatment for text column: " . $this->getColumnName($i_col));
               break;
           }
           break;
         default:
-          die("Unknown column type: " . $mysql_column[$type_col]);
+          die("Unknown column type: " . $this->getColumnMySQLType($i_col));
           break;
       }
-      $column[$type_col] = $mysql_column[$type_col];
 
       $attributes[] = $attribute;
     }
@@ -213,7 +216,7 @@ class DBFit {
     $cols_attrs = zip($attributes, $this->columns);
     // var_dump($cols_attrs);
     
-    $sql = $this->getSQLSelectQuery(array_map(["self", "getColumnName"], $this->columns));
+    $sql = $this->getSQLSelectQuery(array_map([$this, "getColumnName"], range(0, count($this->columns)-1)));
     echo "SQL: $sql" . PHP_EOL;
     $stmt = $this->db->prepare($sql);
     $stmt->execute();
@@ -222,18 +225,18 @@ class DBFit {
       
       /* Pre-process data */
       $row = [];
-      foreach ($cols_attrs as $arr) {
+      foreach ($cols_attrs as $i_col => $arr) {
         $attribute = $arr[0];
         $column    = $arr[1];
 
-        // echo self::getColumnName($column, true);
-        $raw_val = $raw_row[self::getColumnName($column, true)];
+        // echo $this->getColumnName($i_col, true);
+        $raw_val = $raw_row[$this->getColumnName($i_col, true)];
         
         switch (true) {
-          case self::getColumnTreatmentType($column) == "BinaryBagOfWords":
+          case $this->getColumnTreatmentType($i_col) == "BinaryBagOfWords":
 
-            $dict = self::getColumnTreatmentArg($column, 0);
-            // var_dump($dict);
+            $dict = $this->getColumnTreatmentArg($i_col, 0);
+            var_dump($dict);
             foreach ($dict as $word) {
               $val = in_array($word, self::text2words($raw_val));
               $row[] = $val;
@@ -248,7 +251,7 @@ class DBFit {
               if ($attribute instanceof DiscreteAttribute) {
                 $val = array_search($raw_val, $attribute->getDomain());
                 if ($val === false) {
-                  if (self::getColumnTreatmentType($column) == "ForceCategorical") {
+                  if ($this->getColumnTreatmentType($i_col) == "ForceCategorical") {
                     $attribute->pushDomainVal($raw_val);
                     $val = array_search($raw_val, $attribute->getDomain());
                   }
@@ -257,15 +260,15 @@ class DBFit {
                   }
                 }
               }
-              else if (in_array($column[$type_col], ["date", "datetime"])) {
+              else if (in_array($this->getColumnMySQLType($i_col), ["date", "datetime"])) {
                 $type_to_format = [
                   "date"     => "Y-m-d"
                 , "datetime" => "Y-m-d H:i:s"
                 ];
-                $date = DateTime::createFromFormat($type_to_format[$column[$type_col]], $raw_val);
+                $date = DateTime::createFromFormat($type_to_format[$this->getColumnMySQLType($i_col)], $raw_val);
                 assert($date !== false, "Incorrect date string \"$raw_val\"");
 
-                switch (self::getColumnTreatmentType($column)) {
+                switch ($this->getColumnTreatmentType($i_col)) {
                   case NULL:
                     // By default, use DaysSince
                     // break;
@@ -282,7 +285,7 @@ class DBFit {
                     $val = intval($date->diff($today)->format("%R%y"));
                     break;
                   default:
-                    die("Unknown treatment for $column[$type_col] column '{$this->getColumnTreatmentType($column)}'");
+                    die("Unknown treatment for {$this->getColumnMySQLType($i_col)} column '{$this->getColumnTreatmentType($column)}'");
                     break;
                 };
               }
@@ -424,41 +427,6 @@ class DBFit {
   }
 
 
-  static function getColumnName($col, $force_no_table_name = false) {
-    $n = !is_array($col) ? $col : $col[0];
-    return $force_no_table_name ? explode(".", $n)[1] : $n;
-  }
-  static function &getColumnTreatment(&$col) {
-    $x = !is_array($col) ? NULL : $col[1];
-    return $x;
-  }
-  static function getColumnTreatmentType($col) {
-    $tr = self::getColumnTreatment($col);
-    return !is_array($tr) ? $tr : $tr[0];
-  }
-  static function getColumnTreatmentArg($col, $i) {
-    $tr = self::getColumnTreatment($col);
-    return !is_array($tr) ? NULL : $tr[1+$i];
-  }
-  static function setColumnTreatmentArg(&$col, $i, $val) {
-    // TODO $tr = &self::getColumnTreatment($col);
-    $col[1][1+$i] = $val;
-  }
-  static function getColumnAttrName($col) {
-    return !is_array($col) || !array_key_exists(2, $col) ?
-        self::getColumnName($col, true) : $col[2];
-  }
-
-  static function getColumnAttrType($mysql_type, $col) {
-    if (self::isEnumType($mysql_type)) {
-      return "enum";
-    }
-    else if (self::isTextType($mysql_type)) {
-      return "text";
-    } else {
-      return self::$col2attr_type[$mysql_type][self::getColumnTreatmentType($col)];
-    }
-  }
 
   static function isEnumType($mysql_type) {
     return preg_match("/enum.*/i", $mysql_type);
@@ -476,8 +444,7 @@ class DBFit {
       $sql .= " LIMIT {$this->limit}";
     }
 
-    if ($this->join_criterion != NULL) {
-      listify($this->join_criterion);
+    if ($this->join_criterion != NULL && count($this->join_criterion)) {
       $sql .= " WHERE 1";
       foreach ($this->join_criterion as $criterion) {
         $sql .= " AND $criterion";
@@ -585,6 +552,7 @@ class DBFit {
    */
   public function setJoinCriterion($join_criterion)
   {
+      listify($join_criterion);
       $this->join_criterion = $join_criterion;
 
       return $this;
@@ -598,6 +566,54 @@ class DBFit {
       return $this->columns;
   }
 
+  function getColumnName($i_col, $force_no_table_name = false) {
+    // var_dump($i_col);
+    // var_dump($this->columns);
+    $col = $this->columns[$i_col];
+    $n = $col["name"];
+    return $force_no_table_name && count(explode(".", $n)) > 1 ? explode(".", $n)[1] : $n;
+  }
+  function &getColumnTreatment($i_col) {
+    return $this->columns[$i_col]["treatment"];
+  }
+  function getColumnTreatmentType($i_col) {
+    $tr = $this->getColumnTreatment($i_col);
+    return !is_array($tr) ? $tr : $tr[0];
+  }
+  function getColumnTreatmentArg($i_col, $i) {
+    $tr = $this->getColumnTreatment($i_col);
+    return !is_array($tr) || !isset($tr[1+$i]) ? NULL : $tr[1+$i];
+  }
+  function setColumnTreatmentArg($i_col, $i, $val) {
+    $this->getColumnTreatment($i_col)[1+$i] = $val;
+    // $col["treatment"][1+$i] = $val;
+  }
+  function getColumnAttrName($i_col) {
+    $col = $this->columns[$i_col];
+    return !array_key_exists("attr_name", $col) ?
+        $this->getColumnName($i_col, true) : $col["attr_name"];
+  }
+
+  function getColumnMySQLType($i_col) {
+    $col = $this->columns[$i_col];
+    return $col["mysql_type"];
+  }
+  function setColumnMySQLType($i_col, $val) {
+    $this->columns[$i_col]["mysql_type"] = $val;
+  }
+
+  function getColumnAttrType($i_col) {
+    $mysql_type = $this->getColumnMySQLType($i_col);
+    if (self::isEnumType($mysql_type)) {
+      return "enum";
+    }
+    else if (self::isTextType($mysql_type)) {
+      return "text";
+    } else {
+      return self::$col2attr_type[$mysql_type][$this->getColumnTreatmentType($i_col)];
+    }
+  }
+
   /**
    * @param mixed $columns
    *
@@ -605,7 +621,37 @@ class DBFit {
    */
   public function setColumns($columns)
   {
-      $this->columns = $columns;
+
+      $this->columns = [];
+      foreach ($columns as $i_col => &$col) {
+        $new_col = [];
+        $new_col["name"] = NULL;
+        $new_col["treatment"] = NULL;
+        $new_col["attr_name"] = NULL;
+        $new_col["mysql_type"] = NULL;
+        if (is_string($col)) {
+          $new_col["name"] = $col;
+        } else if (is_array($col)) {
+          if (isset($col[0])) {
+            $new_col["name"] = $col[0];
+          }
+          if (isset($col[1])) {
+            listify($col[1]);
+            $new_col["treatment"] = $col[1];
+          }
+          if (isset($col[2])) {
+            $new_col["attr_name"] = $col[2];
+          }
+        } else {
+          die("ERROR! Malformed column: " . get_var_dump($col));
+        }
+
+        if ($new_col["attr_name"] == NULL) {
+          $new_col["attr_name"] = $new_col["name"];
+        }
+
+        $this->columns[] = $new_col;
+      }
 
       return $this;
   }

@@ -32,8 +32,15 @@ function array_list($arr, $delimiter = ", ") {
 }
 
 function listify(&$v) {
-  $v = (is_array($v) ? $v : [$v]);
+  if ($v === NULL) {
+    $v = [];
+  } else {
+    $v = (is_array($v) ? $v : [$v]);
+  }
 }
+
+// function clone($o) {return clone $o;}
+
 
 # Source: https://stackoverflow.com/a/173479/5646732
 function isAssoc(array $arr)
