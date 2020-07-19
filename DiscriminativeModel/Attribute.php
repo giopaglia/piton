@@ -1,6 +1,6 @@
 <?php
 
-/*
+/**
  * Interface for continuous/discrete attributes
  */
 abstract class _Attribute {
@@ -20,132 +20,96 @@ abstract class _Attribute {
   }
 
   /** The type of the attribute (ARFF/Weka style)  */
-  abstract function getARFFType();
+  abstract function getARFFType() : string;
 
-  /* Print a textual representation of a value of the attribute */
-  abstract function reprVal($val);
+  /** Print a textual representation of a value of the attribute */
+  abstract function reprVal($val) : string;
 
-  /* Print a textual representation of the attribute */
-  abstract function toString();
+  /** Print a textual representation of the attribute */
+  abstract function toString() : string;
 
-  /**
-   * @return mixed
-   */
-  public function getName()
+  function getName() : string
   {
-      return $this->name;
+    return $this->name;
   }
 
-  /**
-   * @param mixed $name
-   *
-   * @return self
-   */
-  public function setName($name)
+  function setName(string $name)
   {
-      $this->name = $name;
-
-      return $this;
+    $this->name = $name;
   }
 
-  /**
-   * @return mixed
-   */
-  public function getType()
+  function getType() : string
   {
-      return $this->type;
+    return $this->type;
   }
 
-  /**
-   * @param mixed $type
-   *
-   * @return self
-   */
-  public function setType($type)
+  function setType($type)
   {
-      $this->type = $type;
-
-      return $this;
+    $this->type = $type;
   }
 
-  /**
-   * @return mixed
-   */
-  public function getIndex()
+  function getIndex() : int
   {
-    assert($this->index !== NULL, "ERROR! Attribute with un-initialized index");
+    if(!($this->index !== NULL))
+      die_error("Attribute with un-initialized index");
     return $this->index;
   }
 
-  /**
-   * @param mixed $index
-   *
-   * @return self
-   */
-  public function setIndex($index)
+  function setIndex(int $index)
   {
-      $this->index = $index;
-
-      return $this;
+    $this->index = $index;
   }
 }
 
-/*
+/**
  * Discrete attribute
  */
 class DiscreteAttribute extends _Attribute {
 
-  function __construct($name, $type, $domain = []) {
+  function __construct(string $name, string $type, array $domain = []) {
     parent::__construct($name, $type);
-    $this->domain = $domain;
+    $this->setDomain($domain);
   }
 
   /** Domain: discrete set of values that an instance can show for the attribute */
   private $domain;
-  function pushDomainVal($v) { $this->domain[] = $v; }
 
-  function numValues() { return count($this->domain); }
+  function numValues() : int { return count($this->domain); }
+  function pushDomainVal(string $v) { $this->domain[] = $v; }
 
-  /* Print a textual representation of a value of the attribute */
-  function reprVal($val) {
+  /** Print a textual representation of a value of the attribute */
+  function reprVal($val) : string {
     return $val < 0 || $val === NULL ? $val : strval($this->domain[$val]);
   }
 
   /** The type of the attribute (ARFF/Weka style)  */
-  function getARFFType() {
-    return "{" . join(",", $this->getDomain()) . "}";
+  function getARFFType() : string {
+    return "{" . join(",", $this->domain) . "}";
   }
   
-
-  /* Print a textual representation of the attribute */
-  function toString() {
-    return $this->getName();
+  /** Print a textual representation of the attribute */
+  function toString($short = true) : string {
+    return $short ? $this->name : "[DiscreteAttribute '{$this->name}' (type {$this->type}): " . get_arr_dump($this->domain) . " ]";
   }
 
-
-  /**
-   * @return mixed
-   */
-  public function getDomain()
+  function getDomain() : array
   {
-      return $this->domain;
+    return $this->domain;
   }
 
-  /**
-   * @param mixed $domain
-   *
-   * @return self
-   */
-  public function setDomain($domain)
+  function setDomain(array $domain)
   {
-      $this->domain = $domain;
-
-      return $this;
+    foreach ($domain as $val) {
+      if(!(is_string($val)))
+        die_error("Non-string value encountered in domain when setting domain "
+        . "for DiscreteAttribute \"{$this->getName()}\": " . gettype($val));
+    }
+    $this->domain = $domain;
   }
 }
 
 
-/*
+/**
  * Continuous attribute
  */
 class ContinuousAttribute extends _Attribute {
@@ -159,16 +123,16 @@ class ContinuousAttribute extends _Attribute {
   , "date"      => "date \"yyyy-MM-dd\""
   , "datetime"  => "date \"yyyy-MM-dd'T'HH:mm:ss\""
   ];
-  function getARFFType() {
-    return self::$type2ARFFtype[$this->getType()];
+  function getARFFType() : string {
+    return self::$type2ARFFtype[$this->type];
   }
 
-  // function __construct($name, $type) {
+  // function __construct(string $name, string $type) {
       // parent::__construct($name, $type);
   // }
 
-  /* Print a textual representation of a value of the attribute */
-  function reprVal($val) {
+  /** Print a textual representation of a value of the attribute */
+  function reprVal($val) : string {
     if ($val < 0 || $val === NULL)
       return $val;
     switch ($this->getARFFType()) {
@@ -188,9 +152,9 @@ class ContinuousAttribute extends _Attribute {
     }
   }
 
-  /* Print a textual representation of the attribute */
-  function toString() {
-    return $this->getName();
+  /** Print a textual representation of the attribute */
+  function toString() : string {
+    return $this->name;
   }
 }
 

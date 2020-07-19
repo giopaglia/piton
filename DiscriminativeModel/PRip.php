@@ -4,7 +4,7 @@
  * Interface for learner/optimizers
  */
 interface Learner {
-    function teach(_DiscriminativeModel &$model, Instances $data);
+  function teach(_DiscriminativeModel &$model, Instances $data);
 }
 
 /*
@@ -31,7 +31,6 @@ interface Learner {
  * 3. Delete the rules from the ruleset that would increase the DL of the whole ruleset if it were in it. and add resultant ruleset to RS. 
  * ENDDO
 
- * // (nota: l'allenamento dice anche quanto il modello e' buono. Nel caso di RuleBasedModel() ci sono dei metodi per valutare ogni singola regola. Come si valuta? vedremo)
  */
 class PRip implements Learner {
 
@@ -93,33 +92,31 @@ class PRip implements Learner {
    * Builds a model through RIPPER in the order of class frequencies.
    * For each class it's built in two stages: building and optimization
    * 
-   * @param instances the training data
-   * @throws Exception if classifier can't be built successfully
+   * @param model the model to train
+   * @param data the training data (wrapped in a structure that holds the appropriate header information for the attributes).
    */
-  function teach(&$model, $data) {
+  function teach(_DiscriminativeModel &$model, Instances $data) {
     echo "PRip->teach(&[model], [data])" . PHP_EOL;
+
+    srand($this->seed);
+    $model->resetRules();
 
     /* Remove instances with missing class */
     $data->removeUselessInsts();
     echo $data->toString() . PHP_EOL;
 
-    srand($this->seed);
-
-    $model->resetRules();
+    /* Initialize ruleset */
     $this->ruleset = [];
     $this->rulesetStats = [];
+    $this->classAttr = $data->getClassAttribute();
     $this->numAllConds = RuleStats::numAllConditions($data);
 
     if ($this->debug) {
       echo "Number of all possible conditions = " . $this->numAllConds . PHP_EOL;
     }
     
-    // Sort by class FREQ_ASCEND
-    // m_Distributions = new ArrayList<double[]>();
-
-    // Sort by classes frequency
-    $orderedClassCounts = $data->sortClassesByCount();
-    $this->classAttr = $data->getClassAttribute();
+    /* Sort by classes frequency */
+    $orderedClassCounts = $data->resortClassesByCount();
     if ($this->debug) {
       echo "Sorted classes:\n";
       for ($x = 0; $x < $this->classAttr->numValues(); $x++) {
@@ -128,50 +125,49 @@ class PRip implements Learner {
       }
     }
     
-    // Iterate from less prevalent class to more frequent one
-    for ($y = 0; $y < $data->numClasses() - 1; $y++) { // For each
-                                                                // class
-
-      $classIndex = $y;
+    /* Iterate from less frequent class to the more frequent one */
+    for ($classIndex = 0; $classIndex < $data->numClasses() - 1; $classIndex++) {
+      
       if ($this->debug) {
         echo "\n\n=====================================\n"
           . "Class " . $this->classAttr->reprVal($classIndex) . "(" . $classIndex . "): "
-          . $orderedClassCounts[$y] . " instances\n"
+          . $orderedClassCounts[$classIndex] . " instances\n"
           . "=====================================\n";
       }
 
-      // Ignore classes with no members.
-      if ($orderedClassCounts[$y] == 0) {
+      /* Ignore classes with no members. */
+      if ($orderedClassCounts[$classIndex] == 0) {
         if ($this->debug) {
           echo "Ignoring class!\n";
         }
-      continue;
+        continue;
       }
 
-      // The expected FP/err is the proportion of the class
-      $all = array_sum(array_slice($orderedClassCounts, $y));
-      $expFPRate = $orderedClassCounts[$y] / $all;
+      /* The expected FP/err is the proportion of the class */
+      $all = array_sum(array_slice($orderedClassCounts, $classIndex));
+      $expFPRate = $orderedClassCounts[$classIndex] / $all;
 
-      $classYWeights = 0; $totalWeights = 0;
+      /* Compute class weights & total weights */
+      $totalWeights = $data->getSumOfWeights();
+      $classWeights = 0;
       for ($j = 0; $j < $data->numInstances(); $j++) {
-        $totalWeights += $data->inst_weight($j);
-        if ($data->inst_classValue($j) == $y) {
-          $classYWeights += $data->inst_weight($j);
+        if ($data->inst_classValue($j) == $classIndex) {
+          $classWeights += $data->inst_weight($j);
         }
       }
 
       if ($this->debug) {
-          echo "\$all: $all!\n";
-          echo "\$expFPRate: $expFPRate!\n";
-          echo "\$classYWeights: $classYWeights!\n";
-          echo "\$totalWeights: $totalWeights!\n";
+        echo "\$all: $all!\n";
+        echo "\$expFPRate: $expFPRate!\n";
+        echo "\$classWeights: $classWeights!\n";
+        echo "\$totalWeights: $totalWeights!\n";
       }
 
-      // DL of default rule, no theory DL, only data DL
+      /* DL of default rule, no theory DL, only data DL */
       $defDL = 0.0;
-      if ($classYWeights > 0) {
+      if ($classWeights > 0) {
         $defDL = RuleStats::dataDL($expFPRate, 0.0, $totalWeights, 0.0,
-          $classYWeights);
+          $classWeights);
       } else {
         continue; // Subsumed by previous rules
       }
@@ -186,7 +182,7 @@ class PRip implements Learner {
       $data = $this->rulesetForOneClass($data, $expFPRate, $classIndex, $defDL);
     }
 
-    // Remove redundant numeric tests from the rules
+    /* Remove redundant numeric tests from the rules */
     if ($this->debug) {
       echo "Remove redundant numeric tests from the rules" . PHP_EOL;
     }
@@ -200,68 +196,50 @@ class PRip implements Learner {
       }
     }
     
-    // Set the default rule
+    /* Set the default rule */
     if ($this->debug) {
       echo "Set the default rule" . PHP_EOL;
     }
-    $defRule = new RipperRule();
-    $defRule->setConsequent($data->numClasses() - 1);
+    $defRule = new RipperRule($data->numClasses() - 1);
     $this->ruleset[] = $defRule;
+    $this->rulesetStats[] = new RuleStats($data, [$defRule], $this->numAllConds);
 
-    $defRuleStat = new RuleStats($data, [$defRule]);
-    $defRuleStat->setNumAllConds($this->numAllConds);
-    $this->rulesetStats[] = $defRuleStat;
-
-    foreach ($this->rulesetStats as $ruleStat) {
-      for ($i_r = 0; $i_r < $ruleStat->getRulesetSize(); $i_r++) {
-        $classDist = $ruleStat->getDistributions($i_r);
-        normalize($classDist);
-        // if ($classDist !== NULL) {
-        //   m_Distributions.add(((ClassOrder) m_Filter)
-        //     .distributionsByOriginalIndex($classDist));
-        // }
-      }
-    }
-
-    // free up memory
+    /* Free up memory */
     foreach ($this->rulesetStats as $ruleStat) {
       $ruleStat->cleanUp();
     }
     
     echo "Ultimately, here are the extracted rules: " . PHP_EOL;
-    var_dump($this->ruleset);
     foreach ($this->ruleset as $x => $rule) {
       echo $x . ": " . $rule->toString($this->classAttr) . PHP_EOL;
     }
-    /**/
+    // var_dump($this->ruleset);
     $model->setRules($this->ruleset);
   }
   
   /**
-   * Build a ruleset for the given class according to the given data
+   * Build a ruleset for a given class
    * 
-   * @param expFPRate the expected FP/(FP+FN) used in DL calculation
    * @param data the given data
+   * @param expFPRate the expected FP/(FP+FN) used in DL calculation
    * @param classIndex the given class index
    * @param defDL the default DL in the data
    */
   protected function rulesetForOneClass(Instances &$data, float $expFPRate,
-    float $classIndex, float $defDL) {
-    echo "PRip->rulesetForOneClass(&[model], &[data], expFPRate=$expFPRate, classIndex=$classIndex, defDL=$defDL)" . PHP_EOL;
+    float $classIndex, float $defDL) : Instances {
+    echo "PRip->rulesetForOneClass(&[data], expFPRate=$expFPRate, classIndex=$classIndex, defDL=$defDL)" . PHP_EOL;
 
     $newData = $data;
-    $growData;
-    $pruneData;
     
     $ruleset = [];
     $stop = false;
     $dl = $minDL = $defDL;
 
-    $rstats = null;
+    $rstats = NULL;
     $rst;
 
-    // Check whether data have positive examples
-    $defHasPositive = true; // No longer used
+    /* Check whether data have positive examples */
+    $defHasPositive = true;
     $hasPositive = $defHasPositive;
 
     /********************** Building stage ***********************/
@@ -269,21 +247,14 @@ class PRip implements Learner {
       echo "\n*** Building stage ***\n";
     }
 
-    // Generate new rules until stopping criteria is met
+    /* Generate new rules until stopping criteria is met */
     while ((!$stop) && $hasPositive) {
-      $oneRule = new RipperRule();
-      $oneRule->setConsequent($classIndex); // Must set first
+      $oneRule = new RipperRule($classIndex);
       if ($this->usePruning) {
         /* Split data into Grow and Prune */
-
-        // We should have stratified the data, but ripper seems
-        // to have a bug that makes it not to do so. In order
-        // to simulate it more precisely, we do the same thing.
-        // newData.randomize(m_Random);
         $newData = RuleStats::stratify($newData, $this->numFolds);
+        // Alternative to stratifying: $newData->randomize();
         list($growData, $pruneData) = RuleStats::partition($newData, $this->numFolds);
-        // growData=newData.trainCV($this->numFolds, $this->numFolds-1);
-        // pruneData=newData.testCV($this->numFolds, $this->numFolds-1);
 
         if ($this->debug) {
           echo "\nGrowing rule ...";
@@ -313,32 +284,33 @@ class PRip implements Learner {
         }
       }
 
-      // Compute the DL of this ruleset
-      if ($rstats === null) { // First rule
+      /* Compute the DL of this ruleset */
+      if ($rstats === NULL) {
         $rstats = new RuleStats($newData);
         $rstats->setNumAllConds($this->numAllConds);
       }
 
       $rstats->pushRule($oneRule);
-      echo $rstats->toString() . PHP_EOL;
-      $last = $rstats->getRulesetSize() - 1; // Index of last rule
+      // echo $rstats->toString() . PHP_EOL;
+      $i_rule = $rstats->getRulesetSize() - 1;
 
-      $dl += $rstats->relativeDL($last, $expFPRate, $this->checkErr);
+      $dl += $rstats->relativeDL($i_rule, $expFPRate, $this->checkErr);
 
       if (is_nan($dl) || is_infinite($dl)) {
         throw new Exception("Should never happen: dl in "
           . "building stage NaN or infinite!");
       }
       if ($this->debug) {
-        echo "Before optimization(" . $last . "): the dl = " . $dl
+        echo "Before optimization(" . $i_rule . "): the dl = " . $dl
           . " | best: " . $minDL . PHP_EOL;
       }
 
+      /* Track the best dl so far */
       if ($dl < $minDL) {
-        $minDL = $dl; // The best dl so far
+        $minDL = $dl;
       }
 
-      $rst = $rstats->getSimpleStats($last);
+      $rst = $rstats->getSimpleStats($i_rule);
       if ($this->debug) {
         echo "The rule covers: " . $rst[0] . " | pos = " . $rst[2]
           . " | neg = " . $rst[4] . "\nThe rule doesn't cover: " . $rst[1]
@@ -348,9 +320,12 @@ class PRip implements Learner {
       $stop = $this->checkStop($rst, $minDL, $dl);
 
       if (!$stop) {
-        $ruleset[] = $oneRule; // Accepted
-        $newData = $rstats->getFiltered($last)[1];// Data not covered
-        $hasPositive = $rst[5] > 0.0; // Positives remaining?
+        /* Accept rule */
+        $ruleset[] = $oneRule;
+        /* Update the current data set to be the uncovered one */
+        $newData = $rstats->getFiltered($i_rule)[1];
+        /* Positives remaining? */
+        $hasPositive = $rst[5] > 0.0;
         if ($this->debug) {
           echo "One rule added: has positive? " . $hasPositive . PHP_EOL;
         }
@@ -358,48 +333,47 @@ class PRip implements Learner {
         if ($this->debug) {
           echo "Quit rule" . PHP_EOL;
         }
-        $rstats->popRule(); // Remove last to be re-used
+        $rstats->popRule();
       }
-    }// while !$stop
+    } // while !$stop
 
     /******************** Optimization stage *******************/
     if ($this->usePruning) {
-      $finalRulesetStat = NULL;
       for ($z = 0; $z < $this->numOptimizations; $z++) {
         if ($this->debug) {
           echo "\n*** Optimization: run #$z/{$this->numOptimizations} ***" . PHP_EOL;
         }
         $newData = $data;
+        
+        $stop = false;
+        $dl = $minDL = $defDL;
+        $i_ruleToOpt = -1;
+        
         $finalRulesetStat = new RuleStats($newData);
         $finalRulesetStat->setNumAllConds($this->numAllConds);
 
-        $stop = false;
-        $dl = $minDL = $defDL;
-        $i_ruleToOpt = 0;
-        
         $isResidual = false;
         $hasPositive = $defHasPositive;
 
         while (!$stop && $hasPositive) {
+          $i_ruleToOpt++;
 
-          $isResidual = ($i_ruleToOpt >= count($ruleset)); // Cover residual positive
-                                                     // examples
-          // Re-do shuffling and stratification
-          // newData.randomize(m_Random);
+          /* Cover residual positive examples */
+          $isResidual = ($i_ruleToOpt >= count($ruleset));
+
+          /* Split data into Grow and Prune */
           $newData = RuleStats::stratify($newData, $this->numFolds);
+          // Alternative to stratifying: $newData->randomize();
           list($growData, $pruneData) = RuleStats::partition($newData, $this->numFolds);
-          // growData=newData.trainCV($this->numFolds, $this->numFolds-1);
-          // pruneData=newData.testCV($this->numFolds, $this->numFolds-1);
           $finalRule = NULL;
 
           if ($this->debug) {
             echo "\nRule #" . $i_ruleToOpt . "| isResidual?"
-              . $isResidual . "| data size: " . $newData->sumOfWeights() . PHP_EOL;
+              . $isResidual . "| data size: " . $newData->getSumOfWeights() . PHP_EOL;
           }
 
           if ($isResidual) {
-            $newRule = new RipperRule();
-            $newRule->setConsequent($classIndex);
+            $newRule = new RipperRule($classIndex);
             if ($this->debug) {
               echo "\nGrowing and pruning" . " a new rule ..." . PHP_EOL;
             }
@@ -412,22 +386,20 @@ class PRip implements Learner {
             }
           } else {
             $oldRule = $ruleset[$i_ruleToOpt];
-            // Test coverage of the next old rule
+            /* Test coverage of the next old rule */
             $covers = $oldRule->coversAll($newData);
 
-            if (!$covers) {// Null coverage, no variants can be generated
+            /* Null coverage, no variants can be generated */
+            if (!$covers) {
               $finalRulesetStat->pushRule($oldRule);
-              # TODO move this ++ to the beginning of the while and fix stuff accordingly
-              $i_ruleToOpt++;
               continue;
             }
 
-            // 2 variants
+            /* 2 variants */
             if ($this->debug) {
               echo "\nGrowing and pruning" . " Replace ..." . PHP_EOL;
             }
-            $replace = new RipperRule();
-            $replace->setConsequent($classIndex);
+            $replace = new RipperRule($classIndex);
             $replace->grow($growData, $this->minNo);
 
             // Remove the pruning data covered by the following
@@ -444,7 +416,7 @@ class PRip implements Learner {
             }
             $revision = clone $oldRule;
 
-            // For revision, first remove the data covered by the old rule
+            /* For revision, first remove the data covered by the old rule */
             $newGrowData = Instances::createEmpty($growData);
             /* Split data */
             for ($b = 0; $b < $growData->numInstances(); $b++) {
@@ -461,12 +433,11 @@ class PRip implements Learner {
               $prevRuleStats[$c] = $finalRulesetStat->getSimpleStats($c);
             }
 
-            // Now compare the relative DL of variants
+            /* Now compare the relative DL of the variants */
             $tempRules = array_map("clone", $ruleset);
             $tempRules[$i_ruleToOpt] = $replace;
 
-            $repStat = new RuleStats($data, $tempRules);
-            $repStat->setNumAllConds($this->numAllConds);
+            $repStat = new RuleStats($data, $tempRules, $this->numAllConds);
             $repStat->countData($i_ruleToOpt, $newData, $prevRuleStats);
             $rst = $repStat->getSimpleStats($i_ruleToOpt);
             if ($this->debug) {
@@ -487,8 +458,7 @@ class PRip implements Learner {
             }
 
             $tempRules[$i_ruleToOpt] = $revision;
-            $revStat = new RuleStats($data, $tempRules);
-            $revStat->setNumAllConds($this->numAllConds);
+            $revStat = new RuleStats($data, $tempRules, $this->numAllConds);
             $revStat->countData($i_ruleToOpt, $newData, $prevRuleStats);
             $revDL = $revStat->relativeDL($i_ruleToOpt, $expFPRate, $this->checkErr);
 
@@ -502,8 +472,7 @@ class PRip implements Learner {
                 . "in optmz. stage NaN or " . "infinite!");
             }
 
-            $rstats = new RuleStats($data, $ruleset);
-            $rstats->setNumAllConds($this->numAllConds);
+            $rstats = new RuleStats($data, $ruleset, $this->numAllConds);
             $rstats->countData($i_ruleToOpt, $newData, $prevRuleStats);
             $oldDL = $rstats->relativeDL($i_ruleToOpt, $expFPRate, $this->checkErr);
 
@@ -522,11 +491,14 @@ class PRip implements Learner {
             }
 
             if (($oldDL <= $revDL) && ($oldDL <= $repDL)) {
-              $finalRule = $oldRule; // Old is best
+              /* Select old rule */
+              $finalRule = $oldRule;
             } else if ($revDL <= $repDL) {
-              $finalRule = $revision; // Revision is best
+              /* Select revision rule */
+              $finalRule = $revision;
             } else {
-              $finalRule = $replace; // Replace is best
+              /* Select replace rule */
+              $finalRule = $replace;
             }
           }
 
@@ -535,7 +507,8 @@ class PRip implements Learner {
 
           if ($isResidual) {
 
-            $dl += $finalRulesetStat->relativeDL($i_ruleToOpt, $expFPRate, $this->checkErr);
+            $dl += $finalRulesetStat->relativeDL($i_ruleToOpt, $expFPRate,
+              $this->checkErr);
             if ($this->debug) {
               echo "After optimization: the dl" . "=" . $dl
                 . " | best: " . $minDL . PHP_EOL;
@@ -547,13 +520,13 @@ class PRip implements Learner {
 
             $stop = $this->checkStop($rst, $minDL, $dl);
             if (!$stop) {
-              $ruleset[] = $finalRule; // Accepted
+              $ruleset[] = $finalRule; // Accept
             } else {
               $finalRulesetStat->popRule(); // Remove last to be re-used
               $i_ruleToOpt--;
             }
           } else {
-            $ruleset[$i_ruleToOpt] = $finalRule; // Accepted
+            $ruleset[$i_ruleToOpt] = $finalRule; // Accept
           }
 
           if ($this->debug) {
@@ -567,15 +540,17 @@ class PRip implements Learner {
             echo "]" . PHP_EOL;
           }
 
-          // Data not covered
           if ($finalRulesetStat->getRulesetSize() > 0) {
+            /* Update the current data set to be the uncovered one */
             $newData = $finalRulesetStat->getFiltered($i_ruleToOpt)[1];
           }
-          $hasPositive = $rst[5] > 0.0; // Positives remaining?
-          $i_ruleToOpt++;
+          /* Positives remaining? */
+          $hasPositive = $rst[5] > 0.0;
         } // while !$stop && $hasPositive
-
-        if (count($ruleset) > ($i_ruleToOpt + 1)) { // Hasn't gone through yet
+        $i_ruleToOpt++;
+        
+        /* Push the rest of the rules */
+        if (count($ruleset) > ($i_ruleToOpt + 1)) {
           for ($k = $i_ruleToOpt + 1; $k < count($ruleset); $k++) {
             $finalRulesetStat->pushRule($ruleset[$k]);
           }
@@ -594,7 +569,7 @@ class PRip implements Learner {
       } // For each run of optimization
     } // if pruning is used
 
-    // Concatenate the ruleset for this class to the whole ruleset
+    /* Concatenate the ruleset for this class to the whole ruleset */
     if ($this->debug) {
       echo "\nRuleset: [" . PHP_EOL;
       foreach ($ruleset as $x => $rule) {
@@ -620,7 +595,7 @@ class PRip implements Learner {
     }
 
     if (count($ruleset) > 0) {
-      // Data not covered
+      /* Data not covered */
       return $rstats->getFiltered(count($ruleset) - 1)[1];
     } else {
       return $data;
@@ -637,7 +612,7 @@ class PRip implements Learner {
    * @param dl the current description length of the ruleset
    * @return true if stop criterion meets, false otherwise
    */
-  function checkStop($rst, $minDL, $dl) {
+  function checkStop(array $rst, float $minDL, float $dl) : bool {
 
     if ($dl > $minDL + self::$MAX_DL_SURPLUS) {
       if ($this->debug) {
@@ -645,13 +620,13 @@ class PRip implements Learner {
       }
       return true;
     }
-    else if (!($rst[2] > 0.0)) {// Covered positives
+    else if (!($rst[2] > 0.0)) { // Covered positives
       if ($this->debug) {
         echo "Too few positives." . PHP_EOL;
       }
       return true;
     }
-    else if (($rst[4] / $rst[0]) >= 0.5) {// Err rate
+    else if (($rst[4] / $rst[0]) >= 0.5) { // Err rate
       if ($this->checkErr) {
         if ($this->debug) {
           echo "Error too large: " . $rst[4] . "/" . $rst[0] . PHP_EOL;
@@ -661,7 +636,7 @@ class PRip implements Learner {
         return false;
       }
     }
-    else {// Not stops
+    else { // Don't stop
       if ($this->debug) {
         echo "Continue.";
       }

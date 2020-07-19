@@ -44,9 +44,9 @@ class RuleStats {
   private $distributions;
 
   /** Constructor */
-  function __construct($data = NULL, $rules = [], $numAllConds = NULL) {
+  function __construct(?Instances $data = NULL, array $rules = [], ?int $numAllConds = NULL) {
     $this->data = $data;
-    $this->numAllConds = $numAllConds;
+    $this->setNumAllConds($numAllConds);
 
     $this->ruleset = NULL;
     $this->filtered = NULL;
@@ -74,7 +74,7 @@ class RuleStats {
    * @param index the index of the rule
    * @return the stats
    */
-  function getSimpleStats(int $index) {
+  function getSimpleStats(int $index) : array {
     if (($this->simpleStats !== NULL)
     && ($index < $this->getRulesetSize())) {
       return $this->simpleStats[$index];
@@ -88,7 +88,7 @@ class RuleStats {
    * @param index the index of the rule
    * @return the data covered and uncovered by the rule
    */
-  function getFiltered(int $index) {
+  function getFiltered(int $index) : array {
     if (($this->filtered !== NULL)
     && ($index < $this->getRulesetSize())) {
       return $this->filtered[$index];
@@ -96,7 +96,7 @@ class RuleStats {
     return NULL;
   }
 
-  function getRulesetSize() {
+  function getRulesetSize() : int {
     return count($this->getRuleset());
   }
 
@@ -106,7 +106,7 @@ class RuleStats {
    * @param index the position index of the rule
    * @return the class distributions
    */
-  function getDistributions(int $index) {
+  function getDistributions(int $index) : int {
     if (($this->distributions !== NULL)
     && ($index < $this->getRulesetSize())) {
       return $this->distributions[$index];
@@ -128,7 +128,7 @@ class RuleStats {
    * @param fn False Negative
    * @return the description length
    */
-  static function dataDL($expFPOverErr, $cover, $uncover, $fp, $fn) {
+  static function dataDL(float $expFPOverErr, float $cover, float $uncover, float $fp, float $fn) : float {
     $totalBits = log($cover + $uncover + 1.0, 2); // how much data?
     $coverBits = 0.0;
     $uncoverBits = 0.0; // What's the error?
@@ -146,10 +146,10 @@ class RuleStats {
     }
 
     /*
-     * System.err.println("!!!cover: " + cover + "|uncover" + uncover +
-     * "|coverBits: "+coverBits+"|uncBits: "+ uncoverBits+
-     * "|FPRate: "+expFPOverErr + "|expErr: "+expErr+
-     * "|fp: "+fp+"|fn: "+fn+"|total: "+totalBits);
+     * echo "!!!cover: " . $cover . "|uncover" . $uncover .
+     * "|coverBits: " . $coverBits . "|uncBits: ". $uncoverBits .
+     * "|FPRate: " . $expFPOverErr . "|expErr: ". $expErr .
+     * "|fp: " . $fp . "|fn: " . $fn . "|total: " . $totalBits;
      */
     return ($totalBits + $coverBits + $uncoverBits);
   }
@@ -165,7 +165,7 @@ class RuleStats {
    * @param p the expected proportion of subset known by recipient
    * @return the subset description length
    */
-  static function subsetDL($t, $k, $p) {
+  static function subsetDL(int $t, int $k, float $p) : float {
     $rt = ($p > 0.0) ? (-$k * log($p, 2)) : 0.0;
     $rt -= ($t - $k) * log(1 - $p, 2);
     return $rt;
@@ -205,9 +205,9 @@ class RuleStats {
         $checkErr);
       if (!is_nan($ifDeleted)) {
         /*
-         * System.err.println("!!!deleted ("+k+"): save "+ifDeleted
-         * +" | "+rulesetStat[0] +" | "+rulesetStat[1] +" | "+rulesetStat[4]
-         * +" | "+rulesetStat[5]);
+         * echo "!!!deleted ("+k+"): save ".$ifDeleted
+         * ." | ".$rulesetStat[0] ." | ".$rulesetStat[1] ." | ".$rulesetStat[4]
+         * ." | ".$rulesetStat[5];
          */
 
         if ($k == ($this->getRulesetSize() - 1)) {
@@ -239,7 +239,7 @@ class RuleStats {
     $this->filtered = [];
     $this->simpleStats = [];
     $this->distributions = [];
-    $data = clone $this->data;
+    $data = $this->data;
 
     for ($i = 0; $i < $size; $i++) {
       $stats = array_fill(0, 6, 0.0); // 6 statistics parameters
@@ -304,9 +304,9 @@ class RuleStats {
    * @param folds the given number of folds
    * @return the stratified instances
    */
-  static function stratify(Instances &$data, int $numFolds) {
-    echo "RuleStats->stratify(&[data], numFolds=$numFolds)" . PHP_EOL;
-    echo "data : " . $data->toString() . PHP_EOL;
+  static function stratify(Instances &$data, int $numFolds) : Instances {
+    echo "RuleStats::stratify(&[data], numFolds=$numFolds)" . PHP_EOL;
+    // echo "data : " . $data->toString() . PHP_EOL;
     if (!($data->getClassAttribute() instanceof DiscreteAttribute)) {
       return $data;
     }
@@ -342,7 +342,7 @@ class RuleStats {
         $offset += $numFolds;
       }
     }
-    echo "data_out : " . $data_out->toString() . PHP_EOL;
+    // echo "data_out : " . $data_out->toString() . PHP_EOL;
 
     return $data_out;
   }
@@ -356,8 +356,8 @@ class RuleStats {
    * @param numFolds the given number of folds
    * @return the partitioned instances
    */
-  static function partition(Instances &$data, int $numFolds) {
-    echo "RuleStats->partition(&[data], numFolds=$numFolds)" . PHP_EOL;
+  static function partition(Instances &$data, int $numFolds) : array {
+    echo "RuleStats::partition(&[data], numFolds=$numFolds)" . PHP_EOL;
     echo "data : " . $data->toString() . PHP_EOL;
     $rt = [];
     $splits = $data->numInstances() * ($numFolds - 1) / $numFolds;
@@ -379,8 +379,8 @@ class RuleStats {
    * @param data the given data
    * @return number of all conditions of the data
    */
-  static function numAllConditions(Instances &$data) {
-    echo "RuleStats->numAllConditions(&[data])" . PHP_EOL;
+  static function numAllConditions(Instances &$data) : int {
+    echo "RuleStats::numAllConditions(&[data])" . PHP_EOL;
     $total = 0.0;
     foreach ($data->getAttributes(false) as $attr) {
       // echo $attr->toString() . PHP_EOL;
@@ -392,7 +392,8 @@ class RuleStats {
           $total += 2.0 * $data->numDistinctValues($attr);
           break;
         default:
-          die("ERROR: unknown type of attribute encountered!");
+          die_error("Unknown type of attribute encountered in "
+            . "RuleStats::numAllConditions(...): " . get_class($attr));
           break;
       }
     }
@@ -463,7 +464,7 @@ class RuleStats {
    * @return the data after processing
    */
   static function rmCoveredBySuccessives(Instances &$data,
-    array $rules, int $index) {
+    array $rules, int $index) : Instances {
     $data_out = Instances::createEmpty($data);
 
     for ($i = 0; $i < $data->numInstances(); $i++) {
@@ -498,7 +499,7 @@ class RuleStats {
    * @return the instances covered and not covered by the rule
    */
   static private function computeSimpleStats(_Rule $rule, Instances $data,
-    array &$stats, array &$dist = NULL) {
+    array &$stats, array &$dist = NULL) : array {
     
     $out_data = [Instances::createEmpty($data), Instances::createEmpty($data)];
 
@@ -543,7 +544,7 @@ class RuleStats {
    * @param checkErr whether check if error rate >= 0.5
    * @return the relative DL
    */
-  function relativeDL(int $index, float $expFPRate, bool $checkErr) {
+  function relativeDL(int $index, float $expFPRate, bool $checkErr) : float {
 
     return ($this->minDataDLIfExists($index, $expFPRate, $checkErr)
           + $this->theoryDL($index)
@@ -565,9 +566,9 @@ class RuleStats {
    * @param index the index of the given rule (assuming correct)
    * @return the theory DL, weighted if weight != 1.0
    */
-  function theoryDL(int $index) {
+  function theoryDL(int $index) : float {
 
-    $k = $this->ruleset[$index]->size();
+    $k = $this->ruleset[$index]->getSize();
 
     if ($k == 0) {
       return 0.0;
@@ -593,7 +594,7 @@ class RuleStats {
    * @param checkErr whether check if error rate >= 0.5
    * @return the minDataDL
    */
-  function minDataDLIfDeleted(int $index, float $expFPRate, bool $checkErr) {
+  function minDataDLIfDeleted(int $index, float $expFPRate, bool $checkErr) : float {
     // System.out.println("!!!Enter without: ");
     $rulesetStat = array_fill(0, 6, 0.0); // Stats of ruleset if deleted
     $more = $this->getRulesetSize() - 1 - $index; // How many rules after?
@@ -609,7 +610,7 @@ class RuleStats {
 
     // Recount data from index+1
     $data = ($index == 0) ? $this->data : $this->filtered[$index - 1][1];
-    // System.out.println("!!!without: " + data.sumOfWeights());
+    // System.out.println("!!!without: " + $data->getSumOfWeights());
 
     for ($j = ($index + 1); $j < $this->getRulesetSize(); $j++) {
       $stats = array_fill(0, 6, 0.0);
@@ -667,7 +668,7 @@ class RuleStats {
    * @param checkErr whether check if error rate >= 0.5
    * @return the minDataDL
    */
-  function minDataDLIfExists(int $index, float $expFPRate, bool $checkErr) {
+  function minDataDLIfExists(int $index, float $expFPRate, bool $checkErr) : float {
     // System.out.println("!!!Enter with: ");
     $rulesetStat = array_fill(0, 6, 0.0); // Stats of ruleset if rule exists
     for ($j = 0; $j < $this->getRulesetSize(); $j++) {
@@ -727,7 +728,7 @@ class RuleStats {
    * @return the potential DL that could be decreased
    */
   function potential(int $index, float $expFPOverErr, array $rulesetStat,
-    array $ruleStat, bool $checkErr) {
+    array $ruleStat, bool $checkErr) : float {
     // System.out.println("!!!inside potential: ");
     // Restore the stats if deleted
     $pcov = $rulesetStat[0] - $ruleStat[0];
@@ -763,7 +764,7 @@ class RuleStats {
     }
   }
 
-  function toString() {
+  function toString() : string {
     $out_str = "RuleStats(size {$this->getRulesetSize()}){";
 
     $out_str .=   "Data: " . $this->data->toString(true);
@@ -777,64 +778,26 @@ class RuleStats {
     return $out_str;
   }
 
-  /**
-   * @return mixed
-   */
-  public function getData()
+  public function getData() : Instances
   {
-      return $this->data;
+    return $this->data;
   }
 
-  /**
-   * @param mixed $data
-   *
-   * @return self
-   */
-  public function setData($data)
+  public function setNumAllConds(?int $numAllConds) : self
   {
-      $this->data = $data;
-
-      return $this;
+    $this->numAllConds = $numAllConds;
+    return $this;
   }
 
-  /**
-   * @return mixed
-   */
-  public function getNumAllConds()
+  public function getRuleset() : array
   {
-      return $this->numAllConds;
+    return $this->ruleset;
   }
 
-  /**
-   * @param mixed $numAllConds
-   *
-   * @return self
-   */
-  public function setNumAllConds($numAllConds)
+  public function setRuleset(array $ruleset) : self
   {
-      $this->numAllConds = $numAllConds;
-
-      return $this;
-  }
-
-  /**
-   * @return mixed
-   */
-  public function getRuleset()
-  {
-      return $this->ruleset;
-  }
-
-  /**
-   * @param mixed $ruleset
-   *
-   * @return self
-   */
-  public function setRuleset($ruleset)
-  {
-      $this->ruleset = $ruleset;
-
-      return $this;
+    $this->ruleset = $ruleset;
+    return $this;
   }
 }
 

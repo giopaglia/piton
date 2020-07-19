@@ -4,8 +4,8 @@ include "Attribute.php";
 include "Instances.php";
 
 /**
-* A single antecedent in the rule, composed of an attribute and a value for it.
-*/
+ * A single antecedent in the rule, composed of an attribute and a value for it.
+ */
 abstract class _Antecedent {
   /** The attribute of the antecedent */
   protected $attribute;
@@ -43,7 +43,7 @@ abstract class _Antecedent {
   }
 
 
-  static function createFromAttribute(_Attribute $attribute) {
+  static function createFromAttribute(_Attribute $attribute) : _Antecedent {
     switch (true) {
       case $attribute instanceof DiscreteAttribute:
         $antecedent = new DiscreteAntecedent($attribute);
@@ -52,143 +52,53 @@ abstract class _Antecedent {
         $antecedent = new ContinuousAntecedent($attribute);
         break;
       default:
-        die("ERROR: unknown type of attribute encountered!");
+        die_error("Unknown type of attribute encountered! " . var_dump($attribute));
         break;
     }
     return $antecedent;
   }
 
   /* The abstract members for inheritance */
-  abstract function splitData(&$data, $defAcRt, $cla);
+  abstract function splitData(Instances &$data, float $defAcRt, int $cla) : ?array;
 
-  abstract function covers(&$data, $i);
+  abstract function covers(Instances &$data, int $i) : bool;
 
   /* Print a textual representation of the antecedent */
-  abstract function toString();
+  abstract function toString() : string;
 
   function __clone()
   {
     $this->attribute = clone $this->attribute;
   }
 
-  /**
-   * @return mixed
-   */
-  public function getAttribute()
+  function getAttribute() : _Attribute
   {
-      return $this->attribute;
+    return $this->attribute;
   }
 
-  /**
-   * @param mixed $attribute
-   *
-   * @return self
-   */
-  public function setAttribute($attribute)
+  function getValue()
   {
-      $this->attribute = $attribute;
-
-      return $this;
+    return $this->value;
   }
 
-  /**
-   * @return mixed
-   */
-  public function getValue()
+  function getMaxInfoGain() : float
   {
-      return $this->value;
+    return $this->maxInfoGain;
   }
 
-  /**
-   * @param mixed $value
-   *
-   * @return self
-   */
-  public function setValue($value)
+  function getAccuRate() : float
   {
-      $this->value = $value;
-
-      return $this;
+    return $this->accuRate;
   }
 
-  /**
-   * @return mixed
-   */
-  public function getMaxInfoGain()
+  function getCover() : float
   {
-      return $this->maxInfoGain;
+    return $this->cover;
   }
 
-  /**
-   * @param mixed $maxInfoGain
-   *
-   * @return self
-   */
-  public function setMaxInfoGain($maxInfoGain)
+  function getAccu() : float
   {
-      $this->maxInfoGain = $maxInfoGain;
-
-      return $this;
-  }
-
-  /**
-   * @return mixed
-   */
-  public function getAccuRate()
-  {
-      return $this->accuRate;
-  }
-
-  /**
-   * @param mixed $accuRate
-   *
-   * @return self
-   */
-  public function setAccuRate($accuRate)
-  {
-      $this->accuRate = $accuRate;
-
-      return $this;
-  }
-
-  /**
-   * @return mixed
-   */
-  public function getCover()
-  {
-      return $this->cover;
-  }
-
-  /**
-   * @param mixed $cover
-   *
-   * @return self
-   */
-  public function setCover($cover)
-  {
-      $this->cover = $cover;
-
-      return $this;
-  }
-
-  /**
-   * @return mixed
-   */
-  public function getAccu()
-  {
-      return $this->accu;
-  }
-
-  /**
-   * @param mixed $accu
-   *
-   * @return self
-   */
-  public function setAccu($accu)
-  {
-      $this->accu = $accu;
-
-      return $this;
+    return $this->accu;
   }
 }
 
@@ -201,7 +111,9 @@ class DiscreteAntecedent extends _Antecedent {
    * Constructor
    */
   function __construct(_Attribute $attribute) {
-    assert($attribute instanceof DiscreteAttribute, "DiscreteAntecedent requires a DiscreteAttribute. Got " . get_class($attribute) . " instead.");
+    if(!($attribute instanceof DiscreteAttribute))
+      die_error("DiscreteAntecedent requires a DiscreteAttribute. Got "
+      . get_class($attribute) . " instead.");
     parent::__construct($attribute);
   }
 
@@ -214,7 +126,7 @@ class DiscreteAntecedent extends _Antecedent {
    * @param cl the class label to be predicted
    * @return the array of data after split
    */
-  function splitData(&$data, $defAcRt, $cla) {
+  function splitData(Instances &$data, float $defAcRt, int $cla) : ?array {
     echo "DiscreteAntecedent->splitData(&[data], defAcRt=$defAcRt, cla=$cla)" . PHP_EOL;
     echo $data->toString() . PHP_EOL;
 
@@ -266,11 +178,12 @@ class DiscreteAntecedent extends _Antecedent {
   /**
    * Whether the instance is covered by this antecedent
    * 
-   * @param inst the instance in question
+   * @param data the set of instances
+   * @param i the index of the instance in question
    * @return the boolean value indicating whether the instance is covered by
    *         this antecedent
    */
-  function covers(&$data, $i) {
+  function covers(Instances &$data, int $i) : bool {
     $isCover = false;
     if (!$data->inst_isMissing($i, $this->attribute)) {
       if ($data->inst_valueOfAttr($i, $this->attribute) == $this->value) {
@@ -283,7 +196,7 @@ class DiscreteAntecedent extends _Antecedent {
   /**
    * Print a textual representation of the antecedent
    */
-  function toString($short = false) {
+  function toString(bool $short = false) : string {
     if ($short) {
       return "{$this->attribute->getName()} == \"{$this->attribute->getDomain()[$this->value]}\"";
     }
@@ -307,7 +220,9 @@ class ContinuousAntecedent extends _Antecedent {
    * Constructor
    */
   function __construct(_Attribute $attribute) {
-    assert($attribute instanceof ContinuousAttribute, "ContinuousAntecedent requires a ContinuousAttribute. Got " . get_class($attribute) . " instead.");
+    if(!($attribute instanceof ContinuousAttribute))
+      die_error("ContinuousAntecedent requires a ContinuousAttribute. Got "
+      . get_class($attribute) . " instead.");
     parent::__construct($attribute);
     $this->splitPoint  = NAN;
   }
@@ -322,7 +237,7 @@ class ContinuousAntecedent extends _Antecedent {
    * @param cl the class label to be predicted
    * @return the array of data after split
    */
-  function splitData(&$data, $defAcRt, $cla) {
+  function splitData(Instances &$data, float $defAcRt, int $cla) : ?array {
     echo "ContinuousAntecedent->splitData(&[data], defAcRt=$defAcRt, cla=$cla)" . PHP_EOL;
     echo $data->toString() . PHP_EOL;
 
@@ -452,11 +367,12 @@ class ContinuousAntecedent extends _Antecedent {
   /**
    * Whether the instance is covered by this antecedent
    * 
-   * @param inst the instance in question
+   * @param data the set of instances
+   * @param i the index of the instance in question
    * @return the boolean value indicating whether the instance is covered by
    *         this antecedent
    */
-  function covers(&$data, $i) {
+  function covers(Instances &$data, int $i) : bool {
     $isCover = true;
     if (!$data->inst_isMissing($i, $this->attribute)) {
       if ($this->value == 0) { // First bag
@@ -475,7 +391,7 @@ class ContinuousAntecedent extends _Antecedent {
   /**
    * Print a textual representation of the antecedent
    */
-  function toString($short = false) {
+  function toString(bool $short = false) : string {
     if ($short) {
       return "{$this->attribute->getName()}" . (($this->value == 0) ? " <= " : " >= ") .
         // number_format($this->splitPoint, 6)
@@ -490,24 +406,9 @@ class ContinuousAntecedent extends _Antecedent {
     }
   }
 
-  /**
-   * @return mixed
-   */
-  public function getSplitPoint()
+  function getSplitPoint() : float
   {
-      return $this->splitPoint;
-  }
-
-  /**
-   * @param mixed $splitPoint
-   *
-   * @return self
-   */
-  public function setSplitPoint($splitPoint)
-  {
-      $this->splitPoint = $splitPoint;
-
-      return $this;
+    return $this->splitPoint;
   }
 }
 

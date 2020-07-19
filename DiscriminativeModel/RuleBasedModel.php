@@ -5,29 +5,27 @@ include "Rule.php";
 include "RuleStats.php";
 
 /*
- * Interface for discriminative models
+ * Interface for a generic discriminative model
  */
-interface _DiscriminativeModel {
-  function fit(&$data, $learner);
-  function predict($input_data);
-  
-  function save($path);
-  function load($path);
+abstract class _DiscriminativeModel {
+
+  abstract function fit(Instances &$data, Learner &$learner);
+  abstract function predict(Instances $testDataframe);
+
+  abstract function save(string $path);
+  abstract function load(string $path);
+
+  static function loadFromFile(string $path) : _DiscriminativeModel {
+    echo "_DiscriminativeModel::loadFromFile($path)" . PHP_EOL;
+    die("TODO");
+  }
+
 }
-
-// class DiscriminativeModel implements _DiscriminativeModel {
-
-//   static function loadModel($path) {
-//     echo "DiscriminativeModel::loadModel($path)" . PHP_EOL;
-//     die("TODO");
-//   }
-// }
 
 /*
  * This class represents a propositional rule-based model.
  */
-// class RuleBasedModel extends DiscriminativeModel {
-class RuleBasedModel implements _DiscriminativeModel {
+class RuleBasedModel extends _DiscriminativeModel {
   private $rules;
   
   function __construct() {
@@ -35,56 +33,44 @@ class RuleBasedModel implements _DiscriminativeModel {
     $this->rules = [];
   }
 
-  function fit(&$data, $learner) {
-    echo "RuleBasedModel->fit(" . serialize($data) . ", " . serialize($learner) . ")" . PHP_EOL;
-    $learner->teach($this, $data);
+  function fit(Instances &$trainData, Learner &$learner) {
+    echo "RuleBasedModel->fit([trainData], " . get_class($learner) . ")" . PHP_EOL;
+    $learner->teach($this, $trainData);
   }
 
-  function predict($input_dataframe) {
-    echo "RuleBasedModel->predict(" . serialize($input_dataframe) . ")" . PHP_EOL;
+  function predict(Instances $testDataframe) {
+    echo "RuleBasedModel->predict(" . serialize($testDataframe) . ")" . PHP_EOL;
     // TODO
     // check vari ...
     // Usa  per prevedere il campo della colonna in output
     // ritorna campi della colonna in output.
   }
 
-  function save($path) {
+  function save(string $path) {
     echo "RuleBasedModel->save($path)" . PHP_EOL;
     // TODO
   }
-  function load($path) {
+  function load(string $path) {
     echo "RuleBasedModel->load($path)" . PHP_EOL;
     // TODO
   }
 
 
-    /**
-     * @return mixed
-     */
-    public function getRules()
-    {
-        return $this->rules;
-    }
+  public function getRules() : array
+  {
+    return $this->rules;
+  }
 
-    /**
-     * @param mixed $rules
-     *
-     * @return self
-     */
-    public function setRules($rules)
-    {
-        $this->rules = $rules;
+  public function setRules(array $rules) : self
+  {
+    $this->rules = $rules;
+    return $this;
+  }
 
-        return $this;
-    }
-
-    /**
-     * @return self
-     */
-    public function resetRules()
-    {
-        return $this->setRules([]);
-    }
+  public function resetRules()
+  {
+    return $this->setRules([]);
+  }
 }
 
 

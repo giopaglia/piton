@@ -59,7 +59,7 @@ class DBFit {
   , "enum"    => ["" => "enum"]
   ];
 
-  function __construct($db) {
+  function __construct(object $db) {
     echo "DBFit(DB)" . PHP_EOL;
     $this->db = $db;
   }
@@ -161,7 +161,7 @@ class DBFit {
                 foreach ($stmt->get_result() as $raw_row) {
                   $text = $raw_row[$this->getColumnName($i_col, true)];
                   
-                  $words = self::text2words($text);
+                  $words = $this->text2words($text);
 
                   foreach ($words as $word) {
                     if (!isset($word_counts[$word]))
@@ -238,7 +238,7 @@ class DBFit {
             $dict = $this->getColumnTreatmentArg($i_col, 0);
             var_dump($dict);
             foreach ($dict as $word) {
-              $val = in_array($word, self::text2words($raw_val));
+              $val = in_array($word, $this->text2words($raw_val));
               $row[] = $val;
             }
             break;
@@ -366,14 +366,14 @@ class DBFit {
   }
 
   // Use the model for predicting
-  function predict($input_data) {
+  function predict(Instances $input_data) {
     echo "DBFit->predict(" . $input_data->toString(true) . ")" . PHP_EOL;
     assert($this->model instanceof _DiscriminativeModel, "Error! Model is not initialized");
     return $this->model->predict($input_data);
   }
 
   // Test the model
-  function test($test_data) {
+  function test(Instances $test_data) {
     echo "DBFit->test(" . $test_data->toString(true) . ")" . PHP_EOL;
 
     $ground_truths = $test_data->getClassValues();
@@ -428,11 +428,11 @@ class DBFit {
 
 
 
-  static function isEnumType($mysql_type) {
+  static function isEnumType(string $mysql_type) {
     return preg_match("/enum.*/i", $mysql_type);
   }
 
-  static function isTextType($mysql_type) {
+  static function isTextType(string $mysql_type) {
     return preg_match("/varchar.*/i", $mysql_type);
   }
 
@@ -477,52 +477,32 @@ class DBFit {
     return $words;
   }
 
-  /**
-   * @return mixed
-   */
-  public function getModel()
+  public function getModel() : _DiscriminativeModel
   {
-      return $this->model;
+    return $this->model;
   }
 
-  /**
-   * @param mixed $model
-   *
-   * @return self
-   */
-  public function setModel($model)
+  public function setModel(_DiscriminativeModel $model) : self
   {
-      $this->model = $model;
-
-      return $this;
+    $this->model = $model;
+    return $this;
   }
 
-  /**
-   * @return mixed
-   */
-  public function getDb()
+  public function getDb() : object
   {
-      return $this->db;
+    return $this->db;
   }
 
-  /**
-   * @param mixed $db
-   *
-   * @return self
-   */
-  public function setDb($db)
+  public function setDb(object $db) : self
   {
-      $this->db = $db;
-
-      return $this;
+    $this->db = $db;
+    return $this;
   }
 
-  /**
-   * @return mixed
-   */
-  public function getTableNames()
+  public function getTableNames() : array
   {
-      return $this->table_names;
+    // TODO introduce all kinds of checks
+    return $this->table_names;
   }
 
   /**
@@ -532,6 +512,7 @@ class DBFit {
    */
   public function setTableNames($table_names)
   {
+      listify($table_names);
       $this->table_names = $table_names;
 
       return $this;
@@ -566,43 +547,43 @@ class DBFit {
       return $this->columns;
   }
 
-  function getColumnName($i_col, $force_no_table_name = false) {
+  function getColumnName(int $i_col, bool $force_no_table_name = false) {
     // var_dump($i_col);
     // var_dump($this->columns);
     $col = $this->columns[$i_col];
     $n = $col["name"];
     return $force_no_table_name && count(explode(".", $n)) > 1 ? explode(".", $n)[1] : $n;
   }
-  function &getColumnTreatment($i_col) {
+  function &getColumnTreatment(int $i_col) {
     return $this->columns[$i_col]["treatment"];
   }
-  function getColumnTreatmentType($i_col) {
+  function getColumnTreatmentType(int $i_col) {
     $tr = $this->getColumnTreatment($i_col);
     return !is_array($tr) ? $tr : $tr[0];
   }
-  function getColumnTreatmentArg($i_col, $i) {
+  function getColumnTreatmentArg(int $i_col, int $i) {
     $tr = $this->getColumnTreatment($i_col);
     return !is_array($tr) || !isset($tr[1+$i]) ? NULL : $tr[1+$i];
   }
-  function setColumnTreatmentArg($i_col, $i, $val) {
+  function setColumnTreatmentArg(int $i_col, int $i, $val) {
     $this->getColumnTreatment($i_col)[1+$i] = $val;
     // $col["treatment"][1+$i] = $val;
   }
-  function getColumnAttrName($i_col) {
+  function getColumnAttrName(int $i_col) {
     $col = $this->columns[$i_col];
     return !array_key_exists("attr_name", $col) ?
         $this->getColumnName($i_col, true) : $col["attr_name"];
   }
 
-  function getColumnMySQLType($i_col) {
+  function getColumnMySQLType(int $i_col) {
     $col = $this->columns[$i_col];
     return $col["mysql_type"];
   }
-  function setColumnMySQLType($i_col, $val) {
+  function setColumnMySQLType(int $i_col, $val) {
     $this->columns[$i_col]["mysql_type"] = $val;
   }
 
-  function getColumnAttrType($i_col) {
+  function getColumnAttrType(int $i_col) {
     $mysql_type = $this->getColumnMySQLType($i_col);
     if (self::isEnumType($mysql_type)) {
       return "enum";
@@ -619,7 +600,7 @@ class DBFit {
    *
    * @return self
    */
-  public function setColumns($columns)
+  public function setColumns(array $columns)
   {
 
       $this->columns = [];
@@ -669,7 +650,7 @@ class DBFit {
    *
    * @return self
    */
-  public function setOutputColumnName($output_column_name)
+  public function setOutputColumnName(string $output_column_name)
   {
       $this->output_column_name = $output_column_name;
 
@@ -689,7 +670,7 @@ class DBFit {
    *
    * @return self
    */
-  public function setLimit($limit)
+  public function setLimit(int $limit)
   {
       $this->limit = $limit;
 
@@ -709,7 +690,7 @@ class DBFit {
    *
    * @return self
    */
-  public function setModelType($model_type)
+  public function setModelType(string $model_type)
   {
       $this->model_type = $model_type;
 
@@ -729,7 +710,7 @@ class DBFit {
    *
    * @return self
    */
-  public function setLearningMethod($learning_method)
+  public function setLearningMethod(string $learning_method)
   {
       $this->learning_method = $learning_method;
 

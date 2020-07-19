@@ -328,7 +328,7 @@
         *                       of the $str string. True does not necessarily mean
         *                       that it was replaced.
         */
-        private static function replace(&$str, $check, $repl, $m = null)
+        private static function replace(&$str, $check, $repl, $m = NULL)
         {
             $len = 0 - strlen($check);
 

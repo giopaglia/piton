@@ -5,6 +5,21 @@ define("MODELS_FOLDER", "models");
 
 /* Library of generic utils */
 
+function check_that(bool $cond, $msg = NULL)
+{
+  if (!$cond) {
+    die($msg);
+  }
+}
+
+function die_error($msg = NULL)
+{
+  if ($msg === NULL) {
+    $msg = "An error occurred.";
+  }
+  die("ERROR! " . $msg);
+}
+
 function mysql_set($arr, $map_function = "mysql_quote_str") { return "(" . mysql_list($arr, $map_function) . ")"; }
 function mysql_list($arr, $map_function = "mysql_backtick_str") { return join(", ", array_map($map_function, $arr)); }
 function mysql_quote_str($str) { return "'$str'"; }
@@ -121,7 +136,7 @@ function zip() {
 
     for ($i = 0; $i < $count; $i++) {
         for ($j = 0; $j < count($args); $j++) {
-            $val = (isset($args[$j][$i])) ? $args[$j][$i] : null;
+            $val = (isset($args[$j][$i])) ? $args[$j][$i] : NULL;
             $zipped[$i][$j] = $val;
         }
     }
