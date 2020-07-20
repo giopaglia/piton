@@ -244,7 +244,7 @@ class RuleStats {
     for ($i = 0; $i < $size; $i++) {
       $stats = array_fill(0, 6, 0.0); // 6 statistics parameters
       $classCounts = array_fill(0, $this->data->getClassAttribute()->numValues(), 0.0);
-      $filtered = self::computeSimpleStats($i, $data, $stats, $classCounts);
+      $filtered = self::computeSimpleStats($this->ruleset[$i], $data, $stats, $classCounts);
       $this->filtered[] = $filtered;
       $this->simpleStats[] = $stats;
       $this->distributions[] = $classCounts;
@@ -285,9 +285,9 @@ class RuleStats {
       $this->simpleStats[] = $prevRuleStats[$i];
     }
 
-    for ($j = $index; $j < size; $j++) {
+    for ($j = $index; $j < $size; $j++) {
       $stats = array_fill(0, 6, 0.0); // 6 statistics parameters
-      $filtered = self::computeSimpleStats($j, $data[1], $stats, NULL);
+      $filtered = self::computeSimpleStats($this->ruleset[$j], $data[1], $stats, NULL);
       $this->filtered[] = $filtered;
       $this->simpleStats[] = $stats;
       $data = $filtered; // Data not covered
@@ -358,16 +358,7 @@ class RuleStats {
    */
   static function partition(Instances &$data, int $numFolds) : array {
     echo "RuleStats::partition(&[data], numFolds=$numFolds)" . PHP_EOL;
-    echo "data : " . $data->toString() . PHP_EOL;
-    $rt = [];
-    $splits = $data->numInstances() * ($numFolds - 1) / $numFolds;
-
-    $rt[0] = Instances::createFromSlice($data, 0, $splits);
-    echo "rt[0] : " . $rt[0]->toString() . PHP_EOL;
-    $rt[1] = Instances::createFromSlice($data, $splits, $data->numInstances() - $splits);
-    echo "rt[1] : " . $rt[1]->toString() . PHP_EOL;
-
-    return $rt;
+    return Instances::partition($data, ($numFolds-1)/$numFolds);
   }
 
   /**
@@ -614,7 +605,7 @@ class RuleStats {
 
     for ($j = ($index + 1); $j < $this->getRulesetSize(); $j++) {
       $stats = array_fill(0, 6, 0.0);
-      $split = self::computeSimpleStats($j, $data, $stats, $tmp = NULL);
+      $split = self::computeSimpleStats($this->ruleset[$j], $data, $stats, $tmp = NULL);
       $indexPlus[] = $stats;
       $rulesetStat[0] += $stats[0];
       $rulesetStat[2] += $stats[2];

@@ -20,11 +20,8 @@ $columns = ["ID", "Gender", ["BirthDate", "YearsSince", "Age"], "Sillyness"];
 $join_criterion = NULL;
 $output_column_name = "Sillyness";
 
-$start = microtime(TRUE);
-
 $db_fit = new DBFit($db);
-// $db_fit->setTrainingMode([.80, .20]);
-// $db_fit->setTrainingMode("FullTraining");
+$db_fit->setTrainingMode("FullTraining");
 $db_fit->setModelType($model_type);
 $db_fit->setTableNames($table_names);
 $db_fit->setColumns($columns);
@@ -33,24 +30,6 @@ $db_fit->setOutputColumnName($output_column_name);
 $db_fit->setModelType($model_type);
 $db_fit->setLearningMethod($learning_method);
 $db_fit->test_all_capabilities();
-
-$end = microtime(TRUE);
-echo "The code took " . ($end - $start) . " seconds to complete.";
-
-/* // TODO
-$db_fit = new DBFit($db);
-$db_fit->setModelType($model_type);
-$db_fit->setSQL("SELECT * FROM `reports`");
-$db_fit->setColumnType("BirthDate", "YearsSince");
-$db_fit->setOutputColumnName($output_column_name);
-$db_fit->setModelType($model_type);
-$db_fit->setLearningMethod($learning_method);
-$db_fit->test_all_capabilities();
-//
-exit();
-*/
-
-$start = microtime(TRUE);
 
 $table_names = ["winery"];
 $columns = [
@@ -62,6 +41,8 @@ $output_column_name = "winery.country";
 
 $db_fit = new DBFit($db);
 $db_fit->setModelType($model_type);
+$db_fit->setTrainingMode("FullTraining");
+// $db_fit->setTrainingMode([.8, .2]);
 $db_fit->setTableNames($table_names);
 $db_fit->setColumns($columns);
 $db_fit->setJoinCriterion($join_criterion);
@@ -70,10 +51,6 @@ $db_fit->setOutputColumnName($output_column_name);
 $db_fit->setModelType($model_type);
 $db_fit->setLearningMethod($learning_method);
 $db_fit->test_all_capabilities();
-
-
-$end = microtime(TRUE);
-echo "The code took " . ($end - $start) . " seconds to complete.";
 
 
 echo "All good" . PHP_EOL;

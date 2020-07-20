@@ -8,34 +8,81 @@ include "DiscriminativeModel/PRip.php";
 /*
  * This class can be used to learn intelligent models from a MySQL database.
  *
- * Parameters:
- * - $db                       database access (Object-Oriented MySQL style)
- * - $table_names              names of the concerning database tables (array of strings)
- * - $columns             column names, and an eventual "treatment" for that column (used when processing the data, e.g time in years since the date) (array of (strings/[string, string])). Treatment can be "DaysSince", "MonthsSince", "YearsSince". (TODO ["Default", $value]). Additionally, we can specify how we want to call the derived attribute: for instance, ["BirthDate", "YearsSince", "Age"] creates an "Age" attribute by processing a "BirthDate" sql column.
- * - $join_criterion (?)       join criterion for the concerning tables (TODO se eventualmente uno vuole piu' liberta', questo parametro ed il precedente possono essere sostituiti una stringa $sql, il forse che' fa perdere un po' il senso dell'interfaccia di questa classe)
- * - $output_column_name       attribute to (must be categorical)
- * - $model_type               type of the predictive model (string?)
- * - $learning_method          learning procedure in use
- *
+ * TODO explain
+ * 
  * Handles different types of attributes:
  * - numerical
- * - categorical (finite domain),
+ * - categorical (finite domain)
  * - dates
  * - strings
  * 
  */
 class DBFit {
-  private $model;
-
+  /* Database access (Object-Oriented MySQL style) */
   private $db;
-  private $table_names;
-  private $join_criterion;
+
+  /* Names of the concerning database tables (array of strings) */
+  private $tableNames;
+
+  /* Join criterion for the concerning tables (array of strings) */
+  private $joinCriterion;
+
+  /* MySQL columns to read. This is an array of terms, one for each column.
+    For each column, the name must be specified, so a term can simply be
+     the name of the column (e.g "Age").
+    When dealing with more than one MySQL
+     table, it is mandatory that each column name references the table it belongs,
+     as in "patient.Age".
+    Additional parameters can be supplied for managing the column pre-processing.
+    - A "treatment" for a column determines how to derive an attribute from the
+       column data. For example, "YearsSince" translates each value of
+       a date/datetime column into an attribute value representing the number of
+       years since the date. "DaysSince", "MonthsSince" are also available.
+      "DaysSince" is the default treatment for dates/datetimes
+      "ForceCategorical" forces the corresponding attribute to be nominal, with
+       its domain consisting of the unique values found in the table for the column.
+      For text fields, "BinaryBagOfWords" can be used to generate k binary attributes
+       representing the presence of a frequent word in the field.
+      The column term when a treatment is desired must be an array
+       [columnName, treatment] (e.g ["BirthDate", "ForceCategorical"])
+      Treatments may require/allow arguments, and these can be supplied through
+       an array instead of a simple string. For example, "BinaryBagOfWords"
+       requires a parameter k, representing the size of the dictionary.
+       As an example, the following term requires BinaryBagOfWords with k=10:
+       ["Description", ["BinaryBagOfWords", 10]].
+      A NULL treatment implies no such pre-processing step.
+    - The name of the attribute derived from the column can also be specified:
+       for instance, ["BirthDate", "YearsSince", "Age"] creates an "Age" attribute
+       by processing a "BirthDate" sql column.
+  */
   private $columns;
-  private $output_column_name;
+
+  /* Attribute to predict (must be categorical) */
+  private $outputColumnName;
+
+  /* Limit term in the SELECT query */
   private $limit;
 
-  private $model_type;
-  private $learning_method;
+
+  /* Type of the discriminative model (string) */
+  private $modelType;
+
+  /* Learning procedure in use (string) */
+  private $learningMethod;
+
+
+  /* Discriminative model trained/loaded */
+  private $model;
+
+  /* Optimizer for training the model */
+  private $learner;
+
+  /* Training mode (e.g full training, or perform train/test split) */
+  private $trainingMode;
+
+  /* Data */
+  private $data;
+
 
   /* MAP: Mysql column type -> attr type */
   static $col2attr_type = [
@@ -61,17 +108,26 @@ class DBFit {
 
   function __construct(object $db) {
     echo "DBFit(DB)" . PHP_EOL;
+    if(!(get_class($db) == "mysqli"))
+      die_error("DBFit requires a mysqli object, but got object of type "
+        . get_class($db) . ".");
     $this->db = $db;
+    $this->data = NULL;
   }
 
-  private function read_data() {
-    echo "DBFit->read_data()" . PHP_EOL;
+  /** Read data & pre-process it */
+  private function readData(bool $force = false) {
+    if ($this->data !== NULL && !$force) {
+      return;
+    }
+
+    echo "DBFit->readData()" . PHP_EOL;
 
     /* Checks */
-    // And move output column such that it's the FIRST column
+    /* And place the output column into the FIRST spot */
     $output_col_in_columns = false;
     foreach ($this->columns as $i_col => $col) {
-    	if ($this->getColumnName($i_col) == $this->output_column_name) {
+    	if ($this->getColumnName($i_col) == $this->outputColumnName) {
     		$output_col_in_columns = true;
         array_splice($this->columns, $i_col, 1);
         array_unshift($this->columns, $col);
@@ -79,29 +135,29 @@ class DBFit {
       }
     }
 	  if (!($output_col_in_columns)) {
-      die("ERROR! The output column name (here \"{$this->output_column_name}\") must be in columns");
+      die_error("The output column name (here \"" . $this->outputColumnName
+        . "\") must be in columns.");
     }
-
-    if (count($this->table_names) > 1) {
+    if (count($this->tableNames) > 1) {
       foreach ($this->columns as $i_col => $col) {
         if (!preg_match("/.*\..*/i", $this->getColumnName($i_col))) {
-          die("ERROR! When reading more than one table, " .
+          die_error("When reading more than one table, " .
               "please specify column names in their 'table_name.column_name' form");
         }
       }
     }
     
-
     /* Obtain column types & derive attributes */
     $attributes = [];
     $sql = "SELECT * FROM `information_schema`.`columns` WHERE `table_name` IN "
-          . mysql_set($this->table_names) . " ";
+          . mysql_set($this->tableNames) . " ";
     echo "SQL: $sql" . PHP_EOL;
     $stmt = $this->db->prepare($sql);
     $stmt->execute();
     $raw_mysql_columns = [];
     $res = $stmt->get_result();
-    assert($res !== false, "SQL query failed.");
+    if (!($res !== false))
+      die_error("SQL query failed: $sql");
 
     foreach ($res as $row) {
       // echo get_var_dump($row) . PHP_EOL;
@@ -110,9 +166,21 @@ class DBFit {
     // var_dump($raw_mysql_columns);
     // var_dump($this->columns);
     
+    /* TODO: If the JOIN operation forces the equality between two columns,
+        drop one of the resulting attributes.
+    if ($this->joinCriterion != NULL && count($this->joinCriterion)) {
+      foreach ($this->joinCriterion as $criterion) {
+        if(preg_match("/.*[\s\w]=[\s\w].*
+        /i", $criterion)) {
+
+        }
+      }
+    }*/
     
+    /* Create attributes from column info */
     foreach ($this->columns as $i_col => $column) {
       $mysql_column = NULL;
+      /* Find column */
       foreach ($raw_mysql_columns as $col) {
         if (in_array($this->getColumnName($i_col),
             [$col["TABLE_NAME"].".".$col["COLUMN_NAME"], $col["COLUMN_NAME"]])) {
@@ -121,32 +189,38 @@ class DBFit {
         }
       }
       if ($mysql_column === NULL) {
-        die("Couldn't retrieve information about column \"" . $this->getColumnName($i_col) . "\"");
+        die_error("Couldn't retrieve information about column \""
+          . $this->getColumnName($i_col) . "\"");
       }
       $this->setColumnMySQLType($i_col, $mysql_column["COLUMN_TYPE"]);
 
-      // TODO where does "boolean" go? Should end up creating a discrete attr w/ 2 classes.
+      /* Create attribute */
       $attr_name = $this->getColumnAttrName($i_col);
 
       switch(true) {
+        /* Forcing a categorical attribute */
         case $this->getColumnTreatmentType($i_col) == "ForceCategorical":
           $attribute = new DiscreteAttribute($attr_name, "enum");
           break;
+        /* Numeric column */
         case in_array($this->getColumnMySQLType($i_col), ["int", "float", "double", "real", "date", "datetime"]):
           $attribute = new ContinuousAttribute($attr_name, $this->getColumnAttrType($i_col));
           break;
+        /* Enum column */
         case self::isEnumType($this->getColumnMySQLType($i_col)):
           $domain_arr_str = (preg_replace("/enum\((.*)\)/i", "[$1]", $this->getColumnMySQLType($i_col)));
           eval("\$domain_arr = " . $domain_arr_str . ";");
           $attribute = new DiscreteAttribute($attr_name, "enum", $domain_arr);
           break;
+        /* Text column */
         case self::isTextType($this->getColumnMySQLType($i_col)):
           switch($this->getColumnTreatmentType($i_col)) {
             case "BinaryBagOfWords":
-              if ( is_numeric($this->getColumnTreatmentArg($i_col, 0))) {
+              /* The argument can be the dictionary size (k), or more directly the dictionary */
+              if ( is_integer($this->getColumnTreatmentArg($i_col, 0))) {
                 $k = $this->getColumnTreatmentArg($i_col, 0);
 
-                // Find $k most frequent words
+                /* Find $k most frequent words */
                 $word_counts = [];
                 $sql = $this->getSQLSelectQuery($this->getColumnName($i_col));
                 echo "SQL: $sql" . PHP_EOL;
@@ -157,8 +231,10 @@ class DBFit {
                   $lang = "en";
                   $this->stop_words = explode("\n", file_get_contents($lang . "-stopwords.txt"));
                 }
-
-                foreach ($stmt->get_result() as $raw_row) {
+                $res = $stmt->get_result();
+                if (!($res !== false))
+                  die_error("SQL query failed: $sql");
+                foreach ($res as $raw_row) {
                   $text = $raw_row[$this->getColumnName($i_col, true)];
                   
                   $words = $this->text2words($text);
@@ -185,58 +261,59 @@ class DBFit {
                 $dict = $this->getColumnTreatmentArg($i_col, 0);
               }
               else {
-                die("Please specify a dictionary size for bag-of-words processing column '"
-                   . $this->getColumnName($i_col) . "'.");
+                die_error("Please specify a parameter (dictionary or dictionary size)"
+                  . " for bag-of-words"
+                  . " processing column '" . $this->getColumnName($i_col) . "'.");
               }
 
-              // Binary attributes indicating the presence of each word
+              /* Binary attributes indicating the presence of each word */
               $attribute = [];
               foreach ($dict as $word) {
                 $attribute[] = new DiscreteAttribute("'$word' in $attr_name",
-                  "word_presence", ["✘", "✔"]);
+                  "word_presence", ["N", "Y"]);
               }
 
               $this->setColumnTreatmentArg($i_col, 0, $dict);
               break;
             default:
-              die("Unknown treatment for text column: " . $this->getColumnName($i_col));
+              die_error("Unknown treatment for text column: " . $this->getColumnName($i_col));
               break;
           }
           break;
         default:
-          die("Unknown column type: " . $this->getColumnMySQLType($i_col));
+          die_error("Unknown column type: " . $this->getColumnMySQLType($i_col));
           break;
       }
 
       $attributes[] = $attribute;
     }
 
-    /* Obtain data */
+    /* Finally obtain data */
     $data = [];
-    $cols_attrs = zip($attributes, $this->columns);
-    // var_dump($cols_attrs);
     
     $sql = $this->getSQLSelectQuery(array_map([$this, "getColumnName"], range(0, count($this->columns)-1)));
     echo "SQL: $sql" . PHP_EOL;
     $stmt = $this->db->prepare($sql);
     $stmt->execute();
-    foreach ($stmt->get_result() as $raw_row) {
+    $res = $stmt->get_result();
+    if (!($res !== false))
+      die_error("SQL query failed: $sql");
+    foreach ($res as $raw_row) {
       // echo get_var_dump($raw_row) . PHP_EOL;
       
       /* Pre-process data */
       $row = [];
-      foreach ($cols_attrs as $i_col => $arr) {
-        $attribute = $arr[0];
-        $column    = $arr[1];
+      foreach ($this->columns as $i_col => $column) {
+        $attribute = $attributes[$i_col];
 
-        // echo $this->getColumnName($i_col, true);
         $raw_val = $raw_row[$this->getColumnName($i_col, true)];
         
         switch (true) {
+          /* Text column */
           case $this->getColumnTreatmentType($i_col) == "BinaryBagOfWords":
 
+            /* Append k values, one for each word in the dictionary */
             $dict = $this->getColumnTreatmentArg($i_col, 0);
-            var_dump($dict);
             foreach ($dict as $word) {
               $val = in_array($word, $this->text2words($raw_val));
               $row[] = $val;
@@ -244,33 +321,37 @@ class DBFit {
             break;
            
           default:
-            // Default value (the original, raw one)
+            /* Default value (the original, raw one) */
             $val = $raw_val;
 
             if ($raw_val !== NULL) {
+              /* For categorical attributes, use the class index as value */
               if ($attribute instanceof DiscreteAttribute) {
                 $val = array_search($raw_val, $attribute->getDomain());
                 if ($val === false) {
+                  /* When forcing categorical, push the unfound values to the domain */
                   if ($this->getColumnTreatmentType($i_col) == "ForceCategorical") {
                     $attribute->pushDomainVal($raw_val);
                     $val = array_search($raw_val, $attribute->getDomain());
                   }
                   else {
-                    die("Something's off. Couldn't find element \"" . get_var_dump($raw_val) . "\" in domain of attribute {$attribute->getName()}. " . serialize($attribute));
+                    die_error("Something's off. Couldn't find element \"" . get_var_dump($raw_val) . "\" in domain of attribute {$attribute->getName()}. ");
                   }
                 }
               }
+              /* Dates & Datetime values */
               else if (in_array($this->getColumnMySQLType($i_col), ["date", "datetime"])) {
                 $type_to_format = [
                   "date"     => "Y-m-d"
                 , "datetime" => "Y-m-d H:i:s"
                 ];
                 $date = DateTime::createFromFormat($type_to_format[$this->getColumnMySQLType($i_col)], $raw_val);
-                assert($date !== false, "Incorrect date string \"$raw_val\"");
+                if (!($date !== false))
+                  die_error("Incorrect date string \"$raw_val\"");
 
                 switch ($this->getColumnTreatmentType($i_col)) {
+                  /* By default, DaysSince is used. */
                   case NULL:
-                    // By default, use DaysSince
                     // break;
                   case "DaysSince":
                     $today = new DateTime("now");
@@ -285,7 +366,7 @@ class DBFit {
                     $val = intval($date->diff($today)->format("%R%y"));
                     break;
                   default:
-                    die("Unknown treatment for {$this->getColumnMySQLType($i_col)} column '{$this->getColumnTreatmentType($column)}'");
+                    die_error("Unknown treatment for {$this->getColumnMySQLType($i_col)} column '{$this->getColumnTreatmentType($column)}'");
                     break;
                 };
               }
@@ -293,12 +374,14 @@ class DBFit {
             $row[] = $val;
             break;
         }
-      } // Foreach value in row
+      } // foreach ($this->columns as $i_col => $column)
       $data[] = $row;
-    } // Foreach row
+    } // foreach ($res as $raw_row)
+
     // echo count($data) . " rows retrieved" . PHP_EOL;
     // echo get_var_dump($data);
     
+    /* Linerize attribute array (breaking the symmetry with columns) */
     $final_attributes = [];
 
     foreach ($attributes as $attribute) {
@@ -309,154 +392,158 @@ class DBFit {
           $final_attributes[] = $attr;
         }
       } else {
-        die("Unknown attribute encountered. Must debug code.");
+        die_error("Unknown attribute encountered. Must debug code.");
       }
     }
 
-    $dataframe = new Instances($final_attributes, $data);
+    /* Build instances */
+    $this->data = new Instances($final_attributes, $data);
     
-    $dataframe->save_ARFF("tmp");
+    $this->data->save_ARFF("instances");
 
-    return $dataframe;
+    return $this->data;
   }
 
-  // Train a predictive model onto the data
-  function learn_model() {
-    echo "DBFit->learn_model()" . PHP_EOL;
-
-    assert($this->model_type == "RuleBased", "Only \"RuleBased\" is available as a predictive model");
-
-    $this->model = new RuleBasedModel();
+  /** Train a discriminative model onto the data */
+  function learnModel() {
+    echo "DBFit->learnModel()" . PHP_EOL;
     
-    assert($this->learning_method == "RIPPER", "Only \"RIPPER\" is available as a learning method");
+    $this->readData();
 
-    $learner = new PRip();
-    
-    $dataframe = $this->read_data();
-    $this->model->fit($dataframe, $learner);
+    /* training modes */
+    switch (true) {
+      /* Full training: use data for both training and testing */
+      case $this->trainingMode == "FullTraining":
+        $trainData = $this->data;
+        $testData = $this->data;
+        break;
+      
+      /* Train+test split */
+      case is_array($this->trainingMode):
+        $trRat = $this->trainingMode[0]/($this->trainingMode[0]+$this->trainingMode[1]);
+        list($trainData, $testData) = Instances::partition($this->data, $trRat);
+        break;
+      
+      default:
+        die_error("Unknown training mode: '$trainingMode'");
+        break;
+    }
+    $this->model->fit($trainData, $this->learner);
+    $this->test($testData);
   }
 
-  // Load an existing predictive model. Defaulted to the model trained the most recently
-  function load_model($path = NULL) {
-    echo "DBFit->load_model($path)" . PHP_EOL;
-    // TODO take care of the fact that we might have different model types.
+  /**
+   * Load an existing discriminative model.
+   * Defaulted to the model trained the most recently
+   */
+  // TODO check if this works as expected
+  function loadModel(?string $path = NULL) {
+    echo "DBFit->loadModel($path)" . PHP_EOL;
+    
     /* Default path to that of the latest model */
     if ($path == NULL) {
-      // TODO check if this works as expected
       $models = filesin(MODELS_FOLDER);
       if (count($models) == 0) {
-        // TODO take a less drastic measure
-        die("Error! No model to load.");
+        die_error("loadModel: No model to load in folder: \"". MODELS_FOLDER . "\"");
       }
       sort($models, true);
       $path = $models[0];
       echo "$path";
     }
-    die("TODO load_model");
-    //$this->model = DiscriminativeModel::loadModel($path);
-    // $this->model = new DiscriminativeModel::loadModel($path);
+
+    $this->model = DiscriminativeModel::loadModel($path);
   }
 
-  // Learn a model, and save to file
-  function update_model() {
-    echo "DBFit->update_model()" . PHP_EOL;
-    $this->learn_model();
-    // TODO evaluate model?
+  /* Learn a model, and save to file */
+  function updateModel() {
+    echo "DBFit->updateModel()" . PHP_EOL;
+    $this->learnModel();
     $this->model->save(join_paths(MODELS_FOLDER, date("Y-m-d_H:i:s")));
   }
 
-  // Use the model for predicting
-  function predict(Instances $input_data) {
-    echo "DBFit->predict(" . $input_data->toString(true) . ")" . PHP_EOL;
-    assert($this->model instanceof _DiscriminativeModel, "Error! Model is not initialized");
-    return $this->model->predict($input_data);
+  /* Use the model for predicting */
+  function predict(Instances $inputData) : array {
+    echo "DBFit->predict(" . $inputData->toString(true) . ")" . PHP_EOL;
+
+    if(!($this->model instanceof _DiscriminativeModel))
+      die_error("Model is not initialized");
+
+    return $this->model->predict($inputData);
   }
 
   // Test the model
-  function test(Instances $test_data) {
-    echo "DBFit->test(" . $test_data->toString(true) . ")" . PHP_EOL;
+  function test(Instances $testData) {
+    echo "DBFit->test(" . $testData->toString(true) . ")" . PHP_EOL;
 
-    $ground_truths = $test_data->getClassValues();
-    $test_data->dropOutputAttr();
-    $predictions = $this->predict($test_data);
+    $ground_truths = [];
+    $classAttrDomain = $testData->getClassAttribute()->getDomain();
+
+    for ($x = 0; $x < $testData->numInstances(); $x++) {
+      $ground_truths[] = $classAttrDomain[$testData->inst_classValue($x)];
+    }
+
+    // $testData->dropOutputAttr();
+    $predictions = $this->predict($testData);
     
-    echo "\$ground_truths : " . get_var_dump($ground_truths) . PHP_EOL;
-    echo "\$predictions : " . get_var_dump($predictions) . PHP_EOL;
-
+    // echo "\$ground_truths : " . get_var_dump($ground_truths) . PHP_EOL;
+    // echo "\$predictions : " . get_var_dump($predictions) . PHP_EOL;
+    $negatives = 0;
+    $positives = 0;
+    foreach ($ground_truths as $val) {
+      echo str_pad($val, 10, " ");
+    }
+    echo "\n";
+    foreach ($predictions as $val) {
+      echo str_pad($val, 10, " ");
+    }
+    echo "\n";
+    foreach ($ground_truths as $i => $val) {
+      if ($ground_truths[$i] != $predictions[$i]) {
+        $negatives++;
+      } else {
+        $positives++;
+      }
+    }
+    echo "Accuracy: " . ($positives/($positives+$negatives));
+    echo "\n";
+    
     // TODO compute confusion matrix, etc. using $predictions $ground_truths
   }
 
-  /* DEBUG-ONLY - Test capabilities */
+  /* DEBUG-ONLY - TODO remove */
   function test_all_capabilities() {
     echo "DBFit->test_all_capabilities()" . PHP_EOL;
     
-    $dataframe = $this->read_data();
-
-    /* For testing, let's use the original data and cut the output column */
-    $attrs = $dataframe->getAttributes();
-    //var_dump($attrs);
-    // echo "TESTING DiscreteAntecedent & SPLIT DATA" . PHP_EOL;
-    // $ant = new DiscreteAntecedent($attrs[2]);
-    // $splitData = $ant->splitData($dataframe, 0.5, 1);
-    // foreach ($splitData as $k => $d) {
-      // echo "[$k] => " . PHP_EOL;
-      // echo $d->toString();
-    // }
-    // echo $ant->toString();
-    // echo "END TESTING DiscreteAntecedent & SPLIT DATA" . PHP_EOL;
-
-    // echo "TESTING ContinuousAntecedent & SPLIT DATA" . PHP_EOL;
-    // $ant = new ContinuousAntecedent($attrs[3]);
-    // $splitData = $ant->splitData($dataframe, 0.5, 1);
-    // foreach ($splitData as $k => $d) {
-      // echo "[$k] => " . PHP_EOL;
-      // echo $d->toString();
-    // }
-    // echo $ant->toString();
-    // echo "END TESTING ContinuousAntecedent & SPLIT DATA" . PHP_EOL;
+    $start = microtime(TRUE);
     
-    echo PHP_EOL;
-    echo PHP_EOL;
+    $this->readData();
+    $this->updateModel();
     
-    $this->update_model();
-    $input_dataframe = clone $dataframe;
-    $this->test($input_dataframe);
-    // $this->load_model();
-    // $this->predict($input_dataframe);
-    
+    $end = microtime(TRUE);
+    echo "The code took " . ($end - $start) . " seconds to complete.";
   }
-
-
-
-  static function isEnumType(string $mysql_type) {
-    return preg_match("/enum.*/i", $mysql_type);
-  }
-
-  static function isTextType(string $mysql_type) {
-    return preg_match("/varchar.*/i", $mysql_type);
-  }
-
 
   function getSQLSelectQuery($cols) {
     listify($cols);
-    $sql = "SELECT " . mysql_list($cols, "noop") . " FROM " . mysql_list($this->table_names);
+    $sql = "SELECT " . mysql_list($cols, "noop") . " FROM " . mysql_list($this->tableNames);
     if ($this->limit !== NULL) {
       $sql .= " LIMIT {$this->limit}";
     }
 
-    if ($this->join_criterion != NULL && count($this->join_criterion)) {
+    if ($this->joinCriterion != NULL && count($this->joinCriterion)) {
       $sql .= " WHERE 1";
-      foreach ($this->join_criterion as $criterion) {
+      foreach ($this->joinCriterion as $criterion) {
         $sql .= " AND $criterion";
-        // TODO if is equality of two columns, drop one of the columns/attributes
-        // if(preg_match("/.*[\s\w]=[\s\w].*/i", $criterion)) {}
       }
     }
     return $sql;
   }
 
-
+  // TODO use Nlptools
   function text2words($text) {
+    if ($text === NULL) {
+      return [];
+    }
     $text = strtolower($text);
     
     # to keep letters only (remove punctuation and such)
@@ -469,7 +556,7 @@ class DBFit {
     $words = array_diff($words, $this->stop_words);
 
     # lemmatize
-    // TODO lemmatize($text)
+    // lemmatize($text)
 
     # stem
     $words = array_map(["PorterStemmer", "Stem"], $words);
@@ -477,79 +564,18 @@ class DBFit {
     return $words;
   }
 
-  public function getModel() : _DiscriminativeModel
-  {
-    return $this->model;
+
+  static function isEnumType(string $mysql_type) {
+    return preg_match("/enum.*/i", $mysql_type);
   }
 
-  public function setModel(_DiscriminativeModel $model) : self
-  {
-    $this->model = $model;
-    return $this;
+  static function isTextType(string $mysql_type) {
+    return preg_match("/varchar.*/i", $mysql_type);
   }
 
-  public function getDb() : object
-  {
-    return $this->db;
-  }
 
-  public function setDb(object $db) : self
-  {
-    $this->db = $db;
-    return $this;
-  }
-
-  public function getTableNames() : array
-  {
-    // TODO introduce all kinds of checks
-    return $this->table_names;
-  }
-
-  /**
-   * @param mixed $table_names
-   *
-   * @return self
-   */
-  public function setTableNames($table_names)
-  {
-      listify($table_names);
-      $this->table_names = $table_names;
-
-      return $this;
-  }
-
-  /**
-   * @return mixed
-   */
-  public function getJoinCriterion()
-  {
-      return $this->join_criterion;
-  }
-
-  /**
-   * @param mixed $join_criterion
-   *
-   * @return self
-   */
-  public function setJoinCriterion($join_criterion)
-  {
-      listify($join_criterion);
-      $this->join_criterion = $join_criterion;
-
-      return $this;
-  }
-
-  /**
-   * @return mixed
-   */
-  public function getColumns()
-  {
-      return $this->columns;
-  }
 
   function getColumnName(int $i_col, bool $force_no_table_name = false) {
-    // var_dump($i_col);
-    // var_dump($this->columns);
     $col = $this->columns[$i_col];
     $n = $col["name"];
     return $force_no_table_name && count(explode(".", $n)) > 1 ? explode(".", $n)[1] : $n;
@@ -595,126 +621,177 @@ class DBFit {
     }
   }
 
-  /**
-   * @param mixed $columns
-   *
-   * @return self
-   */
-  public function setColumns(array $columns)
+
+  public function getDb() : object
   {
+    return $this->db;
+  }
 
-      $this->columns = [];
-      foreach ($columns as $i_col => &$col) {
-        $new_col = [];
-        $new_col["name"] = NULL;
-        $new_col["treatment"] = NULL;
-        $new_col["attr_name"] = NULL;
-        $new_col["mysql_type"] = NULL;
-        if (is_string($col)) {
-          $new_col["name"] = $col;
-        } else if (is_array($col)) {
-          if (isset($col[0])) {
-            $new_col["name"] = $col[0];
-          }
-          if (isset($col[1])) {
-            listify($col[1]);
-            $new_col["treatment"] = $col[1];
-          }
-          if (isset($col[2])) {
-            $new_col["attr_name"] = $col[2];
-          }
-        } else {
-          die("ERROR! Malformed column: " . get_var_dump($col));
-        }
+  public function setDb(object $db) : self
+  {
+    $this->data = NULL;
 
-        if ($new_col["attr_name"] == NULL) {
-          $new_col["attr_name"] = $new_col["name"];
-        }
+    $this->db = $db;
+    return $this;
+  }
 
-        $this->columns[] = $new_col;
+  public function getTableNames() : array
+  {
+    return $this->tableNames;
+  }
+
+  public function setTableNames($tableNames) : self
+  {
+    $this->data = NULL;
+
+    listify($tableNames);
+    foreach ($tableNames as $tableName) {
+      if (!is_string($tableName)) {
+        die_error("Non-string value encountered in tableNames: "
+        . "\"$tableName\": ");
       }
+    }
+    $this->tableNames = $tableNames;
 
-      return $this;
+    return $this;
   }
 
-  /**
-   * @return mixed
-   */
-  public function getOutputColumnName()
+  public function getJoinCriterion()
   {
-      return $this->output_column_name;
+    return $this->joinCriterion;
   }
 
-  /**
-   * @param mixed $output_column_name
-   *
-   * @return self
-   */
-  public function setOutputColumnName(string $output_column_name)
+  public function setJoinCriterion($joinCriterion) : self
   {
-      $this->output_column_name = $output_column_name;
+    $this->data = NULL;
 
-      return $this;
+    listify($joinCriterion);
+    foreach ($joinCriterion as $joinCriterion) {
+      if (!is_string($joinCriterion)) {
+        die_error("Non-string value encountered in joinCriterion: "
+        . "\"$joinCriterion\": ");
+      }
+    }
+    $this->joinCriterion = $joinCriterion;
+    return $this;
   }
 
-  /**
-   * @return mixed
-   */
-  public function getLimit()
+  public function addColumn($col) : self
   {
-      return $this->limit;
+    $new_col = [];
+    $new_col["name"] = NULL;
+    $new_col["treatment"] = NULL;
+    $new_col["attr_name"] = NULL;
+    $new_col["mysql_type"] = NULL;
+    if (is_string($col)) {
+      $new_col["name"] = $col;
+    } else if (is_array($col)) {
+      if (isset($col[0])) {
+        $new_col["name"] = $col[0];
+      }
+      if (isset($col[1])) {
+        listify($col[1]);
+        $new_col["treatment"] = $col[1];
+      }
+      if (isset($col[2])) {
+        $new_col["attr_name"] = $col[2];
+      }
+    } else {
+      die_error("Malformed column: " . get_var_dump($col));
+    }
+
+    if ($new_col["attr_name"] == NULL) {
+      $new_col["attr_name"] = $new_col["name"];
+    }
+    $this->columns[] = &$new_col;
+    
+    return $this;
   }
 
-  /**
-   * @param mixed $limit
-   *
-   * @return self
-   */
-  public function setLimit(int $limit)
+  public function setColumns(array $columns) : self
   {
-      $this->limit = $limit;
+    $this->data = NULL;
 
-      return $this;
+    $this->columns = [];
+    foreach ($columns as $col) {
+      $this->addColumn($col);
+    }
+
+    return $this;
   }
 
-  /**
-   * @return mixed
-   */
-  public function getModelType()
+  public function getOutputColumnName() : string
   {
-      return $this->model_type;
+    return $this->outputColumnName;
   }
 
-  /**
-   * @param mixed $model_type
-   *
-   * @return self
-   */
-  public function setModelType(string $model_type)
+  public function setOutputColumnName(string $outputColumnName) : self
   {
-      $this->model_type = $model_type;
+    $this->data = NULL;
 
-      return $this;
+    $this->outputColumnName = $outputColumnName;
+    return $this;
   }
 
-  /**
-   * @return mixed
-   */
-  public function getLearningMethod()
+  public function getLimit() : int
   {
-      return $this->learning_method;
+    return $this->limit;
   }
 
-  /**
-   * @param mixed $learning_method
-   *
-   * @return self
-   */
-  public function setLearningMethod(string $learning_method)
+  public function setLimit(int $limit) : self
   {
-      $this->learning_method = $learning_method;
+    $this->data = NULL;
 
-      return $this;
+    $this->limit = $limit;
+    return $this;
+  }
+
+  public function getModelType() : string
+  {
+    return $this->modelType;
+  }
+
+  public function setModelType(string $modelType) : self
+  {
+    $this->data = NULL;
+
+    $this->modelType = $modelType;
+    if(!($this->modelType == "RuleBased"))
+      die_error("Only \"RuleBased\" is available as a discriminative model");
+
+    $this->model = new RuleBasedModel();
+
+    return $this;
+  }
+
+  public function getLearningMethod() : string
+  {
+    return $this->learningMethod;
+  }
+
+  public function setLearningMethod(string $learningMethod) : self
+  {
+    $this->data = NULL;
+
+    $this->learningMethod = $learningMethod;
+    if(!($this->learningMethod == "RIPPER"))
+      die_error("Only \"RIPPER\" is available as a learning method");
+
+    $this->learner = new PRip();
+    return $this;
+  }
+
+  public function getTrainingMode()
+  {
+    return $this->trainingMode;
+  }
+
+  public function setTrainingMode($trainingMode) : self
+  {
+    $this->data = NULL;
+
+    $this->trainingMode = $trainingMode;
+    return $this;
   }
 }
 

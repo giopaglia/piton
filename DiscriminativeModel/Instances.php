@@ -72,6 +72,20 @@ class Instances {
     return new Instances($insts->attributes, []);
   }
 
+  static function &partition(Instances &$data, float $firstRatio) : array {
+    echo "Instances::partition(&[data], $firstRatio)" . PHP_EOL;
+    echo "data : " . $data->toString() . PHP_EOL;
+    
+    $rt = [];
+
+    $rt[0] = Instances::createFromSlice($data, 0, $data->numInstances()*$firstRatio);
+    echo "rt[0] : " . $rt[0]->toString() . PHP_EOL;
+    $rt[1] = Instances::createFromSlice($data, $data->numInstances()*$firstRatio);
+    echo "rt[1] : " . $rt[1]->toString() . PHP_EOL;
+
+    return $rt;
+  }
+
   /**
    * Instances & attributes handling
    */
@@ -103,7 +117,9 @@ class Instances {
     // return array_sum($this->getWeights());
   }
 
-  function dropAttr(int $j) {
+  /*
+    // Dangerous
+   function dropAttr(int $j) {
     array_splice($this->attributes, $j, 1);
     $this->reindexAttributes();
     foreach ($this->data as &$inst) {
@@ -114,6 +130,7 @@ class Instances {
   function dropOutputAttr() {
     $this->dropAttr(0);
   }
+  */
 
   /**
    * Remove instances with missing values for the output column

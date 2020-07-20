@@ -420,9 +420,8 @@ class PRip implements Learner {
             $newGrowData = Instances::createEmpty($growData);
             /* Split data */
             for ($b = 0; $b < $growData->numInstances(); $b++) {
-              $inst = $growData->getInstance($b);
-              if ($revision->covers($inst)) { // TODO isn't this an error?
-                $newGrowData->pushInstance($inst);
+              if ($revision->covers($growDatainst, $b)) { // TODO isn't this an error?
+                $newGrowData->pushInstance($growData->getInstance($b));
               }
             }
             $revision->grow($newGrowData, $this->minNo);

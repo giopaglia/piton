@@ -10,7 +10,7 @@ include "RuleStats.php";
 abstract class _DiscriminativeModel {
 
   abstract function fit(Instances &$data, Learner &$learner);
-  abstract function predict(Instances $testDataframe);
+  abstract function predict(Instances $testData);
 
   abstract function save(string $path);
   abstract function load(string $path);
@@ -30,7 +30,7 @@ class RuleBasedModel extends _DiscriminativeModel {
   
   function __construct() {
     echo "RuleBasedModel()" . PHP_EOL;
-    $this->rules = [];
+    $this->rules = NULL;
   }
 
   function fit(Instances &$trainData, Learner &$learner) {
@@ -38,12 +38,34 @@ class RuleBasedModel extends _DiscriminativeModel {
     $learner->teach($this, $trainData);
   }
 
-  function predict(Instances $testDataframe) {
-    echo "RuleBasedModel->predict(" . serialize($testDataframe) . ")" . PHP_EOL;
-    // TODO
-    // check vari ...
+  function predict(Instances $testData) {
+    echo "RuleBasedModel->predict(" . $testData->toString(true) . ")" . PHP_EOL;
+    
+    if (!(is_array($this->rules)))
+      die_error("Can't use uninitialized rule-based model.");
+
+    if (!(count($this->rules)))
+      die_error("Can't use empty set of rules in rule-based model.");
+
+    $classAttrDomain = $testData->getClassAttribute()->getDomain();
+    $predictions = [];
+    $data = $testData;
+    for ($x = 0; $x < $data->numInstances(); $x++) {
+      foreach ($this->rules as $rule) {
+        if ($rule->covers($data, $x)) {
+          $predictions[] = $classAttrDomain[$rule->getConsequent()];
+          break;
+        }
+      }
+    }
+
+    if (count($predictions) != $data->numInstances())
+      die_error("Couldn't perform predictions for some instances (" .
+        count($predictions) . "/" . $data->numInstances() . " performed)");
+
     // Usa  per prevedere il campo della colonna in output
     // ritorna campi della colonna in output.
+    return $predictions;
   }
 
   function save(string $path) {
