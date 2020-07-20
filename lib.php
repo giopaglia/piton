@@ -2,6 +2,7 @@
 
 define("PACKAGE_NAME", "DBFit");
 define("MODELS_FOLDER", "models");
+define("DEBUGMODE", false);
 
 /* Library of generic utils */
 
@@ -54,8 +55,14 @@ function listify(&$v) {
   }
 }
 
-// function clone($o) {return clone $o;}
+function clone_object(object $o) {return clone $o;}
 
+# Source: https://www.php.net/manual/en/function.array-diff.php#110572
+function array_equiv(array $A, array $B) {
+  sort($A);
+  sort($B);
+  return $A == $B;
+} 
 
 # Source: https://stackoverflow.com/a/173479/5646732
 function isAssoc(array $arr)
@@ -175,6 +182,11 @@ function make_seed()
   return $sec + $usec * 1000000;
 }
 
+function postfixisify(&$string, $posfix) {
+  if (!endsWith($string, $posfix)) {
+    $string .= $posfix;
+  }
+}
 function startsWith($haystack, $needle) { return $needle === "" || strrpos($haystack, $needle, -strlen($haystack)) !== false; }
 function endsWith($haystack, $needle)   { return $needle === "" || (($temp = strlen($haystack) - strlen($needle)) >= 0 && strpos($haystack, $needle, $temp) !== false); }
 function safePrefix($haystack, $needle) { return (startsWith($haystack, $needle) ? $haystack : $needle . $haystack); }

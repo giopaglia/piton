@@ -2,120 +2,27 @@
 
 @RELATION instances
 
-@ATTRIBUTE winery.country {Italy,Portugal,US,Spain,France,Germany,Argentina,Chile,Australia,Austria}
-@ATTRIBUTE 'flavor' in winery.description {N,Y}
-@ATTRIBUTE 'wine' in winery.description {N,Y}
-@ATTRIBUTE 'aroma' in winery.description {N,Y}
-@ATTRIBUTE 'fruit' in winery.description {N,Y}
-@ATTRIBUTE 'palat' in winery.description {N,Y}
-@ATTRIBUTE 'note' in winery.description {N,Y}
-@ATTRIBUTE 'oak' in winery.description {N,Y}
-@ATTRIBUTE 'drink' in winery.description {N,Y}
-@ATTRIBUTE 'acid' in winery.description {N,Y}
-@ATTRIBUTE 'ripe' in winery.description {N,Y}
-@ATTRIBUTE 'finish' in winery.description {N,Y}
-@ATTRIBUTE 'tannin' in winery.description {N,Y}
-@ATTRIBUTE 'berri' in winery.description {N,Y}
-@ATTRIBUTE 'red' in winery.description {N,Y}
+@ATTRIBUTE patients.Sillyness {Silly,NotSilly}
+@ATTRIBUTE patients.Gender {M,F,Other}
+@ATTRIBUTE patients.ID numeric
+@ATTRIBUTE MonthAge numeric
+@ATTRIBUTE reports.Date numeric
+@ATTRIBUTE State {Awake,Asleep}
+@ATTRIBUTE Heartbeat numeric
+@ATTRIBUTE ID numeric
 
 @DATA
-Italy,N,N,Y,Y,Y,N,N,N,Y,N,N,N,N,N, {1}
-Portugal,N,Y,N,Y,N,N,N,N,Y,Y,N,Y,Y,Y, {1}
-US,Y,Y,N,N,N,N,N,N,Y,N,N,N,N,N, {1}
-US,N,N,Y,N,Y,Y,N,N,N,N,Y,N,N,N, {1}
-US,N,Y,N,N,N,N,N,N,N,N,N,N,N,N, {1}
-Spain,Y,N,Y,Y,N,N,N,N,Y,N,Y,N,N,N, {1}
-Italy,N,N,Y,N,Y,N,N,N,Y,N,N,Y,Y,Y, {1}
-France,N,Y,N,N,N,N,N,N,Y,N,N,N,N,N, {1}
-Germany,Y,Y,N,N,N,Y,N,N,N,N,N,N,N,N, {1}
-France,Y,N,N,Y,N,N,N,Y,Y,N,N,N,N,N, {1}
-US,Y,Y,N,N,N,N,N,N,N,N,Y,N,N,N, {1}
-France,N,Y,N,N,N,N,N,N,N,N,N,N,N,N, {1}
-US,N,Y,N,N,N,N,Y,N,N,N,N,N,N,N, {1}
-Italy,N,N,Y,N,Y,N,Y,N,N,N,Y,Y,N,N, {1}
-US,Y,Y,Y,N,N,N,N,N,N,Y,N,N,N,N, {1}
-Germany,N,N,N,N,Y,Y,N,N,N,N,N,N,N,N, {1}
-Argentina,Y,N,Y,N,Y,N,Y,N,Y,N,Y,N,Y,Y, {1}
-Argentina,Y,N,Y,Y,N,N,Y,N,N,N,Y,N,Y,N, {1}
-Spain,Y,N,Y,Y,N,N,Y,N,N,N,Y,N,N,N, {1}
-US,N,N,Y,Y,Y,Y,N,N,N,N,N,N,N,Y, {1}
-US,N,N,Y,N,Y,Y,Y,N,N,Y,N,N,Y,Y, {1}
-US,N,Y,N,N,N,N,Y,Y,N,N,N,N,Y,N, {1}
-Italy,N,N,Y,Y,Y,N,N,N,Y,N,N,N,N,N, {1}
-US,Y,Y,Y,N,N,N,N,N,Y,N,N,N,N,N, {1}
-Italy,Y,N,Y,N,Y,N,Y,N,N,N,N,Y,N,N, {1}
-US,N,N,Y,N,N,N,Y,N,N,N,N,N,N,N, {1}
-Italy,N,N,Y,Y,Y,Y,Y,N,Y,N,N,N,N,N, {1}
-Italy,N,N,Y,N,Y,N,N,Y,N,Y,N,Y,Y,N, {1}
-Italy,N,N,Y,N,Y,N,Y,N,N,Y,N,Y,Y,N, {1}
-US,N,N,N,Y,N,Y,N,Y,N,N,N,N,N,N, {1}
-France,N,Y,N,Y,N,N,N,N,N,N,N,Y,N,Y, {1}
-Italy,N,Y,N,Y,N,N,N,N,N,N,N,N,N,Y, {1}
-Italy,Y,N,Y,Y,N,N,N,N,N,Y,N,N,N,N, {1}
-US,Y,N,N,N,N,N,N,N,N,N,N,N,Y,N, {1}
-US,Y,N,N,Y,N,Y,N,N,Y,N,N,N,N,N, {1}
-US,Y,N,N,Y,N,Y,N,N,N,Y,Y,N,N,N, {1}
-Chile,Y,N,Y,N,Y,Y,N,N,N,N,Y,N,N,N, {1}
-Italy,Y,Y,Y,Y,N,N,N,N,N,N,N,N,N,N, {1}
-Italy,N,Y,Y,Y,Y,N,N,N,N,Y,N,N,N,N, {1}
-Italy,Y,Y,N,Y,Y,N,N,N,N,N,Y,N,Y,N, {1}
-Italy,N,N,N,N,N,Y,N,N,N,N,N,N,N,N, {1}
-US,Y,Y,N,N,N,Y,N,N,N,N,N,Y,Y,N, {1}
-France,Y,Y,N,Y,N,N,N,N,Y,Y,N,N,Y,Y, {1}
-US,Y,N,N,Y,N,N,Y,N,N,N,N,N,N,N, {1}
-Chile,Y,N,Y,N,Y,Y,N,N,N,N,Y,N,Y,N, {1}
-US,N,Y,N,N,N,Y,Y,N,N,N,Y,Y,N,N, {1}
-Italy,N,N,N,N,N,N,N,N,N,N,N,N,N,N, {1}
-US,Y,Y,N,N,N,N,N,N,Y,N,N,N,N,N, {1}
-US,Y,Y,Y,Y,Y,N,N,N,N,N,N,N,N,N, {1}
-France,N,Y,N,Y,N,N,N,Y,N,Y,N,Y,N,Y, {1}
-Italy,N,N,Y,N,N,N,N,N,N,N,Y,N,Y,N, {1}
-Chile,N,N,Y,Y,Y,N,N,N,N,N,Y,N,N,N, {1}
-Italy,N,N,Y,Y,N,N,N,N,Y,N,Y,N,N,N, {1}
-France,Y,Y,N,N,N,N,N,Y,Y,N,N,N,N,N, {1}
-Italy,N,N,N,N,Y,N,N,N,N,N,N,N,Y,N, {1}
-US,Y,N,N,N,N,Y,Y,N,N,N,N,N,N,N, {1}
-US,Y,N,N,N,N,Y,N,N,N,N,N,N,N,N, {1}
-Italy,N,N,N,Y,N,Y,N,N,N,N,N,N,N,N, {1}
-Chile,Y,N,Y,Y,Y,N,N,N,N,N,Y,N,N,Y, {1}
-US,Y,N,Y,N,N,N,N,N,N,N,N,Y,N,N, {1}
-US,N,Y,N,N,N,N,Y,N,N,Y,N,N,N,N, {1}
-Italy,N,Y,Y,N,Y,N,N,Y,N,N,N,Y,N,N, {1}
-US,Y,N,Y,N,N,Y,N,N,N,N,N,Y,N,N, {1}
-France,N,N,N,Y,N,N,N,Y,Y,Y,N,N,Y,Y, {1}
-US,Y,N,N,N,N,N,N,N,N,N,N,N,N,N, {1}
-France,Y,Y,N,Y,N,N,N,Y,Y,Y,N,N,N,N, {1}
-France,Y,Y,N,N,N,N,N,Y,N,Y,N,N,N,N, {1}
-US,Y,Y,Y,N,N,Y,N,N,N,N,N,N,N,N, {1}
-US,Y,Y,Y,Y,N,N,N,N,N,N,N,N,N,N, {1}
-France,N,Y,N,Y,N,N,N,Y,Y,Y,N,N,N,Y, {1}
-US,Y,N,Y,Y,N,N,Y,N,N,N,N,N,N,N, {1}
-US,Y,Y,N,N,N,N,Y,N,N,N,N,N,N,Y, {1}
-Italy,N,N,Y,Y,Y,Y,N,N,N,N,Y,Y,N,Y, {1}
-US,N,Y,N,N,N,N,Y,N,N,N,N,Y,N,N, {1}
-US,N,Y,Y,N,N,N,N,N,N,N,N,N,N,N, {1}
-US,N,N,N,N,N,N,Y,N,N,Y,N,Y,N,N, {1}
-Germany,Y,N,N,Y,N,Y,N,Y,N,N,N,N,N,N, {1}
-Australia,N,N,Y,N,Y,Y,N,Y,N,Y,Y,N,N,N, {1}
-US,Y,Y,N,N,N,N,N,Y,N,N,N,N,N,N, {1}
-Portugal,N,Y,N,Y,N,N,N,Y,N,N,N,Y,N,N, {1}
-Chile,Y,N,Y,N,N,N,Y,N,N,N,Y,Y,N,N, {1}
-Spain,Y,N,Y,Y,N,N,N,Y,N,N,Y,N,N,N, {1}
-France,N,Y,N,Y,N,N,N,Y,Y,Y,N,N,N,N, {1}
-Australia,N,Y,N,Y,Y,N,N,Y,N,N,N,N,N,N, {1}
-US,N,Y,N,Y,N,N,N,N,N,N,N,N,N,N, {1}
-Germany,Y,Y,N,N,N,N,N,Y,Y,N,Y,N,N,N, {1}
-US,Y,N,Y,Y,Y,N,N,N,N,Y,N,N,N,N, {1}
-US,N,N,N,N,N,N,N,N,N,N,N,Y,N,N, {1}
-Italy,N,N,Y,Y,Y,N,Y,N,Y,N,N,N,N,N, {1}
-Italy,N,N,Y,N,Y,Y,N,N,N,Y,N,N,Y,Y, {1}
-US,N,N,N,Y,Y,N,Y,N,N,Y,N,N,N,N, {1}
-US,N,Y,N,N,N,N,N,N,N,N,N,N,N,N, {1}
-US,N,Y,N,N,N,N,N,N,N,Y,N,N,N,Y, {1}
-Austria,Y,N,N,N,Y,Y,N,Y,N,N,N,N,N,N, {1}
-US,Y,N,Y,Y,Y,Y,N,N,N,N,N,N,N,N, {1}
-France,N,Y,N,N,N,N,N,Y,Y,N,N,Y,N,N, {1}
-France,Y,Y,N,N,N,N,N,Y,Y,Y,Y,N,Y,Y, {1}
-US,Y,Y,N,N,Y,N,N,Y,N,N,Y,N,N,N, {1}
-Italy,N,N,Y,Y,Y,N,N,Y,N,N,N,Y,N,N, {1}
-US,Y,N,N,N,Y,N,N,N,N,N,N,N,N,Y, {1}
+Silly,?,3,6,19,Asleep,140,3, {1}
+Silly,?,3,6,3672,Awake,180,3, {1}
+NotSilly,M,1,11,3368,Awake,180,1, {1}
+NotSilly,Other,2,11,1265,Asleep,122,2, {1}
+NotSilly,Other,2,11,2698,Awake,203,2, {1}
+NotSilly,Other,2,11,2361,Awake,403,2, {1}
+Silly,F,4,6,323,Asleep,203,4, {1}
+Silly,F,4,6,3002,Asleep,215,4, {1}
+NotSilly,M,5,0,3672,Asleep,205,5, {1}
+NotSilly,?,6,6,2333,Awake,200,6, {1}
+Silly,M,7,8,1541,Awake,155,7, {1}
+Silly,M,7,8,2361,Asleep,170,7, {1}
+Silly,Other,8,6,1084,Awake,170,8, {1}
+NotSilly,F,9,5,566,Awake,190,9, {1}

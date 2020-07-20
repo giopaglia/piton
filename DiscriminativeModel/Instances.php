@@ -73,15 +73,15 @@ class Instances {
   }
 
   static function &partition(Instances &$data, float $firstRatio) : array {
-    echo "Instances::partition(&[data], $firstRatio)" . PHP_EOL;
-    echo "data : " . $data->toString() . PHP_EOL;
+    if (DEBUGMODE) echo "Instances::partition(&[data], $firstRatio)" . PHP_EOL;
+    if (DEBUGMODE) echo "data : " . $data->toString() . PHP_EOL;
     
     $rt = [];
 
     $rt[0] = Instances::createFromSlice($data, 0, $data->numInstances()*$firstRatio);
-    echo "rt[0] : " . $rt[0]->toString() . PHP_EOL;
+    if (DEBUGMODE) echo "rt[0] : " . $rt[0]->toString() . PHP_EOL;
     $rt[1] = Instances::createFromSlice($data, $data->numInstances()*$firstRatio);
-    echo "rt[1] : " . $rt[1]->toString() . PHP_EOL;
+    if (DEBUGMODE) echo "rt[1] : " . $rt[1]->toString() . PHP_EOL;
 
     return $rt;
   }
@@ -211,10 +211,10 @@ class Instances {
    */
   function sortByAttr(_Attribute $attr)
   {
-    echo "Instances->sortByAttr(" . $attr->toString() . ")" . PHP_EOL;
+    if (DEBUGMODE) echo "Instances->sortByAttr(" . $attr->toString() . ")" . PHP_EOL;
 
-    // echo $this->toString();
-    // echo " => ";
+    // if (DEBUGMODE) echo $this->toString();
+    // if (DEBUGMODE) echo " => ";
     $j = $attr->getIndex();
     
     usort($this->data, function ($a,$b) use($j) {
@@ -225,7 +225,7 @@ class Instances {
       if ($A === NULL) return 1;
       return ($A < $B) ? -1 : 1;
     });
-    // echo $this->toString();
+    // if (DEBUGMODE) echo $this->toString();
   }
 
   /**
@@ -233,18 +233,77 @@ class Instances {
    */
   function randomize()
   {
-    echo "[ Instances->randomize() ]" . PHP_EOL;
+    if (DEBUGMODE) echo "[ Instances->randomize() ]" . PHP_EOL;
 
-    // echo $this->toString();
+    // if (DEBUGMODE) echo $this->toString();
     shuffle($this->data);
-    // echo $this->toString();
+    // if (DEBUGMODE) echo $this->toString();
   }
 
+  /**
+   * Resort attributes and data according to an extern attribute set 
+   */
+  function sortAttrsAs(array $newAttributes, bool $allowDataLoss = false) {
+    if (DEBUGMODE) echo "Instances->sortAttrsAs([newAttributes], allowDataLoss=$allowDataLoss)" . PHP_EOL;
+    if (DEBUGMODE) echo $this;
+    $copyMap = [];
+    $newData = [];
+
+    $attributes = $this->attributes;
+    /* Find new attributes in the current list of attributes */
+    foreach ($newAttributes as $i_attr => $newAttribute) {
+      /* Look for the correspondent attribute */
+      $oldAttribute = NULL;
+      $i_oldAttribute = NULL;
+      foreach ($attributes as $i => $attr) {
+        if ($newAttribute->getName() == $attr->getName()) {
+          $oldAttribute = $attr;
+          $i_oldAttribute = $i;
+          unset($attributes[$i]);
+          break;
+        }
+      }
+      if ($oldAttribute === NULL) {
+        die_error("Couldn't find attribute '{$newAttribute->getName()}' in the current attribute list " . get_arr_dump($attributes) . " in Instances->sortAttrsAs");
+      }
+
+      if (!$newAttribute->isEquivalentTo($oldAttribute) && !$allowDataLoss) {
+        die_error("Attributes are not equivalent and this might cause data loss. "
+          . $newAttribute . "\n" . $oldAttribute);
+      }
+
+      $copyMap[] = [$oldAttribute, $newAttribute];
+    }
+
+    $newData = [];
+
+    for ($x = 0; $x < $this->numInstances(); $x++) {
+      $newRow = [];
+      foreach ($copyMap as $oldAndNewAttr) {
+        $i = $oldAndNewAttr[0]->getIndex();
+        $new_i = $oldAndNewAttr[1]->getIndex();
+        $oldVal = $this->inst_val($x, $i);
+        $newRow[$new_i] = $oldAndNewAttr[1]->reprValAs($oldAndNewAttr[0], $oldVal);
+        $newRow[] = $this->inst_weight($x);
+      }
+      $newData[] = $newRow;
+    }
+
+    if(count($attributes) && !$allowDataLoss) {
+      die_error("Some attributes were not requested in new attribute set in Instances->sortAttrsAs. If this is desired, please use the allowDataLoss flag. " . get_arr_dump($attributes));
+    }
+
+    $this->data = $newData;
+    $this->setAttributes($newAttributes);
+    if (DEBUGMODE) echo $this;
+  }
+  
   /**
    * Sort the classes of the attribute to predict by frequency
    */
   function resortClassesByCount() {
-    // echo "Instances->resortClassesByCount()" . PHP_EOL;
+    if (DEBUGMODE) echo "Instances->resortClassesByCount()" . PHP_EOL;
+    if (DEBUGMODE) echo get_arr_dump($this->getClassAttribute()->getDomain());
     $classes = $this->getClassAttribute()->getDomain();
 
     $class_counts =  array_fill(0,count($classes),0);
@@ -252,24 +311,27 @@ class Instances {
       $class_counts[$this->inst_classValue($x)]++;
     }
 
-    // echo $this->toString();
+    // if (DEBUGMODE) echo $this->toString();
 
     $indices = range(0, count($classes) - 1);
-    // echo get_var_dump($classes);
+    // if (DEBUGMODE) echo get_var_dump($classes);
+    if (DEBUGMODE) echo get_var_dump($class_counts);
     
     array_multisort($class_counts, SORT_ASC, $classes, $indices);
     $class_map = array_flip($indices);
 
-    // echo get_var_dump($classes);
-    // echo get_var_dump($indices);
-    // echo get_var_dump($class_map);
+    // if (DEBUGMODE) echo get_var_dump($classes);
+    // if (DEBUGMODE) echo get_var_dump($indices);
+    // if (DEBUGMODE) echo get_var_dump($class_map);
 
     for ($x = 0; $x < $this->numInstances(); $x++) {
       $cl = $this->inst_classValue($x);
       $this->inst_setClassValue($x, $class_map[$cl]);
     }
+    $this->getClassAttribute()->setDomain($classes);
+    if (DEBUGMODE) echo get_arr_dump($this->getClassAttribute()->getDomain());
 
-    // echo $this->toString();
+    // if (DEBUGMODE) echo $this->toString();
 
     return $class_counts;
   }
@@ -293,7 +355,7 @@ class Instances {
    * Save data to file, (dense) ARFF/Weka format
    */
   function save_ARFF(string $path) {
-    echo "Instances->save_ARFF($path)" . PHP_EOL;
+    if (DEBUGMODE) echo "Instances->save_ARFF($path)" . PHP_EOL;
     $f = fopen($path, "w");
     fwrite($f, "% Generated with \"" . PACKAGE_NAME . "\"\n");
     fwrite($f, "\n");
@@ -323,6 +385,42 @@ class Instances {
   /**
    * Print a textual representation of the instances
    */
+  function inst_toString(int $i, bool $short = true) : string {
+    $out_str = "";
+    if (!$short) {
+      $out_str .= "\n";
+      $out_str .= str_repeat("======|=", $this->numAttributes()+1) . "|\n";
+      $out_str .= "";
+      foreach ($this->getAttributes() as $att) {
+        $out_str .= substr($att->toString(), 0, 7) . "\t";
+      }
+      $out_str .= "weight";
+      $out_str .= "\n";
+      $out_str .= str_repeat("======|=", $this->numAttributes()+1) . "|\n";
+    }
+    foreach ($this->getInstance($i) as $val) {
+      if ($val === NULL) {
+        $x = "N/A";
+      }
+      else {
+        $x = "{$val}";
+      }
+      $out_str .= str_pad($x, 7, " ", STR_PAD_BOTH) . "\t";
+    }
+    $out_str .= "{" . $this->inst_weight($i) . "}";
+    if (!$short) {
+      $out_str .= "\n";
+      $out_str .= str_repeat("======|=", $this->numAttributes()+1) . "|\n";
+    }
+    return $out_str;
+  }
+
+  /**
+   * Print a textual representation of the instances
+   */
+  function __toString() : string {
+    return $this->toString();
+  }
   function toString(bool $short = false) : string {
     $out_str = "";
     if ($short) {
@@ -341,8 +439,8 @@ class Instances {
       $out_str .= "weight";
       $out_str .= "\n";
       $out_str .= str_repeat("======|=", $this->numAttributes()+1) . "|\n";
-      foreach ($this->data as $k => $inst) {
-        foreach ($this->getInstance($k) as $val) {
+      foreach ($this->data as $i => $inst) {
+        foreach ($this->getInstance($i) as $val) {
           if ($val === NULL) {
             $x = "N/A";
           }
@@ -351,13 +449,19 @@ class Instances {
           }
           $out_str .= str_pad($x, 7, " ", STR_PAD_BOTH) . "\t";
         }
-        $out_str .= "{" . $this->inst_weight($k) . "}";
+        $out_str .= "{" . $this->inst_weight($i) . "}";
         $out_str .= "\n";
       }
       $out_str .= str_repeat("======|=", $this->numAttributes()+1) . "|\n";
     }
     return $out_str;
   }
+
+  function __clone()
+  {
+    $this->attributes = array_map("clone_object", $this->attributes);
+  }
+
 }
 
 /*

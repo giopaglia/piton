@@ -112,6 +112,17 @@ class DBFit {
       die_error("DBFit requires a mysqli object, but got object of type "
         . get_class($db) . ".");
     $this->db = $db;
+    $this->setTableNames(NULL);
+    $this->joinCriterion = NULL;
+    $this->columns = NULL;
+    $this->setOutputColumnName(NULL);
+    $this->setLimit(NULL);
+    $this->setModelType("RuleBased");
+    $this->setLearningMethod("RIPPER");
+    $this->model = NULL;
+    $this->learner = NULL;
+    // $this->setTrainingMode("FullTraining");
+    $this->trainingMode = NULL;
     $this->data = NULL;
   }
 
@@ -404,7 +415,7 @@ class DBFit {
     return $this->data;
   }
 
-  /** Train a discriminative model onto the data */
+  /** Train and test a discriminative model onto the data */
   function learnModel() {
     echo "DBFit->learnModel()" . PHP_EOL;
     
@@ -422,13 +433,23 @@ class DBFit {
       case is_array($this->trainingMode):
         $trRat = $this->trainingMode[0]/($this->trainingMode[0]+$this->trainingMode[1]);
         list($trainData, $testData) = Instances::partition($this->data, $trRat);
+        
         break;
       
       default:
-        die_error("Unknown training mode: '$trainingMode'");
+        die_error("Unknown training mode ('$this->trainingMode')");
         break;
     }
+    
+    /* Train */
     $this->model->fit($trainData, $this->learner);
+    
+    echo "Ultimately, here are the extracted rules: " . PHP_EOL;
+    foreach ($this->model->getRules() as $x => $rule) {
+      echo $x . ": " . $rule->toString() . PHP_EOL;
+    }
+
+    /* Test */
     $this->test($testData);
   }
 
@@ -451,7 +472,7 @@ class DBFit {
       echo "$path";
     }
 
-    $this->model = DiscriminativeModel::loadModel($path);
+    $this->model = _DiscriminativeModel::loadFromFile($path);
   }
 
   /* Learn a model, and save to file */
@@ -472,14 +493,17 @@ class DBFit {
   }
 
   // Test the model
-  function test(Instances $testData) {
+  function test(?Instances $testData) {
+    if ($testData === NULL) {
+      $testData = $this->data;
+    }
     echo "DBFit->test(" . $testData->toString(true) . ")" . PHP_EOL;
 
     $ground_truths = [];
-    $classAttrDomain = $testData->getClassAttribute()->getDomain();
+    $classAttr = $testData->getClassAttribute();
 
     for ($x = 0; $x < $testData->numInstances(); $x++) {
-      $ground_truths[] = $classAttrDomain[$testData->inst_classValue($x)];
+      $ground_truths[] = $classAttr->reprVal($testData->inst_classValue($x));
     }
 
     // $testData->dropOutputAttr();
@@ -666,10 +690,10 @@ class DBFit {
     $this->data = NULL;
 
     listify($joinCriterion);
-    foreach ($joinCriterion as $joinCriterion) {
-      if (!is_string($joinCriterion)) {
+    foreach ($joinCriterion as $jc) {
+      if (!is_string($jc)) {
         die_error("Non-string value encountered in joinCriterion: "
-        . "\"$joinCriterion\": ");
+        . "\"$jc\": ");
       }
     }
     $this->joinCriterion = $joinCriterion;
@@ -708,7 +732,7 @@ class DBFit {
     return $this;
   }
 
-  public function setColumns(array $columns) : self
+  public function setColumns(?array $columns) : self
   {
     $this->data = NULL;
 
@@ -725,7 +749,7 @@ class DBFit {
     return $this->outputColumnName;
   }
 
-  public function setOutputColumnName(string $outputColumnName) : self
+  public function setOutputColumnName(?string $outputColumnName) : self
   {
     $this->data = NULL;
 
@@ -738,7 +762,7 @@ class DBFit {
     return $this->limit;
   }
 
-  public function setLimit(int $limit) : self
+  public function setLimit(?int $limit) : self
   {
     $this->data = NULL;
 
@@ -751,7 +775,7 @@ class DBFit {
     return $this->modelType;
   }
 
-  public function setModelType(string $modelType) : self
+  public function setModelType(?string $modelType) : self
   {
     $this->data = NULL;
 
@@ -769,7 +793,7 @@ class DBFit {
     return $this->learningMethod;
   }
 
-  public function setLearningMethod(string $learningMethod) : self
+  public function setLearningMethod(?string $learningMethod) : self
   {
     $this->data = NULL;
 

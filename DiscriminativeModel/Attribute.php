@@ -22,11 +22,23 @@ abstract class _Attribute {
   /** The type of the attribute (ARFF/Weka style)  */
   abstract function getARFFType() : string;
 
-  /** Print a textual representation of a value of the attribute */
+  /** Obtain the representation of a value of the attribute */
   abstract function reprVal($val) : string;
 
   /** Print a textual representation of the attribute */
   abstract function toString() : string;
+
+  /** Whether two attributes are equal (completely interchangeable) */
+  function isEqualTo(_Attribute $otherAttr) : bool {
+    return $this->isEquivalentTo();
+  }
+
+  /** Whether there can be a mapping between two attributes */
+  function isEquivalentTo(_Attribute $otherAttr) : bool {
+    return get_class($this) == get_class($otherAttr)
+        && $this->getName() == $otherAttr->getName()
+        && $this->getType() == $otherAttr->getType();
+  }
 
   function getName() : string
   {
@@ -74,12 +86,39 @@ class DiscreteAttribute extends _Attribute {
   /** Domain: discrete set of values that an instance can show for the attribute */
   private $domain;
 
+  /** Whether two attributes are equal (completely interchangeable) */
+  function isEqualTo(_Attribute $otherAttr) : bool {
+    return $this->getDomain() == $otherAttr->getDomain()
+       && parent::isEqualTo($otherAttr);
+  }
+
+  /** Whether there can be a mapping between two attributes */
+  function isEquivalentTo(_Attribute $otherAttr) : bool {
+    if (DEBUGMODE) echo get_arr_dump($this->getDomain());
+    if (DEBUGMODE) echo get_arr_dump($otherAttr->getDomain());
+    if (DEBUGMODE) echo array_equiv($this->getDomain(), $otherAttr->getDomain());
+    return array_equiv($this->getDomain(), $otherAttr->getDomain())
+       && parent::isEquivalentTo($otherAttr);
+  }
+
   function numValues() : int { return count($this->domain); }
   function pushDomainVal(string $v) { $this->domain[] = $v; }
 
-  /** Print a textual representation of a value of the attribute */
+  /** Obtain the representation of a value of the attribute */
   function reprVal($val) : string {
     return $val < 0 || $val === NULL ? $val : strval($this->domain[$val]);
+  }
+
+  /** Obtain the representation for the attribute of a value
+    that belonged to a different domain */
+  function reprValAs(DiscreteAttribute $oldAttr, ?int $oldVal) {
+    if ($oldVal === NULL) return NULL;
+    $cl = $oldAttr->reprVal($oldVal);
+    $i = array_search($cl, $this->getDomain());
+    if ($i === false) {
+      die_error("Can't represent nominal value \"$cl\" ($oldVal) within domain " . get_arr_dump($this->getDomain()));
+    }
+    return $i;
   }
 
   /** The type of the attribute (ARFF/Weka style)  */
@@ -88,6 +127,9 @@ class DiscreteAttribute extends _Attribute {
   }
   
   /** Print a textual representation of the attribute */
+  function __toString() : string {
+    return $this->toString();
+  }
   function toString($short = true) : string {
     return $short ? $this->name : "[DiscreteAttribute '{$this->name}' (type {$this->type}): " . get_arr_dump($this->domain) . " ]";
   }
@@ -131,7 +173,7 @@ class ContinuousAttribute extends _Attribute {
       // parent::__construct($name, $type);
   // }
 
-  /** Print a textual representation of a value of the attribute */
+  /** Obtain the representation of a value of the attribute */
   function reprVal($val) : string {
     if ($val < 0 || $val === NULL)
       return $val;
@@ -152,7 +194,15 @@ class ContinuousAttribute extends _Attribute {
     }
   }
 
+  function reprValAs(ContinuousAttribute $oldAttr, $oldVal) {
+    return $oldVal;
+  }
+  
+
   /** Print a textual representation of the attribute */
+  function __toString() : string {
+    return $this->toString();
+  }
   function toString() : string {
     return $this->name;
   }

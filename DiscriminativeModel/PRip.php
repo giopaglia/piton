@@ -76,7 +76,7 @@ class PRip implements Learner {
       $random_seed = make_seed();
     }
 
-    $this->debug = true;
+    $this->debug = DEBUGMODE;
     $this->numOptimizations = 2;
     $this->seed = $random_seed;
     $this->numFolds = 3;
@@ -98,6 +98,7 @@ class PRip implements Learner {
   function teach(_DiscriminativeModel &$model, Instances $data) {
     echo "PRip->teach(&[model], [data])" . PHP_EOL;
 
+    $data = clone $data;
     srand($this->seed);
     $model->resetRules();
 
@@ -209,12 +210,9 @@ class PRip implements Learner {
       $ruleStat->cleanUp();
     }
     
-    echo "Ultimately, here are the extracted rules: " . PHP_EOL;
-    foreach ($this->ruleset as $x => $rule) {
-      echo $x . ": " . $rule->toString($this->classAttr) . PHP_EOL;
-    }
     // var_dump($this->ruleset);
     $model->setRules($this->ruleset);
+    $model->setAttributes($data->getAttributes());
   }
   
   /**
@@ -227,7 +225,7 @@ class PRip implements Learner {
    */
   protected function rulesetForOneClass(Instances &$data, float $expFPRate,
     float $classIndex, float $defDL) : Instances {
-    echo "PRip->rulesetForOneClass(&[data], expFPRate=$expFPRate, classIndex=$classIndex, defDL=$defDL)" . PHP_EOL;
+    if (DEBUGMODE) echo "PRip->rulesetForOneClass(&[data], expFPRate=$expFPRate, classIndex=$classIndex, defDL=$defDL)" . PHP_EOL;
 
     $newData = $data;
     
