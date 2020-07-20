@@ -2,7 +2,7 @@
 
 define("PACKAGE_NAME", "DBFit");
 define("MODELS_FOLDER", "models");
-define("DEBUGMODE", false);
+define("DEBUGMODE", true);
 
 /* Library of generic utils */
 

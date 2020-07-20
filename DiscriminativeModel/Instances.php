@@ -87,6 +87,76 @@ class Instances {
   }
 
   /**
+   * Read data from file, (dense) ARFF/Weka format
+   */
+  function createFromARFF(string $path) {
+    if (DEBUGMODE) echo "Instances::createFromARFF($path)" . PHP_EOL;
+    $f = fopen($path, "r");
+    
+    /* Attributes */
+    $attributes = [];
+    while(!feof($f))  {
+      $line = strtolower(fgets($f));
+      if (startsWith($line, "@attribute")) {
+        $attributes[] = _Attribute::createFromARFF($line);
+      }
+      if (startsWith($line, "@data")) {
+        break;
+      }
+    }
+    $classAttr = array_pop($attributes);
+    array_unshift($attributes, $classAttr);
+
+    /* Print the internal representation given the ARFF value read */
+    $getVal = function($ARFFVal, _Attribute $attr)
+    {
+      $ARFFVal = trim($ARFFVal);
+      if ($ARFFVal === "?") {
+        return NULL;
+      }
+      $k = $attr->getKey($ARFFVal, true);
+      // $k = $attr->getKey($ARFFVal);
+      // echo ($k);
+      // if ($k === false) {
+      //   die_error("ARFF data wrongfully encoded. Couldn't find element \""
+      //     . get_var_dump($ARFFVal)
+      //     . "\" in domain of attribute {$attr->getName()} ("
+      //     . get_arr_dump($attr->getDomain()) . "). ");
+      // }
+      return $k;
+    };
+
+    /* Data */
+    $data = [];
+    $weights = [];
+    while(!feof($f) && $line = strtolower(fgets($f)))  {
+      // TODO fix cuz dis not safe for text
+      $row = explode(",", $line);
+      if (count($row) == count($attributes) + 1) {
+        preg_match("/\{(.*)\}/", $row[array_key_last($row)], $w);
+        $weights[] = $w;
+        array_splice($row, array_key_last($row), 1);
+      } else if (count($row) != count($attributes)) {
+        die_error("ARFF data wrongfully encoded. Found data row with " . 
+          count($row) . " values when there are " . count($attributes) .
+          " attributes.");
+      }
+
+      $classVal = array_pop($row);
+      array_unshift($row, $classVal);
+      $data[] = array_map($getVal, $row, $attributes);
+    }
+
+    if (!count($weights)) {
+      $weights = 1;
+    }
+
+    fclose($f);
+
+    return new Instances($attributes, $data, $weights);
+  }
+
+  /**
    * Instances & attributes handling
    */
   function numAttributes() : int { return count($this->attributes); }
@@ -356,6 +426,7 @@ class Instances {
    */
   function save_ARFF(string $path) {
     if (DEBUGMODE) echo "Instances->save_ARFF($path)" . PHP_EOL;
+    postfixisify($path, ".arff");
     $f = fopen($path, "w");
     fwrite($f, "% Generated with \"" . PACKAGE_NAME . "\"\n");
     fwrite($f, "\n");

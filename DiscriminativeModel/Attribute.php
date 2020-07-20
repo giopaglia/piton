@@ -22,11 +22,44 @@ abstract class _Attribute {
   /** The type of the attribute (ARFF/Weka style)  */
   abstract function getARFFType() : string;
 
+  /** Obtain the value for the representation of the attribute */
+  abstract function getKey($cl);
+
   /** Obtain the representation of a value of the attribute */
   abstract function reprVal($val) : string;
 
   /** Print a textual representation of the attribute */
   abstract function toString() : string;
+  
+
+  /** The type of the attribute (ARFF/Weka style)  */
+  static $ARFFtype2type = [
+    "numeric"  => "float"
+  , "real"     => "float"
+  ];
+
+  static function createFromARFF(string $line) : _Attribute {
+    if (DEBUGMODE) echo "$line" . PHP_EOL;
+    preg_match("/@attribute\s+(\S+)\s+(.*)/", $line, $matches);
+    $name = $matches[1];
+    $type = $matches[2];
+    if (DEBUGMODE) echo "$name" . PHP_EOL;
+    if (DEBUGMODE) echo "$type" . PHP_EOL;
+    switch (true) {
+      case preg_match("/\{(.*)\}/", $type, $domain_str):
+        $domain_arr = array_map("trim",  array_map("trim", explode(",", $domain_str[1])));
+        $attribute = new DiscreteAttribute($name, "enum", $domain_arr);
+        break;
+      case isset(self::$ARFFtype2type[$type])
+       && in_array(self::$ARFFtype2type[$type], ["float", "int"]):
+        $attribute = new ContinuousAttribute($name, $type);
+        break;
+      default:
+        die_error("Unknown ARFF type encountered: " . $type);
+        break;
+    }
+    return $attribute;
+  }
 
   /** Whether two attributes are equal (completely interchangeable) */
   function isEqualTo(_Attribute $otherAttr) : bool {
@@ -104,6 +137,17 @@ class DiscreteAttribute extends _Attribute {
   function numValues() : int { return count($this->domain); }
   function pushDomainVal(string $v) { $this->domain[] = $v; }
 
+  /** Obtain the value for the representation of the attribute */
+  function getKey($cl, $safety_check = false) {
+    $i = array_search($cl, $this->getDomain());
+    if ($i === false && $safety_check) {
+      die_error("Couldn't find element \"" . get_var_dump($cl)
+        . "\" in domain of attribute {$this->getName()} ("
+        . get_arr_dump($this->getDomain()) . "). ");
+    }
+    return $i;
+  }
+
   /** Obtain the representation of a value of the attribute */
   function reprVal($val) : string {
     return $val < 0 || $val === NULL ? $val : strval($this->domain[$val]);
@@ -114,12 +158,13 @@ class DiscreteAttribute extends _Attribute {
   function reprValAs(DiscreteAttribute $oldAttr, ?int $oldVal) {
     if ($oldVal === NULL) return NULL;
     $cl = $oldAttr->reprVal($oldVal);
-    $i = array_search($cl, $this->getDomain());
+    $i = $this->getKey($cl);
     if ($i === false) {
       die_error("Can't represent nominal value \"$cl\" ($oldVal) within domain " . get_arr_dump($this->getDomain()));
     }
     return $i;
   }
+
 
   /** The type of the attribute (ARFF/Weka style)  */
   function getARFFType() : string {
@@ -172,6 +217,11 @@ class ContinuousAttribute extends _Attribute {
   // function __construct(string $name, string $type) {
       // parent::__construct($name, $type);
   // }
+
+  /** Obtain the value for the representation of the attribute */
+  function getKey($cl) {
+    return $cl;
+  }
 
   /** Obtain the representation of a value of the attribute */
   function reprVal($val) : string {

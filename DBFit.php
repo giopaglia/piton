@@ -117,8 +117,8 @@ class DBFit {
     $this->columns = NULL;
     $this->setOutputColumnName(NULL);
     $this->setLimit(NULL);
-    $this->setModelType("RuleBased");
-    $this->setLearningMethod("RIPPER");
+    // $this->setModelType("RuleBased");
+    // $this->setLearningMethod("RIPPER");
     $this->model = NULL;
     $this->learner = NULL;
     // $this->setTrainingMode("FullTraining");
@@ -338,12 +338,12 @@ class DBFit {
             if ($raw_val !== NULL) {
               /* For categorical attributes, use the class index as value */
               if ($attribute instanceof DiscreteAttribute) {
-                $val = array_search($raw_val, $attribute->getDomain());
+                $val = $attribute->getKey($raw_val);
                 if ($val === false) {
                   /* When forcing categorical, push the unfound values to the domain */
                   if ($this->getColumnTreatmentType($i_col) == "ForceCategorical") {
                     $attribute->pushDomainVal($raw_val);
-                    $val = array_search($raw_val, $attribute->getDomain());
+                    $val = $attribute->getKey($raw_val);
                   }
                   else {
                     die_error("Something's off. Couldn't find element \"" . get_var_dump($raw_val) . "\" in domain of attribute {$attribute->getName()}. ");
@@ -528,7 +528,7 @@ class DBFit {
         $positives++;
       }
     }
-    echo "Accuracy: " . ($positives/($positives+$negatives));
+    echo "Test accuracy: " . ($positives/($positives+$negatives));
     echo "\n";
     
     // TODO compute confusion matrix, etc. using $predictions $ground_truths
