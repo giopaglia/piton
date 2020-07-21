@@ -73,15 +73,15 @@ class Instances {
   }
 
   static function &partition(Instances &$data, float $firstRatio) : array {
-    if (DEBUGMODE) echo "Instances::partition(&[data], $firstRatio)" . PHP_EOL;
-    if (DEBUGMODE) echo "data : " . $data->toString() . PHP_EOL;
+    if (DEBUGMODE > 2) echo "Instances::partition(&[data], $firstRatio)" . PHP_EOL;
+    if (DEBUGMODE > 2) echo "data : " . $data->toString() . PHP_EOL;
     
     $rt = [];
 
     $rt[0] = Instances::createFromSlice($data, 0, $data->numInstances()*$firstRatio);
-    if (DEBUGMODE) echo "rt[0] : " . $rt[0]->toString() . PHP_EOL;
+    if (DEBUGMODE > 2) echo "rt[0] : " . $rt[0]->toString() . PHP_EOL;
     $rt[1] = Instances::createFromSlice($data, $data->numInstances()*$firstRatio);
-    if (DEBUGMODE) echo "rt[1] : " . $rt[1]->toString() . PHP_EOL;
+    if (DEBUGMODE > 2) echo "rt[1] : " . $rt[1]->toString() . PHP_EOL;
 
     return $rt;
   }
@@ -90,7 +90,7 @@ class Instances {
    * Read data from file, (dense) ARFF/Weka format
    */
   function createFromARFF(string $path) {
-    if (DEBUGMODE) echo "Instances::createFromARFF($path)" . PHP_EOL;
+    if (DEBUGMODE > 2) echo "Instances::createFromARFF($path)" . PHP_EOL;
     $f = fopen($path, "r");
     
     /* Attributes */
@@ -254,9 +254,9 @@ class Instances {
     return $this->inst_val($i, $j);
   }
 
-  function inst_isMissing(int $i, _Attribute $attr) : bool {
-    return ($this->inst_valueOfAttr($i, $attr) === NULL);
-  }
+  // function inst_isMissing(int $i, _Attribute $attr) : bool {
+  //   return ($this->inst_valueOfAttr($i, $attr) === NULL);
+  // }
   
   function inst_weight(int $i) : int {
     return $this->data[$i][$this->numAttributes()];
@@ -272,7 +272,8 @@ class Instances {
     $this->data[$i][0] = $cl;
   }
 
-  protected function inst_val(int $i, int $j) {
+  // protected function inst_val(int $i, int $j) {
+  function inst_val(int $i, int $j) {
     return $this->data[$i][$j];
   }
 
@@ -281,10 +282,10 @@ class Instances {
    */
   function sortByAttr(_Attribute $attr)
   {
-    if (DEBUGMODE) echo "Instances->sortByAttr(" . $attr->toString() . ")" . PHP_EOL;
+    if (DEBUGMODE > 2) echo "Instances->sortByAttr(" . $attr->toString() . ")" . PHP_EOL;
 
-    // if (DEBUGMODE) echo $this->toString();
-    // if (DEBUGMODE) echo " => ";
+    // if (DEBUGMODE > 2) echo $this->toString();
+    // if (DEBUGMODE > 2) echo " => ";
     $j = $attr->getIndex();
     
     usort($this->data, function ($a,$b) use($j) {
@@ -295,7 +296,7 @@ class Instances {
       if ($A === NULL) return 1;
       return ($A < $B) ? -1 : 1;
     });
-    // if (DEBUGMODE) echo $this->toString();
+    // if (DEBUGMODE > 2) echo $this->toString();
   }
 
   /**
@@ -303,19 +304,19 @@ class Instances {
    */
   function randomize()
   {
-    if (DEBUGMODE) echo "[ Instances->randomize() ]" . PHP_EOL;
+    if (DEBUGMODE > 2) echo "[ Instances->randomize() ]" . PHP_EOL;
 
-    // if (DEBUGMODE) echo $this->toString();
+    // if (DEBUGMODE > 2) echo $this->toString();
     shuffle($this->data);
-    // if (DEBUGMODE) echo $this->toString();
+    // if (DEBUGMODE > 2) echo $this->toString();
   }
 
   /**
    * Resort attributes and data according to an extern attribute set 
    */
   function sortAttrsAs(array $newAttributes, bool $allowDataLoss = false) {
-    if (DEBUGMODE) echo "Instances->sortAttrsAs([newAttributes], allowDataLoss=$allowDataLoss)" . PHP_EOL;
-    if (DEBUGMODE) echo $this;
+    if (DEBUGMODE > 2) echo "Instances->sortAttrsAs([newAttributes], allowDataLoss=$allowDataLoss)" . PHP_EOL;
+    if (DEBUGMODE > 2) echo $this;
     $copyMap = [];
     $newData = [];
 
@@ -365,15 +366,15 @@ class Instances {
 
     $this->data = $newData;
     $this->setAttributes($newAttributes);
-    if (DEBUGMODE) echo $this;
+    if (DEBUGMODE > 2) echo $this;
   }
   
   /**
    * Sort the classes of the attribute to predict by frequency
    */
   function resortClassesByCount() {
-    if (DEBUGMODE) echo "Instances->resortClassesByCount()" . PHP_EOL;
-    if (DEBUGMODE) echo get_arr_dump($this->getClassAttribute()->getDomain());
+    if (DEBUGMODE > 2) echo "Instances->resortClassesByCount()" . PHP_EOL;
+    if (DEBUGMODE > 2) echo get_arr_dump($this->getClassAttribute()->getDomain());
     $classes = $this->getClassAttribute()->getDomain();
 
     $class_counts =  array_fill(0,count($classes),0);
@@ -381,27 +382,27 @@ class Instances {
       $class_counts[$this->inst_classValue($x)]++;
     }
 
-    // if (DEBUGMODE) echo $this->toString();
+    // if (DEBUGMODE > 2) echo $this->toString();
 
     $indices = range(0, count($classes) - 1);
-    // if (DEBUGMODE) echo get_var_dump($classes);
-    if (DEBUGMODE) echo get_var_dump($class_counts);
+    // if (DEBUGMODE > 2) echo get_var_dump($classes);
+    if (DEBUGMODE > 2) echo get_var_dump($class_counts);
     
     array_multisort($class_counts, SORT_ASC, $classes, $indices);
     $class_map = array_flip($indices);
 
-    // if (DEBUGMODE) echo get_var_dump($classes);
-    // if (DEBUGMODE) echo get_var_dump($indices);
-    // if (DEBUGMODE) echo get_var_dump($class_map);
+    // if (DEBUGMODE > 2) echo get_var_dump($classes);
+    // if (DEBUGMODE > 2) echo get_var_dump($indices);
+    // if (DEBUGMODE > 2) echo get_var_dump($class_map);
 
     for ($x = 0; $x < $this->numInstances(); $x++) {
       $cl = $this->inst_classValue($x);
       $this->inst_setClassValue($x, $class_map[$cl]);
     }
     $this->getClassAttribute()->setDomain($classes);
-    if (DEBUGMODE) echo get_arr_dump($this->getClassAttribute()->getDomain());
+    if (DEBUGMODE > 2) echo get_arr_dump($this->getClassAttribute()->getDomain());
 
-    // if (DEBUGMODE) echo $this->toString();
+    // if (DEBUGMODE > 2) echo $this->toString();
 
     return $class_counts;
   }
@@ -425,7 +426,7 @@ class Instances {
    * Save data to file, (dense) ARFF/Weka format
    */
   function save_ARFF(string $path) {
-    if (DEBUGMODE) echo "Instances->save_ARFF($path)" . PHP_EOL;
+    if (DEBUGMODE > 2) echo "Instances->save_ARFF($path)" . PHP_EOL;
     postfixisify($path, ".arff");
     $f = fopen($path, "w");
     fwrite($f, "% Generated with \"" . PACKAGE_NAME . "\"\n");

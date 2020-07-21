@@ -1,5 +1,9 @@
 <?php
 
+ini_set('xdebug.halt_level', E_WARNING|E_NOTICE|E_USER_WARNING|E_USER_NOTICE);
+ini_set('max_execution_time', 300);
+set_time_limit(300);
+
 include "lib.php";
 include "local-lib.php";
 
@@ -11,7 +15,8 @@ include "DBFit.php";
 *                                                   *
 ****************************************************/
 
-
+testSPAM();
+exit();
 testSillyWithJoin();
 exit();
 testSilly();
@@ -25,6 +30,25 @@ exit();
 echo "All good" . PHP_EOL;
 
 
+
+function testSPAM() {
+	$db = getDBConnection();
+	$model_type = "RuleBased";
+	$learning_method = "RIPPER";
+
+	$table_names = "spam";
+	$columns = [["Category", "ForceCategorical"], ["Message", ["BinaryBagOfWords", 10]]];
+	$output_column_name = "Category";
+
+	$db_fit = new DBFit($db);
+	$db_fit->setTrainingMode([.8, .2]);
+	$db_fit->setTableNames($table_names);
+	$db_fit->setColumns($columns);
+	$db_fit->setOutputColumnName($output_column_name);
+	$db_fit->setModelType($model_type);
+	$db_fit->setLearningMethod($learning_method);
+	$db_fit->test_all_capabilities();
+}
 
 function testSilly() {
 	$db = getDBConnection();
@@ -170,7 +194,7 @@ function testDiabetes() {
 	$classAttr = $testData->getClassAttribute();
 
 	for ($x = 0; $x < $testData->numInstances(); $x++) {
-	  $ground_truths[] = $testData->inst_classValue($x);
+	  $ground_truths[] = $classAttr->reprVal($testData->inst_classValue($x));
 	}
 
 	// $testData->dropOutputAttr();

@@ -121,14 +121,14 @@ class RipperRule extends _Rule {
    * @return the default accuracy number
    */
   function computeDefAccu(Instances &$data) : float {
-    if (DEBUGMODE) echo "RipperRule->computeDefAccu(&[data])" . PHP_EOL;
+    if (DEBUGMODE > 2) echo "RipperRule->computeDefAccu(&[data])" . PHP_EOL;
     $defAccu = 0;
     for ($i = 0; $i < $data->numInstances(); $i++) {
       if ($data->inst_classValue($i) == $this->consequent) {
         $defAccu += $data->inst_weight($i);
       }
     }
-    if (DEBUGMODE) echo "\$defAccu : $defAccu" . PHP_EOL;
+    if (DEBUGMODE > 2) echo "\$defAccu : $defAccu" . PHP_EOL;
     return $defAccu;
   }
 
@@ -142,7 +142,7 @@ class RipperRule extends _Rule {
    * @return the data covered by the antecedent
    */
   private function computeInfoGain(Instances &$data, float $defAcRt,
-    _Antecedent $antd) : ?Instances {
+    _Antecedent &$antd) : ?Instances {
 
     /*
      * Split the data into bags. The information gain of each bag is also
@@ -165,8 +165,8 @@ class RipperRule extends _Rule {
    * @param minNo minimum weight allowed within the split
    */
   function grow(Instances &$growData, float $minNo) {
-    if (DEBUGMODE) echo "RipperRule->grow(&[growData])" . PHP_EOL;
-    if (DEBUGMODE) echo $this->toString() . PHP_EOL;
+    if (DEBUGMODE > 2) echo "RipperRule->grow(&[growData])" . PHP_EOL;
+    if (DEBUGMODE > 2) echo $this->toString() . PHP_EOL;
     
     if (!$this->hasConsequent()) {
       throw new Exception(" Consequent not set yet.");
@@ -205,7 +205,7 @@ class RipperRule extends _Rule {
       /* Build one condition based on all attributes not used yet */
       foreach ($growData->getAttributes(false) as $attr) {
 
-        if (DEBUGMODE) echo "\nAttribute '{$attr->toString()}'. (total weight = " . $growData->getSumOfWeights() . ")" . PHP_EOL;
+        if (DEBUGMODE > 2) echo "\nAttribute '{$attr->toString()}'. (total weight = " . $growData->getSumOfWeights() . ")" . PHP_EOL;
 
         $antd = _Antecedent::createFromAttribute($attr);
 
@@ -224,7 +224,7 @@ class RipperRule extends _Rule {
               $maxCoverData = $coverData;
               $maxInfoGain  = $infoGain;
             }
-            if (DEBUGMODE) {
+            if (DEBUGMODE > 2) {
               echo "Test of {" . $antd->toString()
                 . "}:\n\tinfoGain = " . $infoGain . " | Accuracy = "
                 . $antd->getAccuRate()*100 . "% = " . $antd->getAccu() . "/"
@@ -252,7 +252,7 @@ class RipperRule extends _Rule {
       $growData = $maxCoverData; // Grow data size shrinks
       $defAcRt = $maxAntd->getAccuRate();
     }
-    if (DEBUGMODE) echo $this->toString() . PHP_EOL;
+    if (DEBUGMODE > 2) echo $this->toString() . PHP_EOL;
   }
 
 
@@ -265,9 +265,9 @@ class RipperRule extends _Rule {
    *          pruning data instead of the data covered
    */
   function prune(Instances &$pruneData, bool $useWhole) {
-    if (DEBUGMODE) echo "RipperRule->grow(&[growData])" . PHP_EOL;
-    if (DEBUGMODE) echo "Rule: " . $this->toString() . PHP_EOL;
-    if (DEBUGMODE) echo "Data: " . $pruneData->toString() . PHP_EOL;
+    if (DEBUGMODE > 2) echo "RipperRule->grow(&[growData])" . PHP_EOL;
+    if (DEBUGMODE > 2) echo "Rule: " . $this->toString() . PHP_EOL;
+    if (DEBUGMODE > 2) echo "Data: " . $pruneData->toString() . PHP_EOL;
     
     $sumOfWeights = $pruneData->getSumOfWeights();
     if (!($sumOfWeights > 0.0)) {
@@ -277,7 +277,7 @@ class RipperRule extends _Rule {
     /* The default accurate # and rate on pruning data */
     $defAccu = $this->computeDefAccu($pruneData);
 
-    if (DEBUGMODE) {
+    if (DEBUGMODE > 2) {
       echo "Pruning with " . $defAccu . " positive data out of "
         . $sumOfWeights . " instances" . PHP_EOL;
     }
@@ -292,7 +292,7 @@ class RipperRule extends _Rule {
     $worthValue = array_fill(0, $size, 0.0);
 
     /* Calculate accuracy parameters for all the antecedents in this rule */
-    if (DEBUGMODE) echo "Calculating accuracy parameters for all the antecedents..." . PHP_EOL;
+    if (DEBUGMODE > 2) echo "Calculating accuracy parameters for all the antecedents..." . PHP_EOL;
 
     // True negative used if $useWhole
     $tn = 0.0;
@@ -324,14 +324,14 @@ class RipperRule extends _Rule {
         $worthRt[$x] = ($worthValue[$x] + 1.0) / ($coverage[$x] + 2.0);
       }
 
-      if (DEBUGMODE) echo $antd->toString() . ": coverage=" . $coverage[$x] . ", worthValue=" . $worthValue[$x] . PHP_EOL;
+      if (DEBUGMODE > 2) echo $antd->toString() . ": coverage=" . $coverage[$x] . ", worthValue=" . $worthValue[$x] . PHP_EOL;
     }
 
     $maxValue = ($defAccu + 1.0) / ($sumOfWeights + 2.0);
-    if (DEBUGMODE) echo "maxValue=$maxValue";
+    if (DEBUGMODE > 2) echo "maxValue=$maxValue";
     $maxIndex = -1;
     for ($i = 0; $i < $size; $i++) {
-      if (DEBUGMODE) {
+      if (DEBUGMODE > 2) {
         echo $i . " : (useAccuracy? " . !$useWhole . "): "
         . $worthRt[$i] . " ~= " . $worthValue[$i] . "/" . ($useWhole ? $sumOfWeights : $coverage[$i]) . PHP_EOL;
       }
@@ -343,10 +343,10 @@ class RipperRule extends _Rule {
     }
 
     /* Prune the antecedents according to the accuracy parameters */
-    if (DEBUGMODE) var_dump("maxIndex " . $maxIndex . " " . count($this->antecedents));
-    if (DEBUGMODE) var_dump($this->antecedents);
+    if (DEBUGMODE > 2) var_dump("maxIndex " . $maxIndex . " " . count($this->antecedents));
+    if (DEBUGMODE > 2) var_dump($this->antecedents);
     array_splice($this->antecedents, $maxIndex + 1);
-    if (DEBUGMODE) var_dump($this->antecedents);
+    if (DEBUGMODE > 2) var_dump($this->antecedents);
   }
 
   /**
@@ -355,15 +355,15 @@ class RipperRule extends _Rule {
    * @param data
    */
   function cleanUp(Instances &$data) {
-    if (DEBUGMODE) echo "RipperRule->cleanUp(&[data])" . PHP_EOL;
-    if (DEBUGMODE) echo "Rule: " . $this->toString() . PHP_EOL;
-    if (DEBUGMODE) echo "Data: " . $data->toString() . PHP_EOL;
+    if (DEBUGMODE > 2) echo "RipperRule->cleanUp(&[data])" . PHP_EOL;
+    if (DEBUGMODE > 2) echo "Rule: " . $this->toString() . PHP_EOL;
+    if (DEBUGMODE > 2) echo "Data: " . $data->toString() . PHP_EOL;
 
     $mins = array_fill(0,$data->numAttributes(),INF);
     $maxs = array_fill(0,$data->numAttributes(),-INF);
     
     for ($i = $this->getSize() - 1; $i >= 0; $i--) {
-      if (DEBUGMODE) var_dump($this->antecedents);
+      if (DEBUGMODE > 2) var_dump($this->antecedents);
       $j = $this->antecedents[$i]->getAttribute()->getIndex();
       if ($this->antecedents[$i] instanceof ContinuousAntecedent) {
         $splitPoint = $this->antecedents[$i]->getSplitPoint();

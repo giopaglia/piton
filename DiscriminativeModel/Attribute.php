@@ -39,12 +39,12 @@ abstract class _Attribute {
   ];
 
   static function createFromARFF(string $line) : _Attribute {
-    if (DEBUGMODE) echo "$line" . PHP_EOL;
+    if (DEBUGMODE > 2) echo "$line" . PHP_EOL;
     preg_match("/@attribute\s+(\S+)\s+(.*)/", $line, $matches);
     $name = $matches[1];
     $type = $matches[2];
-    if (DEBUGMODE) echo "$name" . PHP_EOL;
-    if (DEBUGMODE) echo "$type" . PHP_EOL;
+    if (DEBUGMODE > 2) echo "$name" . PHP_EOL;
+    if (DEBUGMODE > 2) echo "$type" . PHP_EOL;
     switch (true) {
       case preg_match("/\{(.*)\}/", $type, $domain_str):
         $domain_arr = array_map("trim",  array_map("trim", explode(",", $domain_str[1])));
@@ -127,9 +127,9 @@ class DiscreteAttribute extends _Attribute {
 
   /** Whether there can be a mapping between two attributes */
   function isEquivalentTo(_Attribute $otherAttr) : bool {
-    if (DEBUGMODE) echo get_arr_dump($this->getDomain());
-    if (DEBUGMODE) echo get_arr_dump($otherAttr->getDomain());
-    if (DEBUGMODE) echo array_equiv($this->getDomain(), $otherAttr->getDomain());
+    if (DEBUGMODE > 2) echo get_arr_dump($this->getDomain());
+    if (DEBUGMODE > 2) echo get_arr_dump($otherAttr->getDomain());
+    if (DEBUGMODE > 2) echo array_equiv($this->getDomain(), $otherAttr->getDomain());
     return array_equiv($this->getDomain(), $otherAttr->getDomain())
        && parent::isEquivalentTo($otherAttr);
   }

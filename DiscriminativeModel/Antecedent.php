@@ -9,6 +9,7 @@ include "Instances.php";
 abstract class _Antecedent {
   /** The attribute of the antecedent */
   protected $attribute;
+  protected $attributeIndex;
   
   /**
   * The attribute value of the antecedent. For numeric attribute, it represents the operator (<= or >=)
@@ -35,6 +36,7 @@ abstract class _Antecedent {
    */
   function __construct(_Attribute $attribute) {
     $this->attribute   = $attribute;
+    $this->attributeIndex   = $attribute->getIndex();
     $this->value       = NAN;
     $this->maxInfoGain = 0;
     $this->accuRate    = NAN;
@@ -56,6 +58,14 @@ abstract class _Antecedent {
         break;
     }
     return $antecedent;
+  }
+
+  /**
+   * Functions for the single data instance
+   */
+  
+  function inst_valueOfAttr(Instances $data, int $i) {
+    return $data->inst_val($i, $this->attributeIndex);
   }
 
   /* The abstract members for inheritance */
@@ -130,7 +140,7 @@ class DiscreteAntecedent extends _Antecedent {
    * @return the array of data after split
    */
   function splitData(Instances &$data, float $defAcRt, int $cla) : ?array {
-    if (DEBUGMODE) {
+    if (DEBUGMODE > 2) {
       echo "DiscreteAntecedent->splitData(&[data], defAcRt=$defAcRt, cla=$cla)" . PHP_EOL;
       echo $data->toString() . PHP_EOL;
     }
@@ -145,12 +155,13 @@ class DiscreteAntecedent extends _Antecedent {
 
     /* Split data */
     for ($x = 0; $x < $data->numInstances(); $x++) {
-      if (!$data->inst_isMissing($x, $this->attribute)) {
-        $v = $data->inst_valueOfAttr($x, $this->attribute);
-        $splitData[$v]->pushInstance($data->getInstance($x));
-        $coverage[$v] += $data->inst_weight($x);
+      $val = $this->inst_valueOfAttr($data, $x);
+      if ($val !== NULL) {
+        $splitData[$val]->pushInstance($data->getInstance($x));
+        $w = $data->inst_weight($x);
+        $coverage[$val] += $w;
         if ($data->inst_classValue($x) == $cla) {
-          $accurate[$v] += $data->inst_weight($x);
+          $accurate[$val] += $w;
         }
       }
     }
@@ -173,7 +184,7 @@ class DiscreteAntecedent extends _Antecedent {
       }
     }
 
-    if (DEBUGMODE) {
+    if (DEBUGMODE > 2) {
       foreach ($splitData as $k => $s) {
         echo "splitData[$k] : \n" . $splitData[$k]->toString() . PHP_EOL;
       }
@@ -191,8 +202,9 @@ class DiscreteAntecedent extends _Antecedent {
    */
   function covers(Instances &$data, int $i) : bool {
     $isCover = false;
-    if (!$data->inst_isMissing($i, $this->attribute)) {
-      if ($data->inst_valueOfAttr($i, $this->attribute) == $this->value) {
+    $val = $this->inst_valueOfAttr($data, $i);
+    if ($val !== NULL) {
+      if ($val == $this->value) {
         $isCover = true;
       }
     }
@@ -244,7 +256,7 @@ class ContinuousAntecedent extends _Antecedent {
    * @return the array of data after split
    */
   function splitData(Instances &$data, float $defAcRt, int $cla) : ?array {
-    if (DEBUGMODE) {
+    if (DEBUGMODE > 2) {
       echo "ContinuousAntecedent->splitData(&[data], defAcRt=$defAcRt, cla=$cla)" . PHP_EOL;
       echo $data->toString() . PHP_EOL;
     }
@@ -266,34 +278,36 @@ class ContinuousAntecedent extends _Antecedent {
     $total = $data->numInstances();
     // Find the last instance without missing value
     for ($x = 0; $x < $data->numInstances(); $x++) {
-      if ($data->inst_isMissing($x, $this->attribute)) {
+      if ($this->inst_valueOfAttr($data, $x) === NULL) {
         $total = $x;
         break;
       }
 
-      $sndCover += $data->inst_weight($x);
+      $w = $data->inst_weight($x);
+      $sndCover += $w;
       if ($data->inst_classValue($x) == $cla) {
-        $sndAccu += $data->inst_weight($x);
+        $sndAccu += $w;
       }
     }
 
     if ($total == 0) {
       return NULL; // Data all missing for the attribute
     }
-    $this->splitPoint = $data->inst_valueOfAttr($total - 1, $this->attribute);
+    $this->splitPoint = $this->inst_valueOfAttr($data, $total - 1);
     
     // echo "splitPoint: " . $this->splitPoint . PHP_EOL;
     // echo "total: " . $total . PHP_EOL;
 
     for (; $split <= $total; $split++) {
       if (($split == $total) ||
-          ($data->inst_valueOfAttr($split, $this->attribute) > // Can't split within
-           $data->inst_valueOfAttr($prev, $this->attribute))) { // same value
+          ($this->inst_valueOfAttr($data, $split) > // Can't split within
+           $this->inst_valueOfAttr($data, $prev))) { // same value
 
         for ($y = $prev; $y < $split; $y++) {
-          $fstCover += $data->inst_weight($y);
+          $w = $data->inst_weight($y);
+          $fstCover += $w;
           if ($data->inst_classValue($y) == $cla) {
-            $fstAccu += $data->inst_weight($y); // First bag positive# ++
+            $fstAccu += $w; // First bag positive# ++
           }
         }
 
@@ -339,7 +353,7 @@ class ContinuousAntecedent extends _Antecedent {
           $this->accuRate = $accRate;
           $this->cover = $coverage;
           $this->accu = $accurate;
-          $this->splitPoint = $data->inst_valueOfAttr($prev, $this->attribute);
+          $this->splitPoint = $this->inst_valueOfAttr($data, $prev);
           $finalSplit = ($isFirst) ? $split : $prev;
         }
 
@@ -352,9 +366,10 @@ class ContinuousAntecedent extends _Antecedent {
         // echo "finalSplit: "  . $finalSplit . PHP_EOL;
 
         for ($y = $prev; $y < $split; $y++) {
-          $sndCover -= $data->inst_weight($y);
+          $w = $data->inst_weight($y);
+          $sndCover -= $w;
           if ($data->inst_classValue($y) == $cla) {
-            $sndAccu -= $data->inst_weight($y); // Second bag positive# --
+            $sndAccu -= $w; // Second bag positive# --
           }
         }
         $prev = $split;
@@ -366,7 +381,7 @@ class ContinuousAntecedent extends _Antecedent {
     $splitData[] = Instances::createFromSlice($data, 0, $finalSplit);
     $splitData[] = Instances::createFromSlice($data, $finalSplit, $total - $finalSplit);
 
-    if (DEBUGMODE) {
+    if (DEBUGMODE > 2) {
       foreach ($splitData as $k => $s) {
         echo "splitData[$k] : \n" . $splitData[$k]->toString() . PHP_EOL;
       }
@@ -384,12 +399,13 @@ class ContinuousAntecedent extends _Antecedent {
    */
   function covers(Instances &$data, int $i) : bool {
     $isCover = true;
-    if (!$data->inst_isMissing($i, $this->attribute)) {
+    $val = $this->inst_valueOfAttr($data, $i);
+    if ($val !== NULL) {
       if ($this->value == 0) { // First bag
-        if ($data->inst_valueOfAttr($i, $this->attribute) > $this->splitPoint) {
+        if ($val > $this->splitPoint) {
           $isCover = false;
         }
-      } else if ($data->inst_valueOfAttr($i, $this->attribute) < $this->splitPoint) {
+      } else if ($val < $this->splitPoint) {
         $isCover = false;
       }
     } else {

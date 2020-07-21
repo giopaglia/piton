@@ -515,7 +515,7 @@ class DBFit {
     $classAttr = $testData->getClassAttribute();
 
     for ($x = 0; $x < $testData->numInstances(); $x++) {
-      $ground_truths[] = $testData->inst_classValue($x);
+      $ground_truths[] = $classAttr->reprVal($testData->inst_classValue($x));
     }
 
     // $testData->dropOutputAttr();
@@ -525,14 +525,12 @@ class DBFit {
     // echo "\$predictions : " . get_var_dump($predictions) . PHP_EOL;
     $negatives = 0;
     $positives = 0;
-    foreach ($ground_truths as $val) {
-      echo str_pad($val, 10, " ");
+    if (DEBUGMODE > 1) {
+      foreach ($ground_truths as $i => $val) {
+        echo "[" . $val . "," . $predictions[$i] . "]";
+      }
     }
-    echo "\n";
-    foreach ($predictions as $val) {
-      echo str_pad($val, 10, " ");
-    }
-    echo "\n";
+    if (DEBUGMODE > 1) echo "\n";
     foreach ($ground_truths as $i => $val) {
       if ($ground_truths[$i] != $predictions[$i]) {
         $negatives++;

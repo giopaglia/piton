@@ -96,7 +96,7 @@ class PRip implements Learner {
    * @param data the training data (wrapped in a structure that holds the appropriate header information for the attributes).
    */
   function teach(_DiscriminativeModel &$model, Instances $data) {
-    echo "PRip->teach(&[model], [data])" . PHP_EOL;
+     if (DEBUGMODE > 1) echo "PRip->teach(&[model], [data])" . PHP_EOL;
 
     $data = clone $data;
     srand($this->seed);
@@ -104,7 +104,7 @@ class PRip implements Learner {
 
     /* Remove instances with missing class */
     $data->removeUselessInsts();
-    echo $data->toString() . PHP_EOL;
+    if (DEBUGMODE > 1) echo $data->toString() . PHP_EOL;
 
     /* Initialize ruleset */
     $this->ruleset = [];
@@ -225,7 +225,7 @@ class PRip implements Learner {
    */
   protected function rulesetForOneClass(Instances &$data, float $expFPRate,
     float $classIndex, float $defDL) : Instances {
-    if (DEBUGMODE) echo "PRip->rulesetForOneClass(&[data], expFPRate=$expFPRate, classIndex=$classIndex, defDL=$defDL)" . PHP_EOL;
+    if (DEBUGMODE > 2) echo "PRip->rulesetForOneClass(&[data], expFPRate=$expFPRate, classIndex=$classIndex, defDL=$defDL)" . PHP_EOL;
 
     $newData = $data;
     

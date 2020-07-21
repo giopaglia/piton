@@ -16,7 +16,7 @@ abstract class _DiscriminativeModel {
   abstract function load(string $path);
 
   static function loadFromFile(string $path) : _DiscriminativeModel {
-    if (DEBUGMODE) echo "_DiscriminativeModel::loadFromFile($path)" . PHP_EOL;
+    if (DEBUGMODE > 2) echo "_DiscriminativeModel::loadFromFile($path)" . PHP_EOL;
     postfixisify($path, ".mod");
 
     $str = file_get_contents($path);
@@ -47,20 +47,20 @@ class RuleBasedModel extends _DiscriminativeModel {
   private $attributes;
   
   function __construct() {
-    if (DEBUGMODE) echo "RuleBasedModel()" . PHP_EOL;
+    if (DEBUGMODE > 2) echo "RuleBasedModel()" . PHP_EOL;
     $this->rules = NULL;
     $this->attributes = NULL;
   }
 
   /* Train the model using an optimizer */
   function fit(Instances &$trainData, Learner &$learner) {
-    if (DEBUGMODE) echo "RuleBasedModel->fit([trainData], " . get_class($learner) . ")" . PHP_EOL;
+    if (DEBUGMODE > 2) echo "RuleBasedModel->fit([trainData], " . get_class($learner) . ")" . PHP_EOL;
     $learner->teach($this, $trainData);
   }
 
   /* Perform prediction onto some data. */
   function predict(Instances $testData) : array {
-    if (DEBUGMODE) echo "RuleBasedModel->predict(" . $testData->toString(true) . ")" . PHP_EOL;
+    if (DEBUGMODE > 2) echo "RuleBasedModel->predict(" . $testData->toString(true) . ")" . PHP_EOL;
 
     if (!(is_array($this->rules)))
       die_error("Can't use uninitialized rule-based model.");
@@ -75,22 +75,24 @@ class RuleBasedModel extends _DiscriminativeModel {
     /* Predict */
     $classAttr = $testData->getClassAttribute();
     $predictions = [];
-    echo "rules:\n";
-    foreach ($this->rules as $r => $rule) {
-      echo $rule->toString();
-      echo "\n";
+    if (DEBUGMODE > 1) {
+      echo "rules:\n";
+      foreach ($this->rules as $r => $rule) {
+        echo $rule->toString();
+        echo "\n";
+      }
     }
-    echo "testing:\n";
+    if (DEBUGMODE > 1) echo "testing:\n";
     for ($x = 0; $x < $testData->numInstances(); $x++) {
-      echo "[$x] : " . $testData->inst_toString($x);
+      if (DEBUGMODE > 1) echo "[$x] : " . $testData->inst_toString($x);
       foreach ($this->rules as $r => $rule) {
         if ($rule->covers($testData, $x)) {
-          echo $r;
-          $predictions[] = $rule->getConsequent();
+          if (DEBUGMODE > 1) echo $r;
+          $predictions[] = $classAttr->reprVal($rule->getConsequent());
           break;
         }
       }
-      echo "\n";
+      if (DEBUGMODE > 1) echo "\n";
     }
 
     if (count($predictions) != $testData->numInstances())
@@ -102,7 +104,7 @@ class RuleBasedModel extends _DiscriminativeModel {
 
   /* Save model to file */
   function save(string $path) {
-    if (DEBUGMODE) echo "RuleBasedModel->save($path)" . PHP_EOL;
+    if (DEBUGMODE > 2) echo "RuleBasedModel->save($path)" . PHP_EOL;
     postfixisify($path, ".mod");
 
     // $obj_repr = ["rules" => [], "attributes" => []];
@@ -118,7 +120,7 @@ class RuleBasedModel extends _DiscriminativeModel {
     file_put_contents($path, "RuleBasedModel\n" . serialize($obj_repr));
   }
   function load(string $path) {
-    if (DEBUGMODE) echo "RuleBasedModel->load($path)" . PHP_EOL;
+    if (DEBUGMODE > 2) echo "RuleBasedModel->load($path)" . PHP_EOL;
     postfixisify($path, ".mod");
     // $obj_repr = json_decode(file_get_contents($path));
 

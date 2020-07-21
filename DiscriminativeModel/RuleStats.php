@@ -305,8 +305,8 @@ class RuleStats {
    * @return the stratified instances
    */
   static function stratify(Instances &$data, int $numFolds) : Instances {
-    if (DEBUGMODE) echo "RuleStats::stratify(&[data], numFolds=$numFolds)" . PHP_EOL;
-    // if (DEBUGMODE) echo "data : " . $data->toString() . PHP_EOL;
+    if (DEBUGMODE > 2) echo "RuleStats::stratify(&[data], numFolds=$numFolds)" . PHP_EOL;
+    // if (DEBUGMODE > 2) echo "data : " . $data->toString() . PHP_EOL;
     if (!($data->getClassAttribute() instanceof DiscreteAttribute)) {
       return $data;
     }
@@ -342,7 +342,7 @@ class RuleStats {
         $offset += $numFolds;
       }
     }
-    // if (DEBUGMODE) echo "data_out : " . $data_out->toString() . PHP_EOL;
+    // if (DEBUGMODE > 2) echo "data_out : " . $data_out->toString() . PHP_EOL;
 
     return $data_out;
   }
@@ -357,7 +357,7 @@ class RuleStats {
    * @return the partitioned instances
    */
   static function partition(Instances &$data, int $numFolds) : array {
-    if (DEBUGMODE) echo "RuleStats::partition(&[data], numFolds=$numFolds)" . PHP_EOL;
+    if (DEBUGMODE > 2) echo "RuleStats::partition(&[data], numFolds=$numFolds)" . PHP_EOL;
     return Instances::partition($data, ($numFolds-1)/$numFolds);
   }
 
@@ -371,10 +371,10 @@ class RuleStats {
    * @return number of all conditions of the data
    */
   static function numAllConditions(Instances &$data) : int {
-    if (DEBUGMODE) echo "RuleStats::numAllConditions(&[data])" . PHP_EOL;
+    if (DEBUGMODE > 2) echo "RuleStats::numAllConditions(&[data])" . PHP_EOL;
     $total = 0.0;
     foreach ($data->getAttributes(false) as $attr) {
-      // if (DEBUGMODE) echo $attr->toString() . PHP_EOL;
+      // if (DEBUGMODE > 2) echo $attr->toString() . PHP_EOL;
       switch (true) {
         case $attr instanceof DiscreteAttribute:
           $total += $attr->numValues();
@@ -388,7 +388,7 @@ class RuleStats {
           break;
       }
     }
-    if (DEBUGMODE) echo "-> \$total : $total" . PHP_EOL;
+    if (DEBUGMODE > 2) echo "-> \$total : $total" . PHP_EOL;
     return $total;
   }
 
@@ -398,16 +398,16 @@ class RuleStats {
    * @param rule the rule to be added
    */
   function pushRule(_Rule $rule) {
-    if (DEBUGMODE) echo "RuleStats->pushRule({$rule->toString()})" . PHP_EOL;
+    if (DEBUGMODE > 2) echo "RuleStats->pushRule({$rule->toString()})" . PHP_EOL;
     
     $data = ($this->filtered === NULL) ? $this->data : $this->filtered[array_key_last($this->filtered)][1];
     $stats = array_fill(0, 6, 0.0);
     $classCounts = array_fill(0, $this->data->getClassAttribute()->numValues(), 0.0);
     $filtered = self::computeSimpleStats($rule, $data, $stats, $classCounts);
 
-    if (DEBUGMODE) echo "filtered : { 0 => " . $filtered[0]->toString() . "\n 1 => " . $filtered[1]->toString() . " }" . PHP_EOL;
-    if (DEBUGMODE) echo "stats : " . get_arr_dump($stats) . "" . PHP_EOL;
-    if (DEBUGMODE) echo "classCounts : " . get_arr_dump($classCounts) . "" . PHP_EOL;
+    if (DEBUGMODE > 2) echo "filtered : { 0 => " . $filtered[0]->toString() . "\n 1 => " . $filtered[1]->toString() . " }" . PHP_EOL;
+    if (DEBUGMODE > 2) echo "stats : " . get_arr_dump($stats) . "" . PHP_EOL;
+    if (DEBUGMODE > 2) echo "classCounts : " . get_arr_dump($classCounts) . "" . PHP_EOL;
 
     if ($this->ruleset === NULL) {
       $this->ruleset = [];
@@ -436,7 +436,7 @@ class RuleStats {
    * failed
    */
   function popRule() {
-    if (DEBUGMODE) echo "RuleStats->popRule()" . PHP_EOL;
+    if (DEBUGMODE > 2) echo "RuleStats->popRule()" . PHP_EOL;
     array_pop($this->ruleset);
     array_pop($this->filtered);
     array_pop($this->simpleStats);
