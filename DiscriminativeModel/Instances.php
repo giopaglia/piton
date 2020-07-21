@@ -130,7 +130,7 @@ class Instances {
     $data = [];
     $weights = [];
     while(!feof($f) && $line = strtolower(fgets($f)))  {
-      // TODO fix cuz dis not safe for text
+      // TODO fix cuz dis not safe for text fields
       $row = explode(",", $line);
       if (count($row) == count($attributes) + 1) {
         preg_match("/\{(.*)\}/", $row[array_key_last($row)], $w);

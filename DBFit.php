@@ -177,123 +177,132 @@ class DBFit {
     // var_dump($raw_mysql_columns);
     // var_dump($this->columns);
     
-    /* TODO: If the JOIN operation forces the equality between two columns,
-        drop one of the resulting attributes.
+    /* If the JOIN operation forces the equality between two columns,
+        drop one of the resulting attributes. */
+    $attributesToIgnore = [];
     if ($this->joinCriterion != NULL && count($this->joinCriterion)) {
       foreach ($this->joinCriterion as $criterion) {
-        if(preg_match("/.*[\s\w]=[\s\w].*
-        /i", $criterion)) {
-
+        if(preg_match("/\s*([\S\.]+)\s*=\s*([\S\.]+)\s*/i", $criterion, $matches)) {
+          $attributesToIgnore[] = $matches[2];
         }
       }
-    }*/
+    }
     
     /* Create attributes from column info */
     foreach ($this->columns as $i_col => $column) {
-      $mysql_column = NULL;
-      /* Find column */
-      foreach ($raw_mysql_columns as $col) {
-        if (in_array($this->getColumnName($i_col),
-            [$col["TABLE_NAME"].".".$col["COLUMN_NAME"], $col["COLUMN_NAME"]])) {
-          $mysql_column = $col;
-          break;
-        }
+      if (in_array($this->getColumnName($i_col), $attributesToIgnore)) {
+        $attribute = NULL;
       }
-      if ($mysql_column === NULL) {
-        die_error("Couldn't retrieve information about column \""
-          . $this->getColumnName($i_col) . "\"");
-      }
-      $this->setColumnMySQLType($i_col, $mysql_column["COLUMN_TYPE"]);
-
-      /* Create attribute */
-      $attr_name = $this->getColumnAttrName($i_col);
-
-      switch(true) {
-        /* Forcing a categorical attribute */
-        case $this->getColumnTreatmentType($i_col) == "ForceCategorical":
-          $attribute = new DiscreteAttribute($attr_name, "enum");
-          break;
-        /* Numeric column */
-        case in_array($this->getColumnMySQLType($i_col), ["int", "float", "double", "real", "date", "datetime"]):
-          $attribute = new ContinuousAttribute($attr_name, $this->getColumnAttrType($i_col));
-          break;
-        /* Enum column */
-        case self::isEnumType($this->getColumnMySQLType($i_col)):
-          $domain_arr_str = (preg_replace("/enum\((.*)\)/i", "[$1]", $this->getColumnMySQLType($i_col)));
-          eval("\$domain_arr = " . $domain_arr_str . ";");
-          $attribute = new DiscreteAttribute($attr_name, "enum", $domain_arr);
-          break;
-        /* Text column */
-        case self::isTextType($this->getColumnMySQLType($i_col)):
-          switch($this->getColumnTreatmentType($i_col)) {
-            case "BinaryBagOfWords":
-              /* The argument can be the dictionary size (k), or more directly the dictionary */
-              if ( is_integer($this->getColumnTreatmentArg($i_col, 0))) {
-                $k = $this->getColumnTreatmentArg($i_col, 0);
-
-                /* Find $k most frequent words */
-                $word_counts = [];
-                $sql = $this->getSQLSelectQuery($this->getColumnName($i_col));
-                echo "SQL: $sql" . PHP_EOL;
-                $stmt = $this->db->prepare($sql);
-                $stmt->execute();
-                
-                if (!isset($this->stop_words)) {
-                  $lang = "en";
-                  $this->stop_words = explode("\n", file_get_contents($lang . "-stopwords.txt"));
-                }
-                $res = $stmt->get_result();
-                if (!($res !== false))
-                  die_error("SQL query failed: $sql");
-                foreach ($res as $raw_row) {
-                  $text = $raw_row[$this->getColumnName($i_col, true)];
-                  
-                  $words = $this->text2words($text);
-
-                  foreach ($words as $word) {
-                    if (!isset($word_counts[$word]))
-                      $word_counts[$word] = 0;
-                    $word_counts[$word] += 1;
-                  }
-                }
-                // var_dump($word_counts);
-                
-                $dict = [];
-                // TODO optimize this?
-                foreach (range(0, $k-1) as $i) {
-                  $max_count = max($word_counts);
-                  $max_word = array_search($max_count, $word_counts);
-                  $dict[] = $max_word;
-                  unset($word_counts[$max_word]);
-                }
-                // var_dump($dict);
-              }
-              else if (is_array($this->getColumnTreatmentArg($i_col, 0))) {
-                $dict = $this->getColumnTreatmentArg($i_col, 0);
-              }
-              else {
-                die_error("Please specify a parameter (dictionary or dictionary size)"
-                  . " for bag-of-words"
-                  . " processing column '" . $this->getColumnName($i_col) . "'.");
-              }
-
-              /* Binary attributes indicating the presence of each word */
-              $attribute = [];
-              foreach ($dict as $word) {
-                $attribute[] = new DiscreteAttribute("'$word' in $attr_name",
-                  "word_presence", ["N", "Y"]);
-              }
-
-              $this->setColumnTreatmentArg($i_col, 0, $dict);
-              break;
-            default:
-              die_error("Unknown treatment for text column: " . $this->getColumnName($i_col));
-              break;
+      else {
+        $mysql_column = NULL;
+        /* Find column */
+        foreach ($raw_mysql_columns as $col) {
+          if (in_array($this->getColumnName($i_col),
+              [$col["TABLE_NAME"].".".$col["COLUMN_NAME"], $col["COLUMN_NAME"]])) {
+            $mysql_column = $col;
+            break;
           }
-          break;
-        default:
-          die_error("Unknown column type: " . $this->getColumnMySQLType($i_col));
-          break;
+        }
+        if ($mysql_column === NULL) {
+          die_error("Couldn't retrieve information about column \""
+            . $this->getColumnName($i_col) . "\"");
+        }
+        $this->setColumnMySQLType($i_col, $mysql_column["COLUMN_TYPE"]);
+
+        /* Create attribute */
+        $attr_name = $this->getColumnAttrName($i_col);
+
+        switch(true) {
+          /* Forcing a categorical attribute */
+          case $this->getColumnTreatmentType($i_col) == "ForceCategorical":
+            $attribute = new DiscreteAttribute($attr_name, "enum");
+            break;
+          /* Numeric column */
+          case in_array($this->getColumnMySQLType($i_col), ["int", "float", "double", "real", "date", "datetime"]):
+            $attribute = new ContinuousAttribute($attr_name, $this->getColumnAttrType($i_col));
+            break;
+          /* Boolean column */
+          case in_array($this->getColumnMySQLType($i_col), ["tinyint(1)", "boolean"]):
+            $attribute = new DiscreteAttribute($attr_name, "bool", ["0", "1"]);
+            break;
+          /* Enum column */
+          case self::isEnumType($this->getColumnMySQLType($i_col)):
+            $domain_arr_str = (preg_replace("/enum\((.*)\)/i", "[$1]", $this->getColumnMySQLType($i_col)));
+            eval("\$domain_arr = " . $domain_arr_str . ";");
+            $attribute = new DiscreteAttribute($attr_name, "enum", $domain_arr);
+            break;
+          /* Text column */
+          case self::isTextType($this->getColumnMySQLType($i_col)):
+            switch($this->getColumnTreatmentType($i_col)) {
+              case "BinaryBagOfWords":
+                /* The argument can be the dictionary size (k), or more directly the dictionary */
+                if ( is_integer($this->getColumnTreatmentArg($i_col, 0))) {
+                  $k = $this->getColumnTreatmentArg($i_col, 0);
+
+                  /* Find $k most frequent words */
+                  $word_counts = [];
+                  $sql = $this->getSQLSelectQuery($this->getColumnName($i_col));
+                  echo "SQL: $sql" . PHP_EOL;
+                  $stmt = $this->db->prepare($sql);
+                  $stmt->execute();
+                  
+                  if (!isset($this->stop_words)) {
+                    $lang = "en";
+                    $this->stop_words = explode("\n", file_get_contents($lang . "-stopwords.txt"));
+                  }
+                  $res = $stmt->get_result();
+                  if (!($res !== false))
+                    die_error("SQL query failed: $sql");
+                  foreach ($res as $raw_row) {
+                    $text = $raw_row[$this->getColumnName($i_col, true)];
+                    
+                    $words = $this->text2words($text);
+
+                    foreach ($words as $word) {
+                      if (!isset($word_counts[$word]))
+                        $word_counts[$word] = 0;
+                      $word_counts[$word] += 1;
+                    }
+                  }
+                  // var_dump($word_counts);
+                  
+                  $dict = [];
+                  // TODO optimize this?
+                  foreach (range(0, $k-1) as $i) {
+                    $max_count = max($word_counts);
+                    $max_word = array_search($max_count, $word_counts);
+                    $dict[] = $max_word;
+                    unset($word_counts[$max_word]);
+                  }
+                  // var_dump($dict);
+                }
+                else if (is_array($this->getColumnTreatmentArg($i_col, 0))) {
+                  $dict = $this->getColumnTreatmentArg($i_col, 0);
+                }
+                else {
+                  die_error("Please specify a parameter (dictionary or dictionary size)"
+                    . " for bag-of-words"
+                    . " processing column '" . $this->getColumnName($i_col) . "'.");
+                }
+
+                /* Binary attributes indicating the presence of each word */
+                $attribute = [];
+                foreach ($dict as $word) {
+                  $attribute[] = new DiscreteAttribute("'$word' in $attr_name",
+                    "word_presence", ["N", "Y"]);
+                }
+
+                $this->setColumnTreatmentArg($i_col, 0, $dict);
+                break;
+              default:
+                die_error("Unknown treatment for text column: " . $this->getColumnName($i_col));
+                break;
+            }
+            break;
+          default:
+            die_error("Unknown column type: " . $this->getColumnMySQLType($i_col));
+            break;
+        }
       }
 
       $attributes[] = $attribute;
@@ -316,7 +325,9 @@ class DBFit {
       $row = [];
       foreach ($this->columns as $i_col => $column) {
         $attribute = $attributes[$i_col];
-
+        if ($attribute === NULL) {
+          continue;
+        }
         $raw_val = $raw_row[$this->getColumnName($i_col, true)];
         
         switch (true) {
@@ -402,8 +413,9 @@ class DBFit {
         foreach ($attribute as $attr) {
           $final_attributes[] = $attr;
         }
-      } else {
-        die_error("Unknown attribute encountered. Must debug code.");
+      } else if ($attribute !== NULL) {
+        die_error("Unknown attribute encountered. Must debug code. "
+         . get_var_dump($attribute));
       }
     }
 
@@ -432,6 +444,7 @@ class DBFit {
       /* Train+test split */
       case is_array($this->trainingMode):
         $trRat = $this->trainingMode[0]/($this->trainingMode[0]+$this->trainingMode[1]);
+        // TODO $this->data->randomize();
         list($trainData, $testData) = Instances::partition($this->data, $trRat);
         
         break;
@@ -457,7 +470,6 @@ class DBFit {
    * Load an existing discriminative model.
    * Defaulted to the model trained the most recently
    */
-  // TODO check if this works as expected
   function loadModel(?string $path = NULL) {
     echo "DBFit->loadModel($path)" . PHP_EOL;
     
@@ -503,7 +515,7 @@ class DBFit {
     $classAttr = $testData->getClassAttribute();
 
     for ($x = 0; $x < $testData->numInstances(); $x++) {
-      $ground_truths[] = $classAttr->reprVal($testData->inst_classValue($x));
+      $ground_truths[] = $testData->inst_classValue($x);
     }
 
     // $testData->dropOutputAttr();

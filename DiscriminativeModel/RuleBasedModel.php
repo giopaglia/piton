@@ -86,7 +86,7 @@ class RuleBasedModel extends _DiscriminativeModel {
       foreach ($this->rules as $r => $rule) {
         if ($rule->covers($testData, $x)) {
           echo $r;
-          $predictions[] = $classAttr->reprVal($rule->getConsequent());
+          $predictions[] = $rule->getConsequent();
           break;
         }
       }

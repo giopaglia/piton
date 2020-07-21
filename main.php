@@ -12,10 +12,10 @@ include "DBFit.php";
 ****************************************************/
 
 
+testSillyWithJoin();
+exit();
 testSilly();
 testWinery();
-exit();
-testSillyWithJoin();
 exit();
 testCovid();
 exit();
@@ -90,7 +90,8 @@ function testSillyWithJoin() {
 	  "reports.Date",
 	  ["reports.PatientState", NULL, "State"],
 	  ["reports.PatientHeartbeatMeasure", NULL, "Heartbeat"],
-	  ["reports.PatientID", NULL, "ID"]
+	  ["reports.PatientID", NULL, "ID"],
+	  ["reports.DoctorIsFrares"]
 	];
 	$join_criterion = ["patients.ID = reports.PatientID"];
 	$output_column_name = "patients.Sillyness";
@@ -169,7 +170,7 @@ function testDiabetes() {
 	$classAttr = $testData->getClassAttribute();
 
 	for ($x = 0; $x < $testData->numInstances(); $x++) {
-	  $ground_truths[] = $classAttr->reprVal($testData->inst_classValue($x));
+	  $ground_truths[] = $testData->inst_classValue($x);
 	}
 
 	// $testData->dropOutputAttr();
