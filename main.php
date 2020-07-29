@@ -1,13 +1,24 @@
 <?php
 
+chdir(dirname(__FILE__));
 ini_set('xdebug.halt_level', E_WARNING|E_NOTICE|E_USER_WARNING|E_USER_NOTICE);
-ini_set('max_execution_time', 300);
-set_time_limit(300);
+ini_set('max_execution_time', 3000);
+set_time_limit(3000);
 
 include "lib.php";
 include "local-lib.php";
 
 include "DBFit.php";
+
+/*
+TODOs:
+- Text processing via NlpTools
+- Parallelize code ( https://medium.com/@rossbulat/true-php7-multi-threading-how-to-rebuild-php-and-use-pthreads-bed4243c0561 )
+- Implement an unweighted version of Instances
+- Fix those == that should actually be === https://stackoverflow.com/questions/12151997/why-does-1234-1234-test-evaluate-to-true#comment16259587_12151997
+- Add method setSQL() that directly asks for the SELECT - FROM - WHERE query;
+- Make sql querying secure with addslashes or whatever
+ */
 
 /****************************************************
 *                                                   *
@@ -45,7 +56,7 @@ function testSPAM() {
 	$db_fit->setTableNames($table_names);
 	$db_fit->setColumns($columns);
 	$db_fit->setOutputColumnName($output_column_name);
-	$db_fit->setModelType($model_type);
+	// $db_fit->setModelType($model_type);
 	$db_fit->setLearningMethod($learning_method);
 	$db_fit->test_all_capabilities();
 }
@@ -66,7 +77,7 @@ function testSilly() {
 	$db_fit->setColumns($columns);
 	$db_fit->setJoinCriterion($join_criterion);
 	$db_fit->setOutputColumnName($output_column_name);
-	$db_fit->setModelType($model_type);
+	// $db_fit->setModelType($model_type);
 	$db_fit->setLearningMethod($learning_method);
 	$db_fit->test_all_capabilities();
 }
@@ -92,7 +103,7 @@ function testWinery() {
 	$db_fit->setJoinCriterion($join_criterion);
 	$db_fit->setLimit(100);
 	$db_fit->setOutputColumnName($output_column_name);
-	$db_fit->setModelType($model_type);
+	// $db_fit->setModelType($model_type);
 	$db_fit->setLearningMethod($learning_method);
 	$db_fit->test_all_capabilities();
 	$db_fit->loadModel("models/2020-07-20_22:25:14");
@@ -126,7 +137,7 @@ function testSillyWithJoin() {
 	$db_fit->setColumns($columns);
 	$db_fit->setJoinCriterion($join_criterion);
 	$db_fit->setOutputColumnName($output_column_name);
-	$db_fit->setModelType($model_type);
+	// $db_fit->setModelType($model_type);
 	$db_fit->setLearningMethod($learning_method);
 	$db_fit->test_all_capabilities();
 
@@ -144,7 +155,7 @@ function testCovid() {
 	$output_column_name = "ProvinceCode";
 
 	$db_fit = new DBFit($db);
-	$db_fit->setModelType($model_type);
+	// $db_fit->setModelType($model_type);
 	$db_fit->setTableNames($table_names);
 	$db_fit->setColumns($columns);
 	$db_fit->setJoinCriterion($join_criterion);

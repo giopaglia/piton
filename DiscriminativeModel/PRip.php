@@ -3,8 +3,12 @@
 /*
  * Interface for learner/optimizers
  */
-interface Learner {
-  function teach(_DiscriminativeModel &$model, Instances $data);
+abstract class Learner {
+  /* Returns an uninitialized DiscriminativeModel */
+  abstract function initModel() : DiscriminativeModel;
+
+  /* Trains a DiscriminativeModel */
+  abstract function teach(DiscriminativeModel &$model, Instances $data);
 }
 
 /*
@@ -32,7 +36,7 @@ interface Learner {
  * ENDDO
 
  */
-class PRip implements Learner {
+class PRip extends Learner {
 
   /*** Options that are useful during the training stage */
 
@@ -88,6 +92,10 @@ class PRip implements Learner {
     $this->numAllConds = NULL;
   }
 
+  function initModel() : DiscriminativeModel {
+    return new RuleBasedModel();
+  }
+
   /**
    * Builds a model through RIPPER in the order of class frequencies.
    * For each class it's built in two stages: building and optimization
@@ -95,8 +103,12 @@ class PRip implements Learner {
    * @param model the model to train
    * @param data the training data (wrapped in a structure that holds the appropriate header information for the attributes).
    */
-  function teach(_DiscriminativeModel &$model, Instances $data) {
-     if (DEBUGMODE > 1) echo "PRip->teach(&[model], [data])" . PHP_EOL;
+  function teach(DiscriminativeModel &$model, Instances $data) {
+    if (DEBUGMODE > 1) echo "PRip->teach(&[model], [data])" . PHP_EOL;
+
+    if (!is_a($model, "RuleBasedModel")) {
+      die_error("PRip training requires a DiscriminativeModel of type RuleBasedModel, but got " . get_class($this->trainingMode) . " instead.");
+    }
 
     $data = clone $data;
     srand($this->seed);

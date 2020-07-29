@@ -7,7 +7,7 @@ include "RuleStats.php";
 /*
  * Interface for a generic discriminative model
  */
-abstract class _DiscriminativeModel {
+abstract class DiscriminativeModel {
 
   abstract function fit(Instances &$data, Learner &$learner);
   abstract function predict(Instances $testData);
@@ -15,8 +15,8 @@ abstract class _DiscriminativeModel {
   abstract function save(string $path);
   abstract function load(string $path);
 
-  static function loadFromFile(string $path) : _DiscriminativeModel {
-    if (DEBUGMODE > 2) echo "_DiscriminativeModel::loadFromFile($path)" . PHP_EOL;
+  static function loadFromFile(string $path) : DiscriminativeModel {
+    if (DEBUGMODE > 2) echo "DiscriminativeModel::loadFromFile($path)" . PHP_EOL;
     postfixisify($path, ".mod");
 
     $str = file_get_contents($path);
@@ -28,7 +28,7 @@ abstract class _DiscriminativeModel {
         break;
 
       default:
-        die_error("Unknown model type in _DiscriminativeModel::loadFromFile(\"$path\")" . $obj_str);
+        die_error("Unknown model type in DiscriminativeModel::loadFromFile(\"$path\")" . $obj_str);
         break;
     }
     return $model;
@@ -38,7 +38,7 @@ abstract class _DiscriminativeModel {
 /*
  * This class represents a propositional rule-based model.
  */
-class RuleBasedModel extends _DiscriminativeModel {
+class RuleBasedModel extends DiscriminativeModel {
 
   /* The set of rules */
   private $rules;

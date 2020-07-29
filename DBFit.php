@@ -63,10 +63,6 @@ class DBFit {
   /* Limit term in the SELECT query */
   private $limit;
 
-
-  /* Type of the discriminative model (string) */
-  private $modelType;
-
   /* Learning procedure in use (string) */
   private $learningMethod;
 
@@ -78,6 +74,7 @@ class DBFit {
   private $learner;
 
   /* Training mode (e.g full training, or perform train/test split) */
+  static private $defTrainingMode = [80, 20];
   private $trainingMode;
 
   /* Data */
@@ -117,7 +114,6 @@ class DBFit {
     $this->columns = NULL;
     $this->setOutputColumnName(NULL);
     $this->setLimit(NULL);
-    // $this->setModelType("RuleBased");
     // $this->setLearningMethod("RIPPER");
     $this->model = NULL;
     $this->learner = NULL;
@@ -433,6 +429,11 @@ class DBFit {
     
     $this->readData();
 
+    if ($this->trainingMode === NULL) {
+      $this->trainingMode = $defTrainingMode;
+      echo "Training mode defaulted to " . toString($this->trainingMode);
+    }
+
     /* training modes */
     switch (true) {
       /* Full training: use data for both training and testing */
@@ -450,7 +451,7 @@ class DBFit {
         break;
       
       default:
-        die_error("Unknown training mode ('$this->trainingMode')");
+        die_error("Unknown training mode: " . toString($this->trainingMode));
         break;
     }
     
@@ -484,7 +485,7 @@ class DBFit {
       echo "$path";
     }
 
-    $this->model = _DiscriminativeModel::loadFromFile($path);
+    $this->model = DiscriminativeModel::loadFromFile($path);
   }
 
   /* Learn a model, and save to file */
@@ -498,7 +499,7 @@ class DBFit {
   function predict(Instances $inputData) : array {
     echo "DBFit->predict(" . $inputData->toString(true) . ")" . PHP_EOL;
 
-    if(!($this->model instanceof _DiscriminativeModel))
+    if(!($this->model instanceof DiscriminativeModel))
       die_error("Model is not initialized");
 
     return $this->model->predict($inputData);
@@ -780,24 +781,6 @@ class DBFit {
     return $this;
   }
 
-  public function getModelType() : string
-  {
-    return $this->modelType;
-  }
-
-  public function setModelType(?string $modelType) : self
-  {
-    $this->data = NULL;
-
-    $this->modelType = $modelType;
-    if(!($this->modelType == "RuleBased"))
-      die_error("Only \"RuleBased\" is available as a discriminative model");
-
-    $this->model = new RuleBasedModel();
-
-    return $this;
-  }
-
   public function getLearningMethod() : string
   {
     return $this->learningMethod;
@@ -812,6 +795,8 @@ class DBFit {
       die_error("Only \"RIPPER\" is available as a learning method");
 
     $this->learner = new PRip();
+    $this->model = $this->learner->initModel();
+
     return $this;
   }
 
@@ -825,6 +810,14 @@ class DBFit {
     $this->data = NULL;
 
     $this->trainingMode = $trainingMode;
+    return $this;
+  }
+
+  public function setTrainingSplit(array $trainingMode) : self
+  {
+    $this->data = NULL;
+
+    $this->setTrainingMode($trainingMode);
     return $this;
   }
 }

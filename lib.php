@@ -29,10 +29,23 @@ function noop($str) { return $str; }
 
 function get_var_dump($a)  { ob_start(); var_dump($a); return ob_get_clean(); }
 function die_var_dump($a)  { die(get_var_dump($a)); }
-function get_arr_dump($arr, $delimiter = ", ") {
+function toString($a)
+{
+  switch (true) {
+    case is_array($a):
+      return get_arr_dump($a);
+      break;
+    
+    default:
+      return strval($a);
+      break;
+  }
+  die(get_var_dump($a));
+}
+function get_arr_dump(array $arr, $delimiter = ", ") {
   return "[" . array_list($arr) . "]";
 }
-function array_list($arr, $delimiter = ", ") {
+function array_list(array $arr, $delimiter = ", ") {
   $out_str = "";
   foreach ($arr as $i => $val) {
     if (method_exists($val, "toString")) {
