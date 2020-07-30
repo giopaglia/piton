@@ -201,9 +201,14 @@ function make_seed()
   return $sec + $usec * 1000000;
 }
 
-function postfixisify(&$string, $posfix) {
-  if (!endsWith($string, $posfix)) {
-    $string .= $posfix;
+function postfixisify(&$string, $postfix) {
+  if (!endsWith($string, $postfix)) {
+    $string .= $postfix;
+  }
+}
+function prefixisify(&$string, $prefix) {
+  if (!startsWith($string, $prefix)) {
+    $string = $prefix . $string;
   }
 }
 function startsWith($haystack, $needle) { return $needle === "" || strrpos($haystack, $needle, -strlen($haystack)) !== false; }

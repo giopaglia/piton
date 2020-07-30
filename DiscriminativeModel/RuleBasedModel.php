@@ -141,16 +141,67 @@ class RuleBasedModel extends DiscriminativeModel {
   }
 
   /* Save model to file */
-  function saveToDB(string $name) {
-    if (DEBUGMODE > 2) echo "RuleBasedModel->saveToDB($name)" . PHP_EOL;
-    postfixisify($path, ".mod");
-    die_error("saveToDB TODO");
+  function saveToDB(object $db, string $tableName) {
+    if (DEBUGMODE > 2) echo "RuleBasedModel->saveToDB($tableName)" . PHP_EOL;
+    prefixisify($tableName, "rules_");
+    $sql = "DROP TABLE IF EXISTS $tableName";
+
+    $stmt = $db->prepare($sql);
+    if (!$stmt)
+      die_error("Incorrect SQL query: $sql");
+    $stmt->execute();
+
+    $sql = "CREATE TABLE $tableName ";
+    $sql .= "(class VARCHAR(256), regola TEXT)";
+    // $sql .= "(class VARCHAR(256) PRIMARY KEY, regola TEXT)"; TODO why primary
+
+    echo "SQL: $sql" . PHP_EOL;
+    $stmt = $db->prepare($sql);
+    if (!$stmt)
+      die_error("Incorrect SQL query: $sql");
+    $stmt->execute();
+
+    $arr_vals = [];
+    foreach ($this->rules as $rule) {
+      echo $rule->toString($this->attributes[0]) . PHP_EOL;
+      $antds = [];
+      foreach ($rule->getAntecedents() as $antd) {
+        $antds[] = $antd->serialize();
+      }
+      $arr_vals[] = "\"" .
+           strval($this->attributes[0]->reprVal($rule->getConsequent()))
+            . "\", \"" . join(" AND ", $antds) . "\"";
+    }
+    foreach ($this->attributes as $attribute) {
+      echo $attribute->toString(false) . PHP_EOL;
+    }
+
+    $sql = "INSERT INTO $tableName VALUES (" . join("), (", $arr_vals) . ")";
+    
+    echo "SQL: $sql" . PHP_EOL;
+    $stmt = $db->prepare($sql);
+    if (!$stmt)
+      die_error("Incorrect SQL query: $sql");
+    $stmt->execute();
   }
 
-  function LoadFromDB(string $name) {
-    if (DEBUGMODE > 2) echo "RuleBasedModel->LoadFromDB($name)" . PHP_EOL;
-    postfixisify($path, ".mod");
-    die_error("LoadFromDB TODO");
+  function LoadFromDB(object $db, string $tableName) {
+    if (DEBUGMODE > 2) echo "RuleBasedModel->LoadFromDB($tableName)" . PHP_EOL;
+    prefixisify($tableName, "rules_");
+    
+    $sql = "SELECT class, regola FROM $tableName";
+    echo "SQL: $sql" . PHP_EOL;
+    $stmt = $db->prepare($sql);
+    if (!$stmt)
+      die_error("Incorrect SQL query: $sql");
+    $stmt->execute();
+    $res = $stmt->get_result();
+    if (!($res !== false))
+      die_error("SQL query failed: $sql");
+    foreach ($res as $raw_row) {
+      echo get_var_dump($raw_row) . PHP_EOL;
+     }
+     die_error('TODO load rules from table');
   }
 
   public function getAttributes() : array

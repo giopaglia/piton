@@ -27,8 +27,8 @@ TODOs:
 *                                                   *
 ****************************************************/
 
-testMed();
-exit();
+// testMed();
+// exit();
 testSPAM();
 exit();
 testSillyWithJoin();
@@ -76,13 +76,15 @@ function testMed() {
   $db_fit->setIdentifierColumnName("Referti.ID");
   $db_fit->setDefaultOption("TextTreatment", ["BinaryBagOfWords", 10]);
   $db_fit->setColumns("*");
-  $db_fit->setLimit(1000);
+  $db_fit->setLimit(10);
+  // $db_fit->setLimit(1000);
   $db_fit->setOutputColumnName("RaccomandazioniTerapeuticheUnitarie.TIPO", true);
   $lr = new PRip();
   // $lr->setNumOptimizations(10); TODO
   $lr->setNumOptimizations(3);
   $db_fit->setLearner($lr);
   $db_fit->test_all_capabilities();
+  $db_fit->predictByIdentifier(15);
 }
 
 function testSPAM() {

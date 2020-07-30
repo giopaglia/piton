@@ -521,7 +521,7 @@ class DBFit {
       case is_array($this->trainingMode):
         $trRat = $this->trainingMode[0]/($this->trainingMode[0]+$this->trainingMode[1]);
         // TODO 
-        $this->data->randomize();
+        // $this->data->randomize();
         list($trainData, $testData) = Instances::partition($this->data, $trRat);
         
         break;
@@ -573,8 +573,11 @@ class DBFit {
     echo "DBFit->updateModel()" . PHP_EOL;
     $this->learnModel();
     $this->model->save(join_paths(MODELS_FOLDER, date("Y-m-d_H:i:s")));
-
-    die_error("TODO db");
+    
+    $this->model->saveToDB($this->db, str_replace(".", "_", $this->getOutputColumnName())
+     );
+      // . "_" . join("", array_map([$this, "getColumnName"], range(0, count($this->columns)-1))));
+    
   }
 
   /* Use the model for predicting on a set of instances */
@@ -651,7 +654,8 @@ class DBFit {
     
     $this->readData();
     $this->updateModel();
-    
+    $this->model->LoadFromDB($this->db, str_replace(".", "_", $this->getOutputColumnName()));
+
     $end = microtime(TRUE);
     echo "The code took " . ($end - $start) . " seconds to complete.";
   }

@@ -79,6 +79,12 @@ abstract class _Antecedent {
   }
   abstract function toString() : string;
 
+
+  /**
+   * Print a serialized representation of the antecedent
+   */
+  abstract function serialize() : string;
+
   function __clone()
   {
     $this->attribute = clone $this->attribute;
@@ -221,6 +227,13 @@ class DiscreteAntecedent extends _Antecedent {
     else {
       return "DiscreteAntecedent: ({$this->attribute->getName()} == \"{$this->attribute->getDomain()[$this->value]}\") (maxInfoGain={$this->maxInfoGain}, accuRate={$this->accuRate}, cover={$this->cover}, accu={$this->accu})";
     }
+  }
+
+  /**
+   * Print a serialized representation of the antecedent
+   */
+  function serialize() : string {
+    return "{$this->attribute->getName()} == '{$this->attribute->getDomain()[$this->value]}'";
   }
 }
 
@@ -432,10 +445,22 @@ class ContinuousAntecedent extends _Antecedent {
     }
   }
 
+  /**
+   * Print a serialized representation of the antecedent
+   */
+  function serialize() : string {
+    return "{$this->attribute->getName()}" . (($this->value == 0) ? " <= " : " >= ") .
+      // number_format($this->splitPoint, 6)
+      number_format($this->splitPoint)
+      ;
+  }
+
+
   function getSplitPoint() : float
   {
     return $this->splitPoint;
   }
+
 }
 
 
