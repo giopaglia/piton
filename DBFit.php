@@ -196,19 +196,30 @@ class DBFit {
         }
       }
     }
-    var_dump($this->columns);
+    // var_dump($this->columns);
 
-    /* If any WHERE constraint forces the equality between two columns,
+    /* If any WHERE/JOIN-ON constraint forces the equality between two columns,
         drop one of the resulting attributes. */
     $columnsToIgnore = [];
+    $constraints = [];
     if ($this->whereCriteria != NULL && count($this->whereCriteria)) {
       foreach ($this->whereCriteria as $criterion) {
-        if(preg_match("/\s*([\S\.]+)\s*=\s*([\S\.]+)\s*/i", $criterion, $matches)) {
+        $constraints[] = $criterion;
+      }
+    }
+    foreach ($this->tables as $k => $table) {
+      $constraints = array_merge($constraints, $this->getTableJoinCritera($k));
+    }
+    foreach ($constraints as $constraint) {
+      if(preg_match("/\s*([\S\.]+)\s*=\s*([\S\.]+)\s*/i", $constraint, $matches)) {
+        if (!in_array($matches[2], $columnsToIgnore)) {
           $columnsToIgnore[] = $matches[2];
+        } else if (!in_array($matches[1], $columnsToIgnore)) {
+          $columnsToIgnore[] = $matches[1];
         }
       }
     }
-    
+
     /* Create attributes from column info */
     for ($i_col = 0; $i_col < count($this->columns); $i_col++) {
       if (in_array($this->getColumnName($i_col), $columnsToIgnore)) {
@@ -264,6 +275,7 @@ class DBFit {
                       "word_presence", ["N", "Y"]);
                   }
                   $this->setColumnTreatmentArg($i_col, 0, $dict);
+                  return $attribute;
                 };
 
                 /* The argument can be the dictionary size (k), or more directly the dictionary */
