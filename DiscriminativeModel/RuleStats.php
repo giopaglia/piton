@@ -764,10 +764,12 @@ class RuleStats {
 
     $out_str .=   "Data: " . $this->data->toString(true);
     $out_str .= ", \nnumAllConds: " . $this->numAllConds;
-    $out_str .= ", \nruleset: " . get_arr_dump($this->ruleset);
-    $out_str .= ", \nfiltered: " . get_arr_dump($this->filtered);
-    $out_str .= ", \nsimpleStats: " . get_arr_dump($this->simpleStats);
-    $out_str .= ", \ndistributions: " . get_arr_dump($this->distributions);
+    if (DEBUGMODE > 2) {
+      $out_str .= ", \nruleset: " . get_arr_dump($this->ruleset);
+      $out_str .= ", \nfiltered: " . get_arr_dump($this->filtered);
+      $out_str .= ", \nsimpleStats: " . get_arr_dump($this->simpleStats);
+      $out_str .= ", \ndistributions: " . get_arr_dump($this->distributions);
+    }
     $out_str .= "}";
 
     return $out_str;

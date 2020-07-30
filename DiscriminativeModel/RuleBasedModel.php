@@ -140,6 +140,19 @@ class RuleBasedModel extends DiscriminativeModel {
     $this->attributes = $obj_repr["attributes"];
   }
 
+  /* Save model to file */
+  function saveToDB(string $name) {
+    if (DEBUGMODE > 2) echo "RuleBasedModel->saveToDB($name)" . PHP_EOL;
+    postfixisify($path, ".mod");
+    die_error("saveToDB TODO");
+  }
+
+  function LoadFromDB(string $name) {
+    if (DEBUGMODE > 2) echo "RuleBasedModel->LoadFromDB($name)" . PHP_EOL;
+    postfixisify($path, ".mod");
+    die_error("LoadFromDB TODO");
+  }
+
   public function getAttributes() : array
   {
     return $this->attributes;

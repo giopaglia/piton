@@ -500,8 +500,14 @@ class Instances {
       foreach ($this->getAttributes() as $att) {
         $atts_str[] = substr($att->toString(), 0, 7);
       }
-      $out_str .= "Data{{$this->numInstances()}} instances; [" . join(",", $atts_str) . "]}";
+      $out_str .= "Data{{$this->numInstances()} instances; [" . join(",", $atts_str) . "]}";
     } else {
+      $atts_str = [];
+      foreach ($this->getAttributes() as $att) {
+        $atts_str[] = $att->toString();
+      }
+      $out_str .= "\n";
+      $out_str .= "Data{{$this->numInstances()} instances; {$this->numAttributes()} attributes [" . join(",", $atts_str) . "]}";
       $out_str .= "\n";
       $out_str .= str_repeat("======|=", $this->numAttributes()+1) . "|\n";
       $out_str .= "";

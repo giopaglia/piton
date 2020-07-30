@@ -104,7 +104,7 @@ class PRip extends Learner {
    * @param data the training data (wrapped in a structure that holds the appropriate header information for the attributes).
    */
   function teach(DiscriminativeModel &$model, Instances $data) {
-    if (DEBUGMODE > 1) echo "PRip->teach(&[model], [data])" . PHP_EOL;
+    if (DEBUGMODE > 2) echo "PRip->teach(&[model], [data])" . PHP_EOL;
 
     if (!is_a($model, "RuleBasedModel")) {
       die_error("PRip training requires a DiscriminativeModel of type RuleBasedModel, but got " . get_class($this->trainingMode) . " instead.");
@@ -142,10 +142,10 @@ class PRip extends Learner {
     for ($classIndex = 0; $classIndex < $data->numClasses() - 1; $classIndex++) {
       
       if ($this->debug) {
-        echo "\n\n=====================================\n"
-          . "Class " . $this->classAttr->reprVal($classIndex) . "(" . $classIndex . "): "
+        echo "\n\n===========================================================\n"
+          . "Class \"" . $this->classAttr->reprVal($classIndex) . "\" [" . $classIndex . "]: "
           . $orderedClassCounts[$classIndex] . " instances\n"
-          . "=====================================\n";
+          . "===========================================================\n";
       }
 
       /* Ignore classes with no members. */
@@ -170,10 +170,10 @@ class PRip extends Learner {
       }
 
       if ($this->debug) {
-        echo "\$all: $all!\n";
-        echo "\$expFPRate: $expFPRate!\n";
-        echo "\$classWeights: $classWeights!\n";
-        echo "\$totalWeights: $totalWeights!\n";
+        echo "\$all: $all\n";
+        echo "\$expFPRate: $expFPRate\n";
+        echo "\$classWeights: $classWeights\n";
+        echo "\$totalWeights: $totalWeights\n";
       }
 
       /* DL of default rule, no theory DL, only data DL */
@@ -578,7 +578,7 @@ class PRip extends Learner {
       } // For each run of optimization
     } // if pruning is used
 
-    /* Concatenate the ruleset for this class to the whole ruleset */
+    /* Concatenate the ruleset for this class to the main ruleset */
     if ($this->debug) {
       echo "\nRuleset: [" . PHP_EOL;
       foreach ($ruleset as $x => $rule) {

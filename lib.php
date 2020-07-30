@@ -2,7 +2,7 @@
 
 define("PACKAGE_NAME", "DBFit");
 define("MODELS_FOLDER", "models");
-define("DEBUGMODE", false);
+define("DEBUGMODE", 1);
 
 /* Library of generic utils */
 
@@ -19,6 +19,11 @@ function die_error($msg = NULL)
     $msg = "An error occurred.";
   }
   die("ERROR! " . $msg);
+}
+
+function warn($msg)
+{
+  echo "WARNING! " . $msg . PHP_EOL;
 }
 
 function mysql_set($arr, $map_function = "mysql_quote_str") { return "(" . mysql_list($arr, $map_function) . ")"; }

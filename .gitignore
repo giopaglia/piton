@@ -1,3 +1,7 @@
+SI
 test.php
 models
 cachegrind.out*
+*.arff
+*.sql
+*.csv
