@@ -652,6 +652,19 @@ class PRip extends Learner {
       return false;
     }
   }
+
+
+  function getNumOptimizations()
+  {
+    return $this->numOptimizations;
+  }
+
+  function setNumOptimizations($numOptimizations) : self
+  {
+    $this->numOptimizations = $numOptimizations;
+    return $this;
+  }
+
 }
 
 ?>

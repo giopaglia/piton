@@ -67,15 +67,11 @@ class DBFit {
   /* An identifier column, used during sql-based prediction */
   private $identifierColumn;
 
-  /* Learning procedure in use (string) */
-  private $learningMethod;
-
+  /* Optimizer in use for training the model */
+  private $learner;
 
   /* Discriminative model trained/loaded */
   private $model;
-
-  /* Optimizer for training the model */
-  private $learner;
 
   /* Training mode (e.g full training, or perform train/test split) */
   static private $defTrainingMode = [80, 20];
@@ -125,7 +121,6 @@ class DBFit {
     $this->setOutputColumnName(NULL);
     $this->setIdentifierColumnName(NULL);
     $this->setLimit(NULL);
-    // $this->setLearningMethod("RIPPER");
     $this->model = NULL;
     $this->learner = NULL;
     // $this->setTrainingMode("FullTraining");
@@ -489,6 +484,12 @@ class DBFit {
   function learnModel() {
     echo "DBFit->learnModel()" . PHP_EOL;
     
+    if(!($this->learner instanceof Learner))
+      die_error("Learner is not initialized. Use ->setLearner() or ->setLearningMethod()");
+
+    if(!($this->model instanceof DiscriminativeModel))
+      die_error("Model is not initialized");
+
     $this->readData();
 
     if ($this->trainingMode === NULL) {
@@ -555,11 +556,13 @@ class DBFit {
     $this->model = DiscriminativeModel::loadFromFile($path);
   }
 
-  /* Learn a model, and save to file */
+  /* Learn a model, and save to database */
   function updateModel() {
     echo "DBFit->updateModel()" . PHP_EOL;
     $this->learnModel();
     $this->model->save(join_paths(MODELS_FOLDER, date("Y-m-d_H:i:s")));
+
+    die_error("TODO db");
   }
 
   /* Use the model for predicting on a set of instances */
@@ -964,21 +967,29 @@ class DBFit {
     return $this;
   }
 
-  function getLearningMethod() : string
-  {
-    return $this->learningMethod;
-  }
-
-  function setLearningMethod(?string $learningMethod) : self
+  function setLearner(Learner $learner) : self
   {
     $this->data = NULL;
+    $this->learner = $learner;
 
-    $this->learningMethod = $learningMethod;
-    if(!($this->learningMethod == "RIPPER"))
-      die_error("Only \"RIPPER\" is available as a learning method");
-
-    $this->learner = new PRip();
     $this->model = $this->learner->initModel();
+
+    return $this;
+  }
+
+  function getLearner() : string
+  {
+    return $this->learner;
+  }
+
+  function setLearningMethod(string $learningMethod) : self
+  {
+    if(!($learningMethod == "PRip"))
+      die_error("Only \"PRip\" is available as a learning method");
+
+    $learner = new PRip();
+    // TODO $learner->setNumOptimizations(20);
+    $this->setLearner($learner);
 
     return $this;
   }

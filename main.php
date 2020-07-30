@@ -47,7 +47,6 @@ echo "All good" . PHP_EOL;
 
 function testMed() {
   $db = getDBConnection();
-  $learning_method = "RIPPER";
 
   $db_fit = new DBFit($db);
   $db_fit->setTrainingMode([.8, .2]);
@@ -77,16 +76,18 @@ function testMed() {
   $db_fit->setIdentifierColumnName("Referti.ID");
   $db_fit->setDefaultOption("TextTreatment", ["BinaryBagOfWords", 10]);
   $db_fit->setColumns("*");
-  // $db_fit->setLimit(1000);
+  $db_fit->setLimit(100);
   $db_fit->setOutputColumnName("RaccomandazioniTerapeuticheUnitarie.TIPO", true);
-  $db_fit->setLearningMethod($learning_method);
+  $lr = new PRip();
+  $lr->setNumOptimizations(10);
+  $db_fit->setLearner($lr);
   $db_fit->test_all_capabilities();
 }
 
 function testSPAM() {
   $db = getDBConnection();
   $model_type = "RuleBased";
-  $learning_method = "RIPPER";
+  $learning_method = "PRip";
 
   $table_names = "spam";
   $columns = [["Category", "ForceCategorical"], ["Message", ["BinaryBagOfWords", 10]]];
@@ -105,7 +106,7 @@ function testSPAM() {
 function testSilly() {
   $db = getDBConnection();
   $model_type = "RuleBased";
-  $learning_method = "RIPPER";
+  $learning_method = "PRip";
 
   $table_names = ["patients"];
   $columns = ["ID", "Gender", ["BirthDate", "YearsSince", "Age"], "Sillyness"];
@@ -126,7 +127,7 @@ function testSilly() {
 function testWinery() {
   $db = getDBConnection();
   $model_type = "RuleBased";
-  $learning_method = "RIPPER";
+  $learning_method = "PRip";
 
   $table_names = ["winery"];
   $columns = [
@@ -155,7 +156,7 @@ function testSillyWithJoin() {
   
   $db = getDBConnection();
   $model_type = "RuleBased";
-  $learning_method = "RIPPER";
+  $learning_method = "PRip";
 
   $table_names = ["patients", "reports"];
   $columns = [
@@ -188,7 +189,7 @@ function testCovid() {
 
   $db = getDBConnection();
   $model_type = "RuleBased";
-  $learning_method = "RIPPER";
+  $learning_method = "PRip";
 
   $table_names = ["covid19_italy_province"];
   $columns = [["Date", "DaysSince", "DaysAgo"] , ["ProvinceCode", "ForceCategorical"], "Date", "TotalPositiveCases"];
