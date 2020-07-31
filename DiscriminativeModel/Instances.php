@@ -343,7 +343,7 @@ class Instances {
       }
 
       if (!$newAttribute->isAtLeastAsExpressiveAs($oldAttribute) && !$allowDataLoss) {
-        die_error("Attribute at train time is not as expressive as test time. "
+        die_error("Found a target attribute that is not as expressive as the requested one. This may cause loss of data. "
           . "\nnewAttribute: " . $newAttribute->toString(false)
           . "\noldAttribute: " . $oldAttribute->toString(false));
       }

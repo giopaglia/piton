@@ -76,7 +76,7 @@ function testMed() {
   $db_fit->setIdentifierColumnName("Referti.ID");
   $db_fit->setDefaultOption("TextTreatment", ["BinaryBagOfWords", 10]);
   $db_fit->setColumns("*");
-  $db_fit->setLimit(10);
+  // $db_fit->setLimit(10);
   // $db_fit->setLimit(1000);
   $db_fit->setOutputColumnName("RaccomandazioniTerapeuticheUnitarie.TIPO", true);
   $lr = new PRip();
@@ -84,7 +84,11 @@ function testMed() {
   $lr->setNumOptimizations(3);
   $db_fit->setLearner($lr);
   $db_fit->test_all_capabilities();
+  $db_fit->predictByIdentifier(10);
   $db_fit->predictByIdentifier(15);
+  $db_fit->predictByIdentifier(1);
+  $db_fit->predictByIdentifier(2);
+  $db_fit->predictByIdentifier(3);
 }
 
 function testSPAM() {

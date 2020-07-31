@@ -620,6 +620,7 @@ class DBFit {
     $predict = $this->predict($data);
     // var_dump($predict);
     $predictions = [$predict];
+    var_dump($predictions);
 
     return $predictions;
   }
