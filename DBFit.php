@@ -205,7 +205,7 @@ class DBFit {
         drop one of the resulting attributes. */
     $columnsToIgnore = [];
     $constraints = [];
-    if ($this->whereCriteria != NULL && count($this->whereCriteria)) {
+    if ($this->whereCriteria !== NULL && count($this->whereCriteria)) {
       foreach ($this->whereCriteria as $criterion) {
         $constraints[] = $criterion;
       }
@@ -509,7 +509,7 @@ class DBFit {
     echo "DBFit->loadModel($path)" . PHP_EOL;
     
     /* Default path to that of the latest model */
-    if ($path == NULL) {
+    if ($path === NULL) {
       $models = filesin(MODELS_FOLDER);
       if (count($models) == 0) {
         die_error("loadModel: No model to load in folder: \"". MODELS_FOLDER . "\"");
@@ -577,12 +577,14 @@ class DBFit {
     $this->test($testData);
     // $this->model->save(join_paths(MODELS_FOLDER, date("Y-m-d_H:i:s")));
     
-    $this->model->saveToDB($this->db,
-      str_replace(".", "_", $this->getOutputColumnName())
-      , $testData
-     );
+    $this->model->dumpToDB($this->db,
+      str_replace(".", "_", $this->getOutputColumnName()));
       // . "_" . join("", array_map([$this, "getColumnName"], range(0, count($this->columns)-1))));
-    
+   
+    $this->model->saveToDB($this->db,
+     str_replace(".", "_", $this->getOutputColumnName())
+     , $testData);
+
   }
 
   /* Use the model for predicting on a set of instances */
@@ -608,6 +610,12 @@ class DBFit {
         . " Use ->setIdentifierColumnName()");
 
     $data = $this->readData($idVal);
+
+    if(false && $idVal !== NULL && count($data) !== 1) {
+      // TODO figure out, possible?
+      die_error("Found more than one instance at predict time. {$this->identifierColumnName} = $idVal");
+    }
+
     // var_dump($data);
     $predict = $this->predict($data);
     // var_dump($predict);
@@ -699,15 +707,11 @@ class DBFit {
       $sql .= " ";
     }
 
-    if ($this->limit !== NULL) {
-      $sql .= " LIMIT {$this->limit}";
-    }
-
     $whereCriteria = [];
-    if ($this->whereCriteria != NULL && count($this->whereCriteria)) {
+    if ($this->whereCriteria !== NULL && count($this->whereCriteria)) {
       $whereCriteria = array_merge($whereCriteria, $this->whereCriteria);
     }
-    if ($idVal != NULL) {
+    if ($idVal !== NULL) {
       if($this->identifierColumnName === NULL)
         die_error("An identifier column name must be set. Use ->setIdentifierColumnName()");
       $whereCriteria[] = $this->identifierColumnName . " = $idVal";
@@ -716,6 +720,17 @@ class DBFit {
     if (count($whereCriteria)) {
       $sql .= " WHERE " . join("AND ", $whereCriteria);
     }
+
+    if ($this->limit !== NULL) {
+      if ($idVal === NULL) {
+        $sql .= " LIMIT {$this->limit}";
+      }
+      // else {
+      //   warn("Limit term ignored at predict time");
+      // }
+
+    }
+
     return $sql;
   }
 
@@ -941,7 +956,7 @@ class DBFit {
       die_error("Malformed column: " . toString($col));
     }
 
-    if ($new_col["attr_name"] == NULL) {
+    if ($new_col["attr_name"] === NULL) {
       $new_col["attr_name"] = $new_col["name"];
     }
 

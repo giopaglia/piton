@@ -197,7 +197,7 @@ class RipperRule extends _Rule {
     $splitData = $antd->splitData($data, $defAcRt, $this->consequent);
 
     /* Get the bag of data to be used for next antecedents */
-    if ($splitData != NULL) {
+    if ($splitData !== NULL) {
       return $splitData[$antd->getValue()];
     } else {
       return NULL;
@@ -262,7 +262,7 @@ class RipperRule extends _Rule {
            * returns the data covered by the antecedent
            */
           $coverData = $this->computeInfoGain($growData, $defAcRt, $antd);
-          if ($coverData != NULL) {
+          if ($coverData !== NULL) {
             $infoGain = $antd->getMaxInfoGain();
 
             if ($infoGain > $maxInfoGain) {

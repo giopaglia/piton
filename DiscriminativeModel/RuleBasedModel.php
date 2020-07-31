@@ -35,9 +35,9 @@ abstract class DiscriminativeModel {
   }
 
   /* Save model to database */
-  function saveToDB(object $db, string $tableName, ?Instances &$testData = NULL) {
+  function dumpToDB(object $db, string $tableName) {
     //if (DEBUGMODE > 2) 
-      echo "DiscriminativeModel->saveToDB($tableName)" . PHP_EOL;
+      echo "DiscriminativeModel->dumpToDB($tableName)" . PHP_EOL;
     prefixisify($tableName, "rules_");
     $sql = "DROP TABLE IF EXISTS " . $tableName . "_dump";
 
@@ -195,34 +195,11 @@ class RuleBasedModel extends DiscriminativeModel {
   function saveToDB(object $db, string $tableName, ?Instances &$testData = NULL) {
     //if (DEBUGMODE > 2) 
       echo "RuleBasedModel->saveToDB($tableName)" . PHP_EOL;
-    parent::saveToDB($db, $tableName, $testData);
-
-    // $sql = "DROP TABLE IF EXISTS " . $tableName . "_dump";
-
-    // $stmt = $db->prepare($sql);
-    // if (!$stmt)
-    //   die_error("Incorrect SQL query: $sql");
-    // $stmt->execute();
-
-    // $sql = "CREATE TABLE " . $tableName . "_dump (dump TEXT)";
-
-    // $stmt = $db->prepare($sql);
-    // if (!$stmt)
-    //   die_error("Incorrect SQL query: $sql");
-    // $stmt->execute();
-
-
-    // $obj_repr = ["rules" => $this->rules, "attributes" => $this->attributes];
     
-    // $sql = "INSERT INTO " . $tableName . "_dump VALUES (?)";
-
-    // echo "SQL: $sql" . PHP_EOL;
-    // $stmt = $db->prepare($sql);
-    // $stmt->bind_param("s", $dump);
-    // $dump = serialize($obj_repr);
-    // if (!$stmt)
-    //   die_error("Incorrect SQL query: $sql");
-    // $stmt->execute();
+    if ($testData !== NULL) {
+      $testData = clone $testData;
+      $testData->sortAttrsAs($this->attributes);
+    }
 
     prefixisify($tableName, "rules_");
 
@@ -255,6 +232,7 @@ class RuleBasedModel extends DiscriminativeModel {
             . "\", \"" . join(" AND ", $antds) . "\"";
 
       if ($testData !== NULL) {
+
         $measures = $rule->computeMeasures($testData);
         $str .= "," . join(",", $measures);
       }

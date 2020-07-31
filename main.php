@@ -27,8 +27,8 @@ TODOs:
 *                                                   *
 ****************************************************/
 
-// testMed();
-// exit();
+testMed();
+exit();
 testSPAM();
 exit();
 testSillyWithJoin();

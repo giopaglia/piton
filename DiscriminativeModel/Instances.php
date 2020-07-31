@@ -343,8 +343,9 @@ class Instances {
       }
 
       if (!$newAttribute->isAtLeastAsExpressiveAs($oldAttribute) && !$allowDataLoss) {
-        die_error("Attributes are not equivalent and this might cause data loss. "
-          . $newAttribute . "\n" . $oldAttribute);
+        die_error("Attribute at train time is not as expressive as test time. "
+          . "\nnewAttribute: " . $newAttribute->toString(false)
+          . "\noldAttribute: " . $oldAttribute->toString(false));
       }
 
       $copyMap[] = [$oldAttribute, $newAttribute];
