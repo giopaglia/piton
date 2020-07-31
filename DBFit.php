@@ -65,7 +65,7 @@ class DBFit {
   private $limit;
 
   /* An identifier column, used during sql-based prediction */
-  private $identifierColumn;
+  private $identifierColumnName;
 
   /* Optimizer in use for training the model */
   private $learner;
@@ -76,10 +76,6 @@ class DBFit {
   /* Training mode (e.g full training, or perform train/test split) */
   static private $defTrainingMode = [80, 20];
   private $trainingMode;
-
-  /* Data */
-  private $data;
-
 
   /* Default options TODO explain */
   private $defaultOptions = [];
@@ -125,14 +121,10 @@ class DBFit {
     $this->learner = NULL;
     // $this->setTrainingMode("FullTraining");
     $this->trainingMode = NULL;
-    $this->data = NULL;
   }
 
   /** Read data & pre-process it */
-  private function readData(bool $force = false) {
-    if ($this->data !== NULL && !$force) {
-      return;
-    }
+  private function readData($idVal = NULL) {
 
     echo "DBFit->readData()" . PHP_EOL;
     /* Checks */
@@ -181,13 +173,24 @@ class DBFit {
         if ($this->outputColumnForceCategorical) {
           $this->setColumnTreatment(0, "ForceCategorical");
         }
-        break;
       }
     }
     if (!($output_col_in_columns)) {
       die_error("The output column name (here \"" . $this->outputColumnName
         . "\") must be in columns.");
     }
+    // if($this->identifierColumnName !== NULL) {
+    //   $id_col_in_columns = false;
+    //   foreach ($this->columns as $i_col => $col) {
+    //     if ($this->getColumnName($i_col) == $this->identifierColumnName) {
+    //       $id_col_in_columns = true;
+    //     }
+    //   }
+    //   if (!($id_col_in_columns)) {
+    //     die_error("The identifier column name (here \"" . $this->identifierColumnName
+    //       . "\") must be in columns.");
+    //   }
+    // }
     if (count($this->tables) > 1) {
       foreach ($this->columns as $i_col => $col) {
         if (!preg_match("/.*\..*/i", $this->getColumnName($i_col))) {
@@ -365,9 +368,8 @@ class DBFit {
     }
 
     /* Finally obtain data */
-    $data = [];
     
-    $sql = $this->getSQLSelectQuery(array_map([$this, "getColumnName"], range(0, count($this->columns)-1)));
+    $sql = $this->getSQLSelectQuery(NULL, $idVal);
     echo "SQL: $sql" . PHP_EOL;
     $stmt = $this->db->prepare($sql);
     if (!$stmt)
@@ -376,6 +378,46 @@ class DBFit {
     $res = $stmt->get_result();
     if (!($res !== false))
       die_error("SQL query failed: $sql");
+    $data = $this->readRawData($res, $attributes);
+
+    // echo count($data) . " rows retrieved" . PHP_EOL;
+    // echo get_var_dump($data);
+    
+    /* Deflate attribute array (breaking the symmetry with columns) */
+    $final_attributes = [];
+
+    if(! ($attributes[0] instanceof DiscreteAttribute)) {
+      die_error("Output column must be categorical!");
+    }
+    foreach ($attributes as $attribute) {
+      if ($attribute instanceof _Attribute) {
+        $final_attributes[] = $attribute;
+      } else if (is_array($attribute)) {
+        foreach ($attribute as $attr) {
+          $final_attributes[] = $attr;
+        }
+      } else if ($attribute !== NULL) {
+        die_error("Unknown attribute encountered. Must debug code. "
+         . get_var_dump($attribute));
+      }
+    }
+
+    // var_dump($final_attributes);
+    if (!count($data)) {
+      die_error("No data instance found.");
+    }
+    /* Build instances */
+    $data = new Instances($final_attributes, $data);
+    
+    if (DEBUGMODE && $idVal === NULL) {
+      $data->save_ARFF("instances");
+    }
+
+    return $data;
+  }
+
+  function &readRawData(object &$res, array $attributes) : array {
+
     foreach ($res as $raw_row) {
       // echo get_var_dump($raw_row) . PHP_EOL;
       
@@ -457,52 +499,40 @@ class DBFit {
       } // foreach ($this->columns as $i_col => $column)
       $data[] = $row;
     } // foreach ($res as $raw_row)
-
-    // echo count($data) . " rows retrieved" . PHP_EOL;
-    // echo get_var_dump($data);
+    return $data;
+  }
+  /**
+   * Load an existing discriminative model.
+   * Defaulted to the model trained the most recently
+   */
+  function loadModel(?string $path = NULL) {
+    echo "DBFit->loadModel($path)" . PHP_EOL;
     
-    /* Linerize attribute array (breaking the symmetry with columns) */
-    $final_attributes = [];
-
-    if(! ($attributes[0] instanceof DiscreteAttribute)) {
-      die_error("Output column must be categorical!");
-    }
-    foreach ($attributes as $attribute) {
-      if ($attribute instanceof _Attribute) {
-        $final_attributes[] = $attribute;
-      } else if (is_array($attribute)) {
-        foreach ($attribute as $attr) {
-          $final_attributes[] = $attr;
-        }
-      } else if ($attribute !== NULL) {
-        die_error("Unknown attribute encountered. Must debug code. "
-         . get_var_dump($attribute));
+    /* Default path to that of the latest model */
+    if ($path == NULL) {
+      $models = filesin(MODELS_FOLDER);
+      if (count($models) == 0) {
+        die_error("loadModel: No model to load in folder: \"". MODELS_FOLDER . "\"");
       }
+      sort($models, true);
+      $path = $models[0];
+      echo "$path";
     }
 
-    // var_dump($final_attributes);
-    if (!count($data)) {
-      die_error("No data instance found.");
-    }
-    /* Build instances */
-    $this->data = new Instances($final_attributes, $data);
-    
-    $this->data->save_ARFF("instances");
-
-    return $this->data;
+    $this->model = DiscriminativeModel::loadFromFile($path);
   }
 
-  /** Train and test a discriminative model onto the data */
-  function learnModel() {
-    echo "DBFit->learnModel()" . PHP_EOL;
-    
+  /* Train and test a model on the data, and save to database */
+  function updateModel() {
+    echo "DBFit->updateModel()" . PHP_EOL;
+
     if(!($this->learner instanceof Learner))
       die_error("Learner is not initialized. Use ->setLearner() or ->setLearningMethod()");
 
     if(!($this->model instanceof DiscriminativeModel))
       die_error("Model is not initialized");
 
-    $this->readData();
+    $data = $this->readData();
 
     if ($this->trainingMode === NULL) {
       $this->trainingMode = $defTrainingMode;
@@ -513,16 +543,16 @@ class DBFit {
     switch (true) {
       /* Full training: use data for both training and testing */
       case $this->trainingMode == "FullTraining":
-        $trainData = $this->data;
-        $testData = $this->data;
+        $trainData = $data;
+        $testData = $data;
         break;
       
       /* Train+test split */
       case is_array($this->trainingMode):
         $trRat = $this->trainingMode[0]/($this->trainingMode[0]+$this->trainingMode[1]);
         // TODO 
-        // $this->data->randomize();
-        list($trainData, $testData) = Instances::partition($this->data, $trRat);
+        // $data->randomize();
+        list($trainData, $testData) = Instances::partition($data, $trRat);
         
         break;
       
@@ -545,36 +575,11 @@ class DBFit {
 
     /* Test */
     $this->test($testData);
-  }
-
-  /**
-   * Load an existing discriminative model.
-   * Defaulted to the model trained the most recently
-   */
-  function loadModel(?string $path = NULL) {
-    echo "DBFit->loadModel($path)" . PHP_EOL;
+    // $this->model->save(join_paths(MODELS_FOLDER, date("Y-m-d_H:i:s")));
     
-    /* Default path to that of the latest model */
-    if ($path == NULL) {
-      $models = filesin(MODELS_FOLDER);
-      if (count($models) == 0) {
-        die_error("loadModel: No model to load in folder: \"". MODELS_FOLDER . "\"");
-      }
-      sort($models, true);
-      $path = $models[0];
-      echo "$path";
-    }
-
-    $this->model = DiscriminativeModel::loadFromFile($path);
-  }
-
-  /* Learn a model, and save to database */
-  function updateModel() {
-    echo "DBFit->updateModel()" . PHP_EOL;
-    $this->learnModel();
-    $this->model->save(join_paths(MODELS_FOLDER, date("Y-m-d_H:i:s")));
-    
-    $this->model->saveToDB($this->db, str_replace(".", "_", $this->getOutputColumnName())
+    $this->model->saveToDB($this->db,
+      str_replace(".", "_", $this->getOutputColumnName())
+      , $testData
      );
       // . "_" . join("", array_map([$this, "getColumnName"], range(0, count($this->columns)-1))));
     
@@ -592,25 +597,27 @@ class DBFit {
 
   /* Use the model for predicting the value of the output columns for a new instance,
       identified by the identifier column */
-  function predictByIdentifier(string $IDVal) : array {
-    echo "DBFit->predictByIdentifier($IDVal)" . PHP_EOL;
+  function predictByIdentifier(string $idVal) : array {
+    echo "DBFit->predictByIdentifier($idVal)" . PHP_EOL;
 
     if(!($this->model instanceof DiscriminativeModel))
       die_error("Model is not initialized");
 
-    if(!($this->identifierColumn !== NULL))
-      die_error("In order to predictByIdentifier, an identifierColumn must be set.");
+    if($this->identifierColumnName === NULL)
+      die_error("In order to predictByIdentifier, an identifierColumnName must be set."
+        . " Use ->setIdentifierColumnName()");
 
-    $predictions = [];
-    die_error("identifierColumn TODO");
+    $data = $this->readData($idVal);
+    // var_dump($data);
+    $predict = $this->predict($data);
+    // var_dump($predict);
+    $predictions = [$predict];
+
     return $predictions;
   }
 
   // Test the model
-  function test(?Instances $testData) {
-    if ($testData === NULL) {
-      $testData = $this->data;
-    }
+  function test(Instances $testData) {
     echo "DBFit->test(" . $testData->toString(true) . ")" . PHP_EOL;
 
     $ground_truths = [];
@@ -651,16 +658,29 @@ class DBFit {
     echo "DBFit->test_all_capabilities()" . PHP_EOL;
     
     $start = microtime(TRUE);
-    
-    $this->readData();
     $this->updateModel();
-    $this->model->LoadFromDB($this->db, str_replace(".", "_", $this->getOutputColumnName()));
-
     $end = microtime(TRUE);
-    echo "The code took " . ($end - $start) . " seconds to complete.";
+    echo "updateModel took " . ($end - $start) . " seconds to complete." . PHP_EOL;
+    
+    $start = microtime(TRUE);
+    $this->model->LoadFromDB($this->db, str_replace(".", "_", $this->getOutputColumnName()));
+    $end = microtime(TRUE);
+    echo "LoadFromDB took " . ($end - $start) . " seconds to complete." . PHP_EOL;
+
+    if ($this->identifierColumnName !== NULL) {
+      $start = microtime(TRUE);
+      $this->predictByIdentifier(1);
+      $end = microtime(TRUE);
+      echo "predictByIdentifier took " . ($end - $start) . " seconds to complete." . PHP_EOL;
+    }
   }
 
-  function getSQLSelectQuery($cols) {
+  /* TODO explain */
+  function getSQLSelectQuery($cols = NULL, $idVal = NULL) {
+    if ($cols === NULL) {
+      $cols = array_map([$this, "getColumnName"], range(0, count($this->columns)-1));
+    }
+
     listify($cols);
     $sql = "SELECT " . mysql_list($cols, "noop") . " FROM ";
     
@@ -683,8 +703,18 @@ class DBFit {
       $sql .= " LIMIT {$this->limit}";
     }
 
+    $whereCriteria = [];
     if ($this->whereCriteria != NULL && count($this->whereCriteria)) {
-      $sql .= " WHERE " . join("AND ", $this->whereCriteria);
+      $whereCriteria = array_merge($whereCriteria, $this->whereCriteria);
+    }
+    if ($idVal != NULL) {
+      if($this->identifierColumnName === NULL)
+        die_error("An identifier column name must be set. Use ->setIdentifierColumnName()");
+      $whereCriteria[] = $this->identifierColumnName . " = $idVal";
+    }
+
+    if (count($whereCriteria)) {
+      $sql .= " WHERE " . join("AND ", $whereCriteria);
     }
     return $sql;
   }
@@ -805,8 +835,6 @@ class DBFit {
 
   function setDb(object $db) : self
   {
-    $this->data = NULL;
-
     $this->db = $db;
     return $this;
   }
@@ -818,8 +846,6 @@ class DBFit {
 
   function setWhereCriteria($whereCriteria) : self
   {
-    $this->data = NULL;
-
     listify($whereCriteria);
     foreach ($whereCriteria as $jc) {
       if (!is_string($jc)) {
@@ -834,8 +860,6 @@ class DBFit {
 
   function setTables($tables) : self
   {
-    $this->data = NULL;
-
     listify($tables);
     $this->tables = [];
     foreach ($tables as $table) {
@@ -882,8 +906,6 @@ class DBFit {
 
   function setColumns($columns) : self
   {
-    $this->data = NULL;
-
     if ($columns === "*") {
       $this->columns = $columns;
     } else {
@@ -948,8 +970,6 @@ class DBFit {
 
   function setOutputColumnName(?string $outputColumnName, $forceCategorical = false) : self
   {
-    $this->data = NULL;
-
     $this->outputColumnName = $outputColumnName;
     if ($forceCategorical) {
       $this->outputColumnForceCategorical = $forceCategorical;
@@ -957,15 +977,13 @@ class DBFit {
     return $this;
   }
 
-  function getIdentifierColumnName() : string
-  {
-    return $this->identifierColumnName;
-  }
+  // function getIdentifierColumnName() : string
+  // {
+  //   return $this->identifierColumnName;
+  // }
 
   function setIdentifierColumnName(?string $identifierColumnName) : self
   {
-    $this->data = NULL;
-
     $this->identifierColumnName = $identifierColumnName;
     return $this;
   }
@@ -977,15 +995,12 @@ class DBFit {
 
   function setLimit(?int $limit) : self
   {
-    $this->data = NULL;
-
     $this->limit = $limit;
     return $this;
   }
 
   function setLearner(Learner $learner) : self
   {
-    $this->data = NULL;
     $this->learner = $learner;
 
     $this->model = $this->learner->initModel();
@@ -1017,16 +1032,12 @@ class DBFit {
 
   function setTrainingMode($trainingMode) : self
   {
-    $this->data = NULL;
-
     $this->trainingMode = $trainingMode;
     return $this;
   }
 
   function setTrainingSplit(array $trainingMode) : self
   {
-    $this->data = NULL;
-
     $this->setTrainingMode($trainingMode);
     return $this;
   }

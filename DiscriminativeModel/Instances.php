@@ -319,6 +319,10 @@ class Instances {
     if (DEBUGMODE > 2) echo $this;
     $copyMap = [];
     $newData = [];
+    // var_dump($this->attributes);
+    // echo PHP_EOL;
+    // var_dump($newAttributes);
+    // echo PHP_EOL;
 
     $attributes = $this->attributes;
     /* Find new attributes in the current list of attributes */
@@ -338,7 +342,7 @@ class Instances {
         die_error("Couldn't find attribute '{$newAttribute->getName()}' in the current attribute list " . get_arr_dump($attributes) . " in Instances->sortAttrsAs");
       }
 
-      if (!$newAttribute->isEquivalentTo($oldAttribute) && !$allowDataLoss) {
+      if (!$newAttribute->isAtLeastAsExpressiveAs($oldAttribute) && !$allowDataLoss) {
         die_error("Attributes are not equivalent and this might cause data loss. "
           . $newAttribute . "\n" . $oldAttribute);
       }

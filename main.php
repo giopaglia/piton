@@ -97,6 +97,7 @@ function testSPAM() {
   $output_column_name = "Category";
 
   $db_fit = new DBFit($db);
+  $db_fit->setIdentifierColumnName("ID");
   $db_fit->setTrainingMode([.8, .2]);
   $db_fit->setTables($table_names);
   $db_fit->setColumns($columns);
@@ -104,6 +105,7 @@ function testSPAM() {
   // $db_fit->setModelType($model_type);
   $db_fit->setLearningMethod($learning_method);
   $db_fit->test_all_capabilities();
+  $db_fit->predictByIdentifier(1);
 }
 
 function testSilly() {

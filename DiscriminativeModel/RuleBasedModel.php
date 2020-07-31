@@ -33,6 +33,57 @@ abstract class DiscriminativeModel {
     }
     return $model;
   }
+
+  /* Save model to database */
+  function saveToDB(object $db, string $tableName, ?Instances &$testData = NULL) {
+    //if (DEBUGMODE > 2) 
+      echo "DiscriminativeModel->saveToDB($tableName)" . PHP_EOL;
+    prefixisify($tableName, "rules_");
+    $sql = "DROP TABLE IF EXISTS " . $tableName . "_dump";
+
+    $stmt = $db->prepare($sql);
+    if (!$stmt)
+      die_error("Incorrect SQL query: $sql");
+    $stmt->execute();
+
+    $sql = "CREATE TABLE " . $tableName . "_dump (dump TEXT)";
+
+    $stmt = $db->prepare($sql);
+    if (!$stmt)
+      die_error("Incorrect SQL query: $sql");
+    $stmt->execute();
+
+    $sql = "INSERT INTO " . $tableName . "_dump VALUES (?)";
+
+    echo "SQL: $sql" . PHP_EOL;
+    $stmt = $db->prepare($sql);
+    $stmt->bind_param("s", $dump);
+    $dump = serialize($this);
+    if (!$stmt)
+      die_error("Incorrect SQL query: $sql");
+    $stmt->execute();
+  }
+
+  function &LoadFromDB(object $db, string $tableName) {
+    if (DEBUGMODE > 2) echo "DiscriminativeModel->LoadFromDB($tableName)" . PHP_EOL;
+    prefixisify($tableName, "rules_");
+    
+    $sql = "SELECT dump FROM " . $tableName . "_dump";
+    echo "SQL: $sql" . PHP_EOL;
+    $stmt = $db->prepare($sql);
+    if (!$stmt)
+      die_error("Incorrect SQL query: $sql");
+    $stmt->execute();
+    $res = $stmt->get_result();
+    
+    if (!($res !== false))
+      die_error("SQL query failed: $sql");
+    if($res->num_rows !== 1) {
+      die_error("Error reading RuleBasedModel table dump.");
+    }
+    $obj = unserialize($res->fetch_assoc()["dump"]);
+    return $obj;
+  }
 }
 
 /*
@@ -140,10 +191,41 @@ class RuleBasedModel extends DiscriminativeModel {
     $this->attributes = $obj_repr["attributes"];
   }
 
-  /* Save model to file */
-  function saveToDB(object $db, string $tableName) {
-    if (DEBUGMODE > 2) echo "RuleBasedModel->saveToDB($tableName)" . PHP_EOL;
+  /* Save model to database */
+  function saveToDB(object $db, string $tableName, ?Instances &$testData = NULL) {
+    //if (DEBUGMODE > 2) 
+      echo "RuleBasedModel->saveToDB($tableName)" . PHP_EOL;
+    parent::saveToDB($db, $tableName, $testData);
+
+    // $sql = "DROP TABLE IF EXISTS " . $tableName . "_dump";
+
+    // $stmt = $db->prepare($sql);
+    // if (!$stmt)
+    //   die_error("Incorrect SQL query: $sql");
+    // $stmt->execute();
+
+    // $sql = "CREATE TABLE " . $tableName . "_dump (dump TEXT)";
+
+    // $stmt = $db->prepare($sql);
+    // if (!$stmt)
+    //   die_error("Incorrect SQL query: $sql");
+    // $stmt->execute();
+
+
+    // $obj_repr = ["rules" => $this->rules, "attributes" => $this->attributes];
+    
+    // $sql = "INSERT INTO " . $tableName . "_dump VALUES (?)";
+
+    // echo "SQL: $sql" . PHP_EOL;
+    // $stmt = $db->prepare($sql);
+    // $stmt->bind_param("s", $dump);
+    // $dump = serialize($obj_repr);
+    // if (!$stmt)
+    //   die_error("Incorrect SQL query: $sql");
+    // $stmt->execute();
+
     prefixisify($tableName, "rules_");
+
     $sql = "DROP TABLE IF EXISTS $tableName";
 
     $stmt = $db->prepare($sql);
@@ -152,7 +234,7 @@ class RuleBasedModel extends DiscriminativeModel {
     $stmt->execute();
 
     $sql = "CREATE TABLE $tableName ";
-    $sql .= "(class VARCHAR(256), regola TEXT)";
+    $sql .= "(class VARCHAR(256), rule TEXT, support float, confidence float, lift float, conviction float)";
     // $sql .= "(class VARCHAR(256) PRIMARY KEY, regola TEXT)"; TODO why primary
 
     echo "SQL: $sql" . PHP_EOL;
@@ -168,15 +250,25 @@ class RuleBasedModel extends DiscriminativeModel {
       foreach ($rule->getAntecedents() as $antd) {
         $antds[] = $antd->serialize();
       }
-      $arr_vals[] = "\"" .
+      $str = "\"" .
            strval($this->attributes[0]->reprVal($rule->getConsequent()))
             . "\", \"" . join(" AND ", $antds) . "\"";
+
+      if ($testData !== NULL) {
+        $measures = $rule->computeMeasures($testData);
+        $str .= "," . join(",", $measures);
+      }
+      $arr_vals[] = $str;
     }
     foreach ($this->attributes as $attribute) {
       echo $attribute->toString(false) . PHP_EOL;
     }
 
-    $sql = "INSERT INTO $tableName VALUES (" . join("), (", $arr_vals) . ")";
+    $sql = "INSERT INTO $tableName";
+    if ($testData === NULL) {
+      $sql .= " (class,rule)";
+    }
+    $sql .= " VALUES (" . join("), (", $arr_vals) . ")";
     
     echo "SQL: $sql" . PHP_EOL;
     $stmt = $db->prepare($sql);
@@ -185,24 +277,27 @@ class RuleBasedModel extends DiscriminativeModel {
     $stmt->execute();
   }
 
-  function LoadFromDB(object $db, string $tableName) {
-    if (DEBUGMODE > 2) echo "RuleBasedModel->LoadFromDB($tableName)" . PHP_EOL;
-    prefixisify($tableName, "rules_");
+  // function LoadFromDB(object $db, string $tableName) {
+  //   if (DEBUGMODE > 2) echo "RuleBasedModel->LoadFromDB($tableName)" . PHP_EOL;
+  //   prefixisify($tableName, "rules_");
     
-    $sql = "SELECT class, regola FROM $tableName";
-    echo "SQL: $sql" . PHP_EOL;
-    $stmt = $db->prepare($sql);
-    if (!$stmt)
-      die_error("Incorrect SQL query: $sql");
-    $stmt->execute();
-    $res = $stmt->get_result();
-    if (!($res !== false))
-      die_error("SQL query failed: $sql");
-    foreach ($res as $raw_row) {
-      echo get_var_dump($raw_row) . PHP_EOL;
-     }
-     die_error('TODO load rules from table');
-  }
+  //   // $sql = "SELECT class, rule, relevance, confidence, lift, conviction FROM $tableName";
+  //   $sql = "SELECT dump FROM " . $tableName . "_dump";
+  //   echo "SQL: $sql" . PHP_EOL;
+  //   $stmt = $this->db->prepare($sql);
+  //   if (!$stmt)
+  //     die_error("Incorrect SQL query: $sql");
+  //   $stmt->execute();
+  //   $res = $stmt->get_result();
+  //   if (!($res !== false))
+  //     die_error("SQL query failed: $sql");
+  //   if(count($res) !== 1) {
+  //     die_error("Error reading RuleBasedModel table dump.");
+  //   }
+  //   $obj_repr = unserialize($res[0]);
+  //   $this->rules = $obj_repr["rules"];
+  //   $this->attributes = $obj_repr["attributes"];
+  // }
 
   public function getAttributes() : array
   {

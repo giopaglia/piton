@@ -61,17 +61,20 @@ abstract class _Attribute {
     return $attribute;
   }
 
-  /** Whether two attributes are equal (completely interchangeable) */
-  function isEqualTo(_Attribute $otherAttr) : bool {
-    return $this->isEquivalentTo();
-  }
+  // /** Whether two attributes are equal (completely interchangeable) */
+  // function isEqualTo(_Attribute $otherAttr) : bool {
+  //   return $this->isEquivalentTo();
+  // }
 
-  /** Whether there can be a mapping between two attributes */
-  function isEquivalentTo(_Attribute $otherAttr) : bool {
-    return get_class($this) == get_class($otherAttr)
-        && $this->getName() == $otherAttr->getName()
-        && $this->getType() == $otherAttr->getType();
-  }
+  // * Whether there can be a bijective mapping between two attributes 
+  // function isEquivalentTo(_Attribute $otherAttr) : bool {
+  //   return get_class($this) == get_class($otherAttr)
+  //       && $this->getName() == $otherAttr->getName()
+  //       && $this->getType() == $otherAttr->getType();
+  // }
+
+  /** Whether there can be a mapping from one attribute to another */
+  abstract function isAtLeastAsExpressiveAs(_Attribute $otherAttr);
 
   function getName() : string
   {
@@ -119,19 +122,27 @@ class DiscreteAttribute extends _Attribute {
   /** Domain: discrete set of values that an instance can show for the attribute */
   private $domain;
 
-  /** Whether two attributes are equal (completely interchangeable) */
-  function isEqualTo(_Attribute $otherAttr) : bool {
-    return $this->getDomain() == $otherAttr->getDomain()
-       && parent::isEqualTo($otherAttr);
-  }
+  // /** Whether two attributes are equal (completely interchangeable) */
+  // function isEqualTo(_Attribute $otherAttr) : bool {
+  //   return $this->getDomain() == $otherAttr->getDomain()
+  //      && parent::isEqualTo($otherAttr);
+  // }
 
-  /** Whether there can be a mapping between two attributes */
-  function isEquivalentTo(_Attribute $otherAttr) : bool {
-    if (DEBUGMODE > 2) echo get_arr_dump($this->getDomain());
-    if (DEBUGMODE > 2) echo get_arr_dump($otherAttr->getDomain());
-    if (DEBUGMODE > 2) echo array_equiv($this->getDomain(), $otherAttr->getDomain());
-    return array_equiv($this->getDomain(), $otherAttr->getDomain())
-       && parent::isEquivalentTo($otherAttr);
+  // /** Whether there can be a mapping between two attributes */
+  // function isEquivalentTo(_Attribute $otherAttr) : bool {
+  //   if (DEBUGMODE > 2) echo get_arr_dump($this->getDomain());
+  //   if (DEBUGMODE > 2) echo get_arr_dump($otherAttr->getDomain());
+  //   if (DEBUGMODE > 2) echo array_equiv($this->getDomain(), $otherAttr->getDomain());
+  //   return array_equiv($this->getDomain(), $otherAttr->getDomain())
+  //      && parent::isEquivalentTo($otherAttr);
+  // }
+
+  /** Whether there can be a mapping frmb one attribute to another */
+  function isAtLeastAsExpressiveAs(_Attribute $otherAttr) {
+    return get_class($this) == get_class($otherAttr)
+        && $this->getName() == $otherAttr->getName()
+        && $this->getType() == $otherAttr->getType()
+        && !count(array_diff($otherAttr->getDomain(), $this->getDomain()));
   }
 
   function numValues() : int { return count($this->domain); }
@@ -217,6 +228,13 @@ class ContinuousAttribute extends _Attribute {
   // function __construct(string $name, string $type) {
       // parent::__construct($name, $type);
   // }
+
+  /** Whether there can be a mapping frmb one attribute to another */
+  function isAtLeastAsExpressiveAs(_Attribute $otherAttr) {
+    return get_class($this) == get_class($otherAttr)
+        && $this->getName() == $otherAttr->getName()
+        && $this->getType() == $otherAttr->getType();
+  }
 
   /** Obtain the value for the representation of the attribute */
   function getKey($cl) {

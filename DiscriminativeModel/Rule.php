@@ -114,6 +114,52 @@ class RipperRule extends _Rule {
   }
 
   /**
+   * TODO
+   */
+  function computeMeasures(Instances &$data) : array {
+    if (DEBUGMODE > 2) echo "RipperRule->computeMeasures(&[data])" . PHP_EOL;
+    
+    $tot       = $data->numInstances();
+    $totWeight = $data->getSumOfWeights();
+    
+    // $covered = 0;
+    $coveredWeight = 0;
+    // $tp = 0;
+    $tpWeight = 0;
+    $totConsWeight = 0;
+
+    for ($i = 0; $i < $tot; $i++) {
+      if ($this->covers($data, $i)) {
+        // Covered by antecedents
+        // $covered += 1;
+        $coveredWeight += $data->inst_weight($i);
+        if ($data->inst_classValue($i) == $this->consequent) {
+          // True positive for the rule
+          // $tp += 1;
+          $tpWeight += $data->inst_weight($i);
+        }
+      }
+      if ($data->inst_classValue($i) == $this->consequent) {
+        // Same consequent
+        $totConsWeight += $data->inst_weight($i);
+      }
+    }
+    // TODO use non-weighted counterparts?
+    $support      = $coveredWeight / $totWeight;
+    $confidence   = ($tpWeight / $totWeight) / $support;
+    $supportCons  = $totConsWeight / $totWeight;
+    $lift         = $confidence / $supportCons;
+    $conviction   = (1-$support) / (1-$confidence);
+
+    if (DEBUGMODE > 2) echo "\$support    : $support    " . PHP_EOL;
+    if (DEBUGMODE > 2) echo "\$confidence : $confidence " . PHP_EOL;
+    if (DEBUGMODE > 2) echo "\$lift       : $lift       " . PHP_EOL;
+    if (DEBUGMODE > 2) echo "\$conviction : $conviction " . PHP_EOL;
+    return [$support, $confidence, $lift, $conviction];
+  }
+
+
+  /**
    * Private function to compute default number of accurate instances in the
    * specified data for the consequent of the rule
    * 
