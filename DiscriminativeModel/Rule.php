@@ -145,16 +145,17 @@ class RipperRule extends _Rule {
       }
     }
     // TODO use non-weighted counterparts?
-    $support      = $coveredWeight / $totWeight;
-    $confidence   = ($tpWeight / $totWeight) / $support;
-    $supportCons  = $totConsWeight / $totWeight;
-    $lift         = $confidence / $supportCons;
-    $conviction   = (1-$support) / (1-$confidence);
+    
+    $support      = safe_div($coveredWeight, $totWeight);
+    $confidence   = safe_div(safe_div($tpWeight, $totWeight), $support);
+    $supportCons  = safe_div($totConsWeight, $totWeight);
+    $lift         = safe_div($confidence, $supportCons);
+    $conviction   = safe_div((1-$support), (1-$confidence));
 
-    if (DEBUGMODE > 2) echo "\$support    : $support    " . PHP_EOL;
-    if (DEBUGMODE > 2) echo "\$confidence : $confidence " . PHP_EOL;
-    if (DEBUGMODE > 2) echo "\$lift       : $lift       " . PHP_EOL;
-    if (DEBUGMODE > 2) echo "\$conviction : $conviction " . PHP_EOL;
+    if (DEBUGMODE) echo "\$support    : $support    " . PHP_EOL;
+    if (DEBUGMODE) echo "\$confidence : $confidence " . PHP_EOL;
+    if (DEBUGMODE) echo "\$lift       : $lift       " . PHP_EOL;
+    if (DEBUGMODE) echo "\$conviction : $conviction " . PHP_EOL;
     return [$support, $confidence, $lift, $conviction];
   }
 

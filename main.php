@@ -27,6 +27,8 @@ TODOs:
 *                                                   *
 ****************************************************/
 
+testMed3();
+exit();
 testMed();
 exit();
 testSPAM();
@@ -43,6 +45,78 @@ exit();
 exit();
 echo "All good" . PHP_EOL;
 
+
+
+function testMed3() {
+  $db = getDBConnection();
+
+  $db_fit = new DBFit($db);
+  $db_fit->setTrainingMode([.8, .2]);
+
+  $db_fit->setTables([
+    "Anamnesi",
+    ["Referti", "Anamnesi.ID_REFERTO = Referti.ID"], 
+    ["Diagnosi", "Diagnosi.ID_REFERTO = Referti.ID"], 
+    ["RaccomandazioniTerapeutiche", "RaccomandazioniTerapeutiche.ID_REFERTO = Referti.ID"], 
+    ["RaccomandazioniTerapeuticheUnitarie", "RaccomandazioniTerapeuticheUnitarie.ID_RACCOMANDAZIONE_TERAPEUTICA = RaccomandazioniTerapeutiche.ID"], 
+    ["Pazienti", "Pazienti.ID = Referti.ID_PAZIENTE"]
+  ]);
+  $db_fit->setIdentifierColumnName("Referti.ID");
+  $db_fit->setDefaultOption("TextTreatment", ["BinaryBagOfWords", 10]);
+  $db_fit->setColumns("*");
+  $db_fit->setLimit(100);
+  // $db_fit->setLimit(1000);
+  $db_fit->setOutputColumns([
+    ["RaccomandazioniTerapeuticheUnitarie.TIPO", "ForceBinary"],
+    ["ElementiTerapici", "ElementiTerapici.ID_RACCOMANDAZIONE_TERAPEUTICA_UNITARIA = RaccomandazioniTerapeuticheUnitarie.ID"],
+    ["PrincipiAttivi", "ElementiTerapici.ID_PRINCIPIO_ATTIVO = PrincipiAttivi.ID"]
+  ]);
+  
+  $lr = new PRip();
+  // $lr->setNumOptimizations(10); TODO
+  $lr->setNumOptimizations(3);
+  $db_fit->setLearner($lr);
+  $db_fit->test_all_capabilities();
+  $db_fit->predictByIdentifier(10);
+  $db_fit->predictByIdentifier(15);
+  $db_fit->predictByIdentifier(1);
+  $db_fit->predictByIdentifier(2);
+  $db_fit->predictByIdentifier(3);
+}
+
+function testMed2() {
+  $db = getDBConnection();
+
+  $db_fit = new DBFit($db);
+  $db_fit->setTrainingMode([.8, .2]);
+
+  $db_fit->setTables([
+    "Anamnesi",
+    ["Referti", "Anamnesi.ID_REFERTO = Referti.ID"], 
+    ["Diagnosi", "Diagnosi.ID_REFERTO = Referti.ID"], 
+    ["RaccomandazioniTerapeutiche", "RaccomandazioniTerapeutiche.ID_REFERTO = Referti.ID"], 
+    ["RaccomandazioniTerapeuticheUnitarie", "RaccomandazioniTerapeuticheUnitarie.ID_RACCOMANDAZIONE_TERAPEUTICA = RaccomandazioniTerapeutiche.ID"], 
+    ["ElementiTerapici", "ElementiTerapici.ID_RACCOMANDAZIONE_TERAPEUTICA_UNITARIA = RaccomandazioniTerapeuticheUnitarie.ID"],
+    ["PrincipiAttivi", "ElementiTerapici.ID_PRINCIPIO_ATTIVO = PrincipiAttivi.ID"], 
+    ["Pazienti", "Pazienti.ID = Referti.ID_PAZIENTE"]
+  ]);
+  $db_fit->setIdentifierColumnName("Referti.ID");
+  $db_fit->setDefaultOption("TextTreatment", ["BinaryBagOfWords", 10]);
+  $db_fit->setColumns("*");
+  $db_fit->setLimit(100);
+  // $db_fit->setLimit(1000);
+  $db_fit->setOutputColumnName("RaccomandazioniTerapeuticheUnitarie.TIPO", "ForceBinary");
+  $lr = new PRip();
+  // $lr->setNumOptimizations(10); TODO
+  $lr->setNumOptimizations(3);
+  $db_fit->setLearner($lr);
+  $db_fit->test_all_capabilities();
+  $db_fit->predictByIdentifier(10);
+  $db_fit->predictByIdentifier(15);
+  $db_fit->predictByIdentifier(1);
+  $db_fit->predictByIdentifier(2);
+  $db_fit->predictByIdentifier(3);
+}
 
 
 function testMed() {
@@ -65,10 +139,8 @@ function testMed() {
    */
   $db_fit->setTables([
     "Anamnesi",
-    // ["Diagnosi",
-    //  ["Anamnesi.ID_REFERTO = Diagnosi.ID_REFERTO",
-    //    "Anamnesi.DATA_SALVA = Diagnosi.DATA_SALVA"]], 
     ["Referti", "Anamnesi.ID_REFERTO = Referti.ID"], 
+    ["Diagnosi", "Diagnosi.ID_REFERTO = Referti.ID"], 
     ["RaccomandazioniTerapeutiche", "RaccomandazioniTerapeutiche.ID_REFERTO = Referti.ID"], 
     ["RaccomandazioniTerapeuticheUnitarie", "RaccomandazioniTerapeuticheUnitarie.ID_RACCOMANDAZIONE_TERAPEUTICA = RaccomandazioniTerapeutiche.ID"], 
     ["Pazienti", "Pazienti.ID = Referti.ID_PAZIENTE"]

@@ -35,7 +35,7 @@ abstract class DiscriminativeModel {
   }
 
   /* Save model to database */
-  function dumpToDB(object $db, string $tableName) {
+  function dumpToDB(object &$db, string $tableName) {
     //if (DEBUGMODE > 2) 
       echo "DiscriminativeModel->dumpToDB($tableName)" . PHP_EOL;
     prefixisify($tableName, "rules_");
@@ -48,7 +48,7 @@ abstract class DiscriminativeModel {
       die_error("Query failed: $sql");
     $stmt->close();
 
-    $sql = "CREATE TABLE " . $tableName . "_dump (dump TEXT)";
+    $sql = "CREATE TABLE " . $tableName . "_dump (dump LONGTEXT)";
 
     $stmt = $db->prepare($sql);
     if (!$stmt)
@@ -61,8 +61,9 @@ abstract class DiscriminativeModel {
 
     echo "SQL: $sql" . PHP_EOL;
     $stmt = $db->prepare($sql);
-    $stmt->bind_param("s", $dump);
     $dump = serialize($this);
+    // echo $dump;
+    $stmt->bind_param("s", $dump);
     if (!$stmt)
       die_error("Incorrect SQL query: $sql");
     if (!$stmt->execute())
@@ -71,7 +72,7 @@ abstract class DiscriminativeModel {
     
   }
 
-  function &LoadFromDB(object $db, string $tableName) {
+  function &LoadFromDB(object &$db, string $tableName) {
     if (DEBUGMODE > 2) echo "DiscriminativeModel->LoadFromDB($tableName)" . PHP_EOL;
     prefixisify($tableName, "rules_");
     
@@ -201,7 +202,7 @@ class RuleBasedModel extends DiscriminativeModel {
   }
 
   /* Save model to database */
-  function saveToDB(object $db, string $tableName, ?Instances &$testData = NULL) {
+  function saveToDB(object &$db, string $tableName, ?Instances &$testData = NULL) {
     //if (DEBUGMODE > 2) 
       echo "RuleBasedModel->saveToDB($tableName)" . PHP_EOL;
     
@@ -222,7 +223,7 @@ class RuleBasedModel extends DiscriminativeModel {
     $stmt->close();
 
     $sql = "CREATE TABLE $tableName ";
-    $sql .= "(class VARCHAR(256), rule TEXT, support float, confidence float, lift float, conviction float)";
+    $sql .= "(ID INT AUTO_INCREMENT PRIMARY KEY, class VARCHAR(256), rule TEXT, support float, confidence float, lift float, conviction float)";
     // $sql .= "(class VARCHAR(256) PRIMARY KEY, regola TEXT)"; TODO why primary
 
     echo "SQL: $sql" . PHP_EOL;
@@ -247,7 +248,7 @@ class RuleBasedModel extends DiscriminativeModel {
       if ($testData !== NULL) {
 
         $measures = $rule->computeMeasures($testData);
-        $str .= "," . join(",", $measures);
+        $str .= "," . join(",", array_map("mysql_number", $measures));
       }
       $arr_vals[] = $str;
     }
@@ -257,7 +258,9 @@ class RuleBasedModel extends DiscriminativeModel {
 
     $sql = "INSERT INTO $tableName";
     if ($testData === NULL) {
-      $sql .= " (class,rule)";
+      $sql .= " (class, rule)";
+    } else {
+      $sql .= " (class, rule, support, confidence, lift, conviction)";
     }
     $sql .= " VALUES (" . join("), (", $arr_vals) . ")";
     
@@ -270,7 +273,7 @@ class RuleBasedModel extends DiscriminativeModel {
     $stmt->close();
   }
 
-  // function LoadFromDB(object $db, string $tableName) {
+  // function LoadFromDB(object &$db, string $tableName) {
   //   if (DEBUGMODE > 2) echo "RuleBasedModel->LoadFromDB($tableName)" . PHP_EOL;
   //   prefixisify($tableName, "rules_");
     

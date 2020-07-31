@@ -561,7 +561,7 @@ class DBFit {
       case is_array($this->trainingMode):
         $trRat = $this->trainingMode[0]/($this->trainingMode[0]+$this->trainingMode[1]);
         // TODO 
-        // $data->randomize();
+        $data->randomize();
         list($trainData, $testData) = Instances::partition($data, $trRat);
         
         break;

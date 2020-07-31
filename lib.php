@@ -32,7 +32,7 @@ function mysql_list($arr, $map_function = "mysql_backtick_str") { return join(",
 function mysql_quote_str($str) { return "'$str'"; }
 function mysql_backtick_str($str) { return "`$str`"; }
 
-function &mysql_select(object $db, string $sql) : object {
+function &mysql_select(object &$db, string $sql) : object {
 
   echo "SQL: $sql" . PHP_EOL;
   $stmt = $db->prepare($sql);
@@ -47,7 +47,11 @@ function &mysql_select(object $db, string $sql) : object {
   return $res;
 }
 
+function mysql_number(float $x) : string { return (is_nan($x) ? "NULL" : strval($x)); }
+
 function noop($str) { return $str; }
+
+function safe_div($n, $d) { return $d == 0 ? NAN : $n / $d; }
 
 function get_var_dump($a)  { ob_start(); var_dump($a); return ob_get_clean(); }
 function die_var_dump($a)  { die(get_var_dump($a)); }
