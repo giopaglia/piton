@@ -56,7 +56,7 @@ class DBFit {
 
   /* Name of the (categorical) column/attribute to predict (string) */
   private $outputColumnName;
-  private $outputColumnForceCategorical = false;
+  private $outputColumnTreatment;
 
   /* SQL WHERE clauses for the concerning tables (array of strings) */
   private $whereCriteria;
@@ -145,9 +145,11 @@ class DBFit {
     $stmt = $this->db->prepare($sql);
     if (!$stmt)
       die_error("Incorrect SQL query: $sql");
-    $stmt->execute();
+    if (!$stmt->execute())
+      die_error("Query failed: $sql");
     $raw_mysql_columns = [];
     $res = $stmt->get_result();
+    $stmt->close();
     if (!($res !== false))
       die_error("SQL query failed: $sql");
 
@@ -170,9 +172,7 @@ class DBFit {
         $output_col_in_columns = true;
         array_splice($this->columns, $i_col, 1);
         array_unshift($this->columns, $col);
-        if ($this->outputColumnForceCategorical) {
-          $this->setColumnTreatment(0, "ForceCategorical");
-        }
+        $this->setColumnTreatment(0, $this->outputColumnTreatment);
       }
     }
     if (!($output_col_in_columns)) {
@@ -252,6 +252,37 @@ class DBFit {
           case $this->getColumnTreatmentType($i_col) == "ForceCategorical":
             $attribute = new DiscreteAttribute($attr_name, "enum");
             break;
+          /* Forcing a set of binary categorical attributes */
+          case $this->getColumnTreatmentType($i_col) == "ForceBinary":
+            
+            /* Find classes */
+            $classes = [];
+            $sql = $this->getSQLSelectQuery($this->getColumnName($i_col));
+            echo "SQL: $sql" . PHP_EOL;
+            $stmt = $this->db->prepare($sql);
+            if (!$stmt)
+              die_error("Incorrect SQL query: $sql");
+            if (!$stmt->execute())
+              die_error("Query failed: $sql");
+            $res = $stmt->get_result();
+            $stmt->close();
+            if (!($res !== false))
+              die_error("SQL query failed: $sql");
+            foreach ($res as $raw_row) {
+              $class = $raw_row[$this->getColumnName($i_col, true)];
+              $classes[$class] = 0;
+            }
+            $classes = array_keys($classes);
+
+            var_dump($classes);
+            $attribute = [];
+
+            foreach ($classes as $class) {
+              $attribute[] = new DiscreteAttribute($attr_name . "/" . $class, "column-class", ["0", "1"]);
+            }
+            $this->setColumnTreatmentArg($i_col, 0, $classes);
+
+            break;
           /* Numeric column */
           case in_array($this->getColumnAttrType($i_col), ["int", "float", "double"]):
             $attribute = new ContinuousAttribute($attr_name, $this->getColumnAttrType($i_col));
@@ -292,15 +323,17 @@ class DBFit {
                   $stmt = $this->db->prepare($sql);
                   if (!$stmt)
                     die_error("Incorrect SQL query: $sql");
-                  $stmt->execute();
+                  if (!$stmt->execute())
+                    die_error("Query failed: $sql");
+                  $res = $stmt->get_result();
+                  $stmt->close();
+                  if (!($res !== false))
+                    die_error("SQL query failed: $sql");
                   
                   if (!isset($this->stop_words)) {
                     $lang = "en";
                     $this->stop_words = explode("\n", file_get_contents($lang . "-stopwords.txt"));
                   }
-                  $res = $stmt->get_result();
-                  if (!($res !== false))
-                    die_error("SQL query failed: $sql");
                   foreach ($res as $raw_row) {
                     $text = $raw_row[$this->getColumnName($i_col, true)];
                     
@@ -374,8 +407,10 @@ class DBFit {
     $stmt = $this->db->prepare($sql);
     if (!$stmt)
       die_error("Incorrect SQL query: $sql");
-    $stmt->execute();
+    if (!$stmt->execute())
+      die_error("Query failed: $sql");
     $res = $stmt->get_result();
+    $stmt->close();
     if (!($res !== false))
       die_error("SQL query failed: $sql");
     $data = $this->readRawData($res, $attributes);
@@ -386,8 +421,8 @@ class DBFit {
     /* Deflate attribute array (breaking the symmetry with columns) */
     $final_attributes = [];
 
-    if(! ($attributes[0] instanceof DiscreteAttribute)) {
-      die_error("Output column must be categorical!");
+    if(!($attributes[0] instanceof DiscreteAttribute)) {
+      //TODO die_error("Output column must be categorical!");
     }
     foreach ($attributes as $attribute) {
       if ($attribute instanceof _Attribute) {
@@ -430,6 +465,17 @@ class DBFit {
         }
         $raw_val = $raw_row[$this->getColumnName($i_col, true)];
         switch (true) {
+          /* ForceBinary */
+          case $this->getColumnTreatmentType($i_col) == "ForceBinary":
+
+            /* Append k values, one for each of the classes */
+            $classes = $this->getColumnTreatmentArg($i_col, 0);
+            foreach ($classes as $class) {
+              $val = ($class == $raw_val);
+              $row[] = $val;
+            }
+            break;
+           
           /* Text column */
           case $this->getColumnTreatmentType($i_col) == "BinaryBagOfWords":
 
@@ -786,6 +832,8 @@ class DBFit {
     return $force_no_table_name && count(explode(".", $n)) > 1 ? explode(".", $n)[1] : $n;
   }
   function &getColumnTreatment(int $i) {
+    if ($this->columns[$i]["treatment"] !== NULL)
+      listify($this->columns[$i]["treatment"]);
     $tr = &$this->columns[$i]["treatment"];
     if (($tr === NULL) && $this->getColumnAttrType($i, $tr) === "text"
            && isset($this->defaultOptions["TextTreatment"])) {
@@ -984,12 +1032,10 @@ class DBFit {
     return $this->outputColumnName;
   }
 
-  function setOutputColumnName(?string $outputColumnName, $forceCategorical = false) : self
+  function setOutputColumnName(?string $outputColumnName, $treatment = NULL) : self
   {
     $this->outputColumnName = $outputColumnName;
-    if ($forceCategorical) {
-      $this->outputColumnForceCategorical = $forceCategorical;
-    }
+    $this->outputColumnTreatment = $treatment;
     return $this;
   }
 

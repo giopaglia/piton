@@ -44,14 +44,18 @@ abstract class DiscriminativeModel {
     $stmt = $db->prepare($sql);
     if (!$stmt)
       die_error("Incorrect SQL query: $sql");
-    $stmt->execute();
+    if (!$stmt->execute())
+      die_error("Query failed: $sql");
+    $stmt->close();
 
     $sql = "CREATE TABLE " . $tableName . "_dump (dump TEXT)";
 
     $stmt = $db->prepare($sql);
     if (!$stmt)
       die_error("Incorrect SQL query: $sql");
-    $stmt->execute();
+    if (!$stmt->execute())
+      die_error("Query failed: $sql");
+    $stmt->close();
 
     $sql = "INSERT INTO " . $tableName . "_dump VALUES (?)";
 
@@ -61,7 +65,10 @@ abstract class DiscriminativeModel {
     $dump = serialize($this);
     if (!$stmt)
       die_error("Incorrect SQL query: $sql");
-    $stmt->execute();
+    if (!$stmt->execute())
+      die_error("Query failed: $sql");
+    $stmt->close();
+    
   }
 
   function &LoadFromDB(object $db, string $tableName) {
@@ -73,8 +80,10 @@ abstract class DiscriminativeModel {
     $stmt = $db->prepare($sql);
     if (!$stmt)
       die_error("Incorrect SQL query: $sql");
-    $stmt->execute();
+    if (!$stmt->execute())
+      die_error("Query failed: $sql");
     $res = $stmt->get_result();
+    $stmt->close();
     
     if (!($res !== false))
       die_error("SQL query failed: $sql");
@@ -208,7 +217,9 @@ class RuleBasedModel extends DiscriminativeModel {
     $stmt = $db->prepare($sql);
     if (!$stmt)
       die_error("Incorrect SQL query: $sql");
-    $stmt->execute();
+    if (!$stmt->execute())
+      die_error("Query failed: $sql");
+    $stmt->close();
 
     $sql = "CREATE TABLE $tableName ";
     $sql .= "(class VARCHAR(256), rule TEXT, support float, confidence float, lift float, conviction float)";
@@ -218,7 +229,9 @@ class RuleBasedModel extends DiscriminativeModel {
     $stmt = $db->prepare($sql);
     if (!$stmt)
       die_error("Incorrect SQL query: $sql");
-    $stmt->execute();
+    if (!$stmt->execute())
+      die_error("Query failed: $sql");
+    $stmt->close();
 
     $arr_vals = [];
     foreach ($this->rules as $rule) {
@@ -252,7 +265,9 @@ class RuleBasedModel extends DiscriminativeModel {
     $stmt = $db->prepare($sql);
     if (!$stmt)
       die_error("Incorrect SQL query: $sql");
-    $stmt->execute();
+    if (!$stmt->execute())
+      die_error("Query failed: $sql");
+    $stmt->close();
   }
 
   // function LoadFromDB(object $db, string $tableName) {
@@ -265,7 +280,9 @@ class RuleBasedModel extends DiscriminativeModel {
   //   $stmt = $this->db->prepare($sql);
   //   if (!$stmt)
   //     die_error("Incorrect SQL query: $sql");
-  //   $stmt->execute();
+    // if (!$stmt->execute())
+    //   die_error("Query failed: $sql");
+    // $stmt->close();
   //   $res = $stmt->get_result();
   //   if (!($res !== false))
   //     die_error("SQL query failed: $sql");

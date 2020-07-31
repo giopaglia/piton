@@ -343,6 +343,7 @@ class Instances {
       }
 
       if (!$newAttribute->isAtLeastAsExpressiveAs($oldAttribute) && !$allowDataLoss) {
+        // TODO a problem can arise when forcing categorical, for example on text data, using limit at train time. sometimes the full domain is not covered, then a new class may arise at test time. what to do then? In real life application, it shouldn't happen, at least for thec lass attribute, which field is empty
         die_error("Found a target attribute that is not as expressive as the requested one. This may cause loss of data. "
           . "\nnewAttribute: " . $newAttribute->toString(false)
           . "\noldAttribute: " . $oldAttribute->toString(false));

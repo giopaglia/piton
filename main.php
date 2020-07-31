@@ -76,9 +76,9 @@ function testMed() {
   $db_fit->setIdentifierColumnName("Referti.ID");
   $db_fit->setDefaultOption("TextTreatment", ["BinaryBagOfWords", 10]);
   $db_fit->setColumns("*");
-  // $db_fit->setLimit(10);
+  $db_fit->setLimit(10);
   // $db_fit->setLimit(1000);
-  $db_fit->setOutputColumnName("RaccomandazioniTerapeuticheUnitarie.TIPO", true);
+  $db_fit->setOutputColumnName("RaccomandazioniTerapeuticheUnitarie.TIPO", "ForceBinary");
   $lr = new PRip();
   // $lr->setNumOptimizations(10); TODO
   $lr->setNumOptimizations(3);
