@@ -31,6 +31,22 @@ function mysql_set($arr, $map_function = "mysql_quote_str") { return "(" . mysql
 function mysql_list($arr, $map_function = "mysql_backtick_str") { return join(", ", array_map($map_function, $arr)); }
 function mysql_quote_str($str) { return "'$str'"; }
 function mysql_backtick_str($str) { return "`$str`"; }
+
+function &mysql_select(object $db, string $sql) : object {
+
+  echo "SQL: $sql" . PHP_EOL;
+  $stmt = $db->prepare($sql);
+  if (!$stmt)
+    die_error("Incorrect SQL query: $sql");
+  if (!$stmt->execute())
+    die_error("Query failed: $sql");
+  $res = $stmt->get_result();
+  $stmt->close();
+  if (!($res !== false))
+    die_error("SQL query failed: $sql");
+  return $res;
+}
+
 function noop($str) { return $str; }
 
 function get_var_dump($a)  { ob_start(); var_dump($a); return ob_get_clean(); }

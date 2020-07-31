@@ -80,7 +80,6 @@ class DBFit {
   /* Default options TODO explain */
   private $defaultOptions = [];
 
-
   /* MAP: Mysql column type -> attr type */
   static $col2attr_type = [
     "datetime" => [
@@ -112,14 +111,14 @@ class DBFit {
         . get_class($db) . ".");
     $this->db = $db;
     $this->tables = [];
-    $this->whereCriteria = NULL;
     $this->columns = [];
     $this->setOutputColumnName(NULL);
     $this->setIdentifierColumnName(NULL);
-    $this->setLimit(NULL);
+    $this->whereCriteria = NULL;
+    $this->limit = NULL;
+
     $this->model = NULL;
     $this->learner = NULL;
-    // $this->setTrainingMode("FullTraining");
     $this->trainingMode = NULL;
   }
 
@@ -141,18 +140,9 @@ class DBFit {
     $attributes = [];
     $sql = "SELECT * FROM `information_schema`.`columns` WHERE `table_name` IN "
           . mysql_set(array_map([$this, "getTableName"], range(0, count($this->tables)-1))) . " ";
-    echo "SQL: $sql" . PHP_EOL;
-    $stmt = $this->db->prepare($sql);
-    if (!$stmt)
-      die_error("Incorrect SQL query: $sql");
-    if (!$stmt->execute())
-      die_error("Query failed: $sql");
-    $raw_mysql_columns = [];
-    $res = $stmt->get_result();
-    $stmt->close();
-    if (!($res !== false))
-      die_error("SQL query failed: $sql");
 
+    $res = mysql_select($this->db, $sql);
+    $raw_mysql_columns = [];
     foreach ($res as $row) {
       // echo get_var_dump($row) . PHP_EOL;
       $raw_mysql_columns[] = $row;
@@ -258,16 +248,8 @@ class DBFit {
             /* Find classes */
             $classes = [];
             $sql = $this->getSQLSelectQuery($this->getColumnName($i_col));
-            echo "SQL: $sql" . PHP_EOL;
-            $stmt = $this->db->prepare($sql);
-            if (!$stmt)
-              die_error("Incorrect SQL query: $sql");
-            if (!$stmt->execute())
-              die_error("Query failed: $sql");
-            $res = $stmt->get_result();
-            $stmt->close();
-            if (!($res !== false))
-              die_error("SQL query failed: $sql");
+            $res = mysql_select($this->db, $sql);
+
             foreach ($res as $raw_row) {
               $class = $raw_row[$this->getColumnName($i_col, true)];
               $classes[$class] = 0;
@@ -319,16 +301,7 @@ class DBFit {
                   /* Find $k most frequent words */
                   $word_counts = [];
                   $sql = $this->getSQLSelectQuery($this->getColumnName($i_col));
-                  echo "SQL: $sql" . PHP_EOL;
-                  $stmt = $this->db->prepare($sql);
-                  if (!$stmt)
-                    die_error("Incorrect SQL query: $sql");
-                  if (!$stmt->execute())
-                    die_error("Query failed: $sql");
-                  $res = $stmt->get_result();
-                  $stmt->close();
-                  if (!($res !== false))
-                    die_error("SQL query failed: $sql");
+                  $res = mysql_select($this->db, $sql);
                   
                   if (!isset($this->stop_words)) {
                     $lang = "en";
@@ -403,16 +376,7 @@ class DBFit {
     /* Finally obtain data */
     
     $sql = $this->getSQLSelectQuery(NULL, $idVal);
-    echo "SQL: $sql" . PHP_EOL;
-    $stmt = $this->db->prepare($sql);
-    if (!$stmt)
-      die_error("Incorrect SQL query: $sql");
-    if (!$stmt->execute())
-      die_error("Query failed: $sql");
-    $res = $stmt->get_result();
-    $stmt->close();
-    if (!($res !== false))
-      die_error("SQL query failed: $sql");
+    $res = mysql_select($this->db, $sql);
     $data = $this->readRawData($res, $attributes);
 
     // echo count($data) . " rows retrieved" . PHP_EOL;
@@ -581,7 +545,7 @@ class DBFit {
     $data = $this->readData();
 
     if ($this->trainingMode === NULL) {
-      $this->trainingMode = $defTrainingMode;
+      $this->trainingMode = $this->defTrainingMode;
       echo "Training mode defaulted to " . toString($this->trainingMode);
     }
 
@@ -903,25 +867,6 @@ class DBFit {
     return $this;
   }
 
-  function getWhereCriteria()
-  {
-    return $this->whereCriteria;
-  }
-
-  function setWhereCriteria($whereCriteria) : self
-  {
-    listify($whereCriteria);
-    foreach ($whereCriteria as $jc) {
-      if (!is_string($jc)) {
-        die_error("Non-string value encountered in whereCriteria: "
-        . "\"$jc\": ");
-      }
-    }
-    $this->whereCriteria = $whereCriteria;
-    return $this;
-  }
-
-
   function setTables($tables) : self
   {
     listify($tables);
@@ -1050,10 +995,19 @@ class DBFit {
     return $this;
   }
 
-  function getLimit() : int
+  function setWhereCriteria($whereCriteria) : self
   {
-    return $this->limit;
+    listify($whereCriteria);
+    foreach ($whereCriteria as $jc) {
+      if (!is_string($jc)) {
+        die_error("Non-string value encountered in whereCriteria: "
+        . "\"$jc\": ");
+      }
+    }
+    $this->whereCriteria = $whereCriteria;
+    return $this;
   }
+
 
   function setLimit(?int $limit) : self
   {
