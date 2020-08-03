@@ -56,7 +56,10 @@ class DBFit {
 
   /* Name of the (categorical) column/attribute to predict (string) */
   private $outputColumnName;
-  private $outputColumnTreatment;
+  
+  /* Names (categorical) column/attribute to predict, together with
+      additional join constraints for hierarchical prediction. */
+  private $outputColumns;
 
   /* SQL WHERE clauses for the concerning tables (array of strings) */
   private $whereCriteria;
@@ -113,6 +116,7 @@ class DBFit {
     $this->tables = [];
     $this->columns = [];
     $this->setOutputColumnName(NULL);
+    $this->setOutputColumns([]);
     $this->setIdentifierColumnName(NULL);
     $this->whereCriteria = NULL;
     $this->limit = NULL;
@@ -127,32 +131,16 @@ class DBFit {
 
     echo "DBFit->readData()" . PHP_EOL;
     /* Checks */
+    if (!count($this->columns)) {
+      die_error("Must specify the concerning columns, through ->setColumns() or ->addColumn().");
+    }
     if (!count($this->tables)) {
       die_error("Must specify the concerning tables, through ->setTables() or ->addTable().");
     }
-    if ($this->columns !== "*") {
-      if (!count($this->columns)) {
-        die_error("Must specify the concerning columns, through ->setColumns() or ->addColumn().");
-      }
-    }
     
-    /* Obtain column types & derive attributes */
-    $attributes = [];
-    $sql = "SELECT * FROM `information_schema`.`columns` WHERE `table_name` IN "
-          . mysql_set(array_map([$this, "getTableName"], range(0, count($this->tables)-1))) . " ";
+    /* Derive attributes */
 
-    $res = mysql_select($this->db, $sql);
-    $raw_mysql_columns = [];
-    foreach ($res as $row) {
-      // echo get_var_dump($row) . PHP_EOL;
-      $raw_mysql_columns[] = $row;
-    }
-    // var_dump($raw_mysql_columns);
-    // var_dump($this->columns);
-    
-    if ($this->columns === "*") {
-      $this->deriveColumnsFromRawMySQLColumns($raw_mysql_columns);
-    }
+    $attributes = [];
 
     /* Checks */
     /* And place the output column at the FIRST spot */
@@ -162,7 +150,6 @@ class DBFit {
         $output_col_in_columns = true;
         array_splice($this->columns, $i_col, 1);
         array_unshift($this->columns, $col);
-        $this->setColumnTreatment(0, $this->outputColumnTreatment);
       }
     }
     if (!($output_col_in_columns)) {
@@ -233,21 +220,6 @@ class DBFit {
         $attribute = NULL;
       }
       else {
-        $mysql_column = NULL;
-        /* Find column */
-        foreach ($raw_mysql_columns as $col) {
-          if (in_array($this->getColumnName($i_col),
-              [$col["TABLE_NAME"].".".$col["COLUMN_NAME"], $col["COLUMN_NAME"]])) {
-            $mysql_column = $col;
-            break;
-          }
-        }
-        if ($mysql_column === NULL) {
-          die_error("Couldn't retrieve information about column \""
-            . $this->getColumnName($i_col) . "\"");
-        }
-        $this->setColumnMySQLType($i_col, $mysql_column["COLUMN_TYPE"]);
-        
         /* Create attribute(s) for this column */
         $attribute = $this->computeAttributesOfColumn($i_col);
       }
@@ -1061,8 +1033,21 @@ class DBFit {
 
   function setColumns($columns) : self
   {
+    if (!count($this->tables)) {
+      die_error("Must specify the concerning tables before the columns, through ->setTables() or ->addTable().");
+    }
+
     if ($columns === "*") {
-      $this->columns = $columns;
+      /* Obtain column names from database */
+      $sql = "SELECT * FROM `information_schema`.`columns` WHERE `table_name` IN "
+            . mysql_set(array_map([$this, "getTableName"], range(0, count($this->tables)-1))) . " ";
+      $res = mysql_select($this->db, $sql);
+      
+      $colsNames = [];
+      foreach ($res->fetch_all() as $raw_col) {
+        $colsNames[] = $raw_col["TABLE_NAME"].".".$raw_col["COLUMN_NAME"];
+      }
+      return $this->setColumns($colsNames);
     } else {
       listify($columns);
       $this->columns = [];
@@ -1070,68 +1055,153 @@ class DBFit {
         $this->addColumn($col);
       }
     }
-
     return $this;
   }
 
   function addColumn($col) : self
   {
+    if (!is_array($this->columns)) {
+      die_error("Can't addColumn at this time! Use ->setColumns() instead.");
+    }
+
     $new_col = [];
     $new_col["name"] = NULL;
     $new_col["treatment"] = NULL;
     $new_col["attr_name"] = NULL;
     $new_col["mysql_type"] = NULL;
+
     if (is_string($col)) {
       $new_col["name"] = $col;
     } else if (is_array($col)) {
+      if(!is_string($col[0])) {
+        die_error("Malformed column name: " . toString($col[0])
+          . ". The name must be a string.");
+      }
       $new_col["name"] = $col[0];
       if (isset($col[1])) {
         listify($col[1]);
         $new_col["treatment"] = $col[1];
       }
       if (isset($col[2])) {
+        if(!is_string($col[0])) {
+          die_error("Malformed target attribute name for column: " . toString($col[2])
+            . ". The target name must be a string.");
+        }
         $new_col["attr_name"] = $col[2];
       }
     } else {
-      die_error("Malformed column: " . toString($col));
+      die_error("Malformed column term: " . toString($col));
     }
 
     if ($new_col["attr_name"] === NULL) {
       $new_col["attr_name"] = $new_col["name"];
     }
 
-    if (!is_array($this->columns)) {
-      die_error("Can't addColumn at this time! Use ->setColumns() instead.");
+    /* Obtain column type */
+    $sql = "SELECT * FROM `information_schema`.`columns` WHERE `table_name` IN "
+          . mysql_set(array_map([$this, "getTableName"], range(0, count($this->tables)-1))) . " ";
+    $res = mysql_select($this->db, $sql);
+
+    $raw_mysql_columns = $res->fetch_all();
+    /* Find column */
+    foreach ($raw_mysql_columns as $col) {
+      if (in_array($new_col["name"],
+          [$col["TABLE_NAME"].".".$col["COLUMN_NAME"], $col["COLUMN_NAME"]])) {
+        $mysql_column = $col;
+        break;
+      }
     }
+    if ($mysql_column === NULL) {
+      die_error("Couldn't retrieve information about column \""
+        . $new_col["name"] . "\"");
+    }
+    $new_col["mysql_type"] = $mysql_column["COLUMN_TYPE"];
 
     $this->columns[] = &$new_col;
-    
+
     return $this;
   }
 
-  function deriveColumnsFromRawMySQLColumns(array $raw_mysql_columns) {
-    $cols = [];
-    foreach ($raw_mysql_columns as $raw_col) {
-      $cols[] = $raw_col["TABLE_NAME"].".".$raw_col["COLUMN_NAME"];
+  function setOutputColumns($outputColumns) : self
+  {
+    if ($outputColumns === NULL) {
+      $this->outputColumns = [];
+    } else {
+      listify($outputColumns);
+      $this->outputColumns = [];
+      foreach ($outputColumns as $col) {
+        $this->addOutputColumn($col);
+      }
     }
-    echo toString($cols) . "\n";
-    $this->setColumns($cols);
+    return $this;
+  }
+
+  function addOutputColumn($col) : self
+  {
+    if (!is_array($this->outputColumns)) {
+      die_error("Can't addOutputColumn at this time! Use ->setOutputColumns() instead.");
+    }
+
+    $new_col = [];
+    $new_col["name"] = NULL;
+    $new_col["joins"] = [];
+
+    if (is_string($col)) {
+      $new_col["name"] = $col;
+    } else if (is_array($col)) {
+      if(!is_string($col[0])) {
+        die_error("Malformed output column name: " . get_var_dump($col[0])
+          . ". The name must be a string.");
+      }
+
+      $new_col["name"] = $col[0];
+      if (isset($col[1])) {
+        $new_col["joins"] = $col[1];
+      }
+    } else {
+      die_error("Malformed output column term: " . toString($col));
+    }
+
+    if (!count($this->columns)) {
+      die_error("You must set the columns in use before the output columns.");
+    }
+    if (!in_array($new_col["name"], $this->getColumnNames(true))) {
+      die_error("Output column '" . $new_col["name"] . "' not found in columns.");
+    }
+    if ($this->identifierColumnName !== NULL
+      && $new_col["name"] == $this->identifierColumnName) {
+      die_error("Output column ('" . $new_col["name"]
+        . "') cannot be used as identifier.");
+    }
+
+    $this->outputColumns[] = &$new_col;
+
+    foreach ($this->columns as $i_col => $col) {
+      if ($this->getColumnName($i_col) == $new_col["name"]) {
+        if ($this->getColumnTreatment($i_col) === NULL) {
+          $this->setColumnTreatment($i_col, "ForceCategoricalIfNotEnum");
+          die_error("check this" . $this->getColumnTreatment($i_col));
+        }
+      }
+    }
+    return $this;
   }
 
   function getOutputColumnName() : string
   {
+    die_error("TODO remove getOutputColumnName()");
     return $this->outputColumnName;
   }
 
-  function setOutputColumnName(?string $outputColumnName, $treatment = "ForceCategoricalIfNotEnum") : self
+  function setOutputColumnName(?string $outputColumnName, $treatment = NULL) : self
   {
-    if ($this->outputColumnName !== NULL && $this->identifierColumnName !== NULL
-      && $this->outputColumnName == $this->identifierColumnName) {
-      die_error("Output column ('{$this->outputColumnName}') cannot be used as identifier.");
+    foreach ($this->columns as $i_col => $col) {
+      if ($this->getColumnName($i_col) == $outputColumnName) {
+        $this->setColumnTreatment($i_col, $treatment);
+        die_error("check this" . $this->getColumnTreatment($i_col));
+      }
     }
-    $this->outputColumnName = $outputColumnName;
-    $this->outputColumnTreatment = $treatment;
-    return $this;
+    return $this->setOutputColumns([[$outputColumnName]]);
   }
 
   // function getIdentifierColumnName() : string
@@ -1141,9 +1211,9 @@ class DBFit {
 
   function setIdentifierColumnName(?string $identifierColumnName) : self
   {
-    if ($this->outputColumnName !== NULL && $this->identifierColumnName !== NULL
-      && $this->outputColumnName == $this->identifierColumnName) {
-      die_error("Identifier column ('{$this->outputColumnName}') cannot be considered as the output column.");
+    if ($this->outputColumnName !== NULL && $identifierColumnName !== NULL
+      && $this->outputColumnName == $identifierColumnName) {
+      die_error("Identifier column ('{$identifierColumnName}') cannot be considered as the output column.");
     }
     $this->identifierColumnName = $identifierColumnName;
     return $this;

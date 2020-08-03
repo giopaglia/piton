@@ -27,8 +27,8 @@ TODOs:
 *                                                   *
 ****************************************************/
 
-// testMed3();
-// exit();
+testMed3();
+exit();
 testMed2();
 exit();
 testMed();
@@ -213,7 +213,7 @@ function testMed3() {
 "RaccomandazioniTerapeutiche.SOSPENSIONE_TERAPIA_CHECKBOX",
 "RaccomandazioniTerapeutiche.SOSPENSIONE_TERAPIA_FARMACO",
 "RaccomandazioniTerapeutiche.SOSPENSIONE_TERAPIA_MESI",
-"RaccomandazioniTerapeuticheUnitarie.TIPO",
+["RaccomandazioniTerapeuticheUnitarie.TIPO"],
 "Referti.DATA_ANNULLA",
 "Referti.MOTIVO_ANNULLA",
 "Referti.STATO",
@@ -222,10 +222,12 @@ function testMed3() {
   $db_fit->setLimit(100);
   // $db_fit->setLimit(1000);
   $db_fit->setOutputColumns([
-    ["RaccomandazioniTerapeuticheUnitarie.TIPO", "ForceBinary"],
-    ["PrincipiAttivi.Nome", "ForceCategorical", 
-      ["ElementiTerapici", "ElementiTerapici.ID_RACCOMANDAZIONE_TERAPEUTICA_UNITARIA = RaccomandazioniTerapeuticheUnitarie.ID"],
-      ["PrincipiAttivi", "ElementiTerapici.ID_PRINCIPIO_ATTIVO = PrincipiAttivi.ID"]
+    ["RaccomandazioniTerapeuticheUnitarie.TIPO"],
+    ["PrincipiAttivi.Nome",
+      [
+        ["ElementiTerapici", "ElementiTerapici.ID_RACCOMANDAZIONE_TERAPEUTICA_UNITARIA = RaccomandazioniTerapeuticheUnitarie.ID"],
+        ["PrincipiAttivi", "ElementiTerapici.ID_PRINCIPIO_ATTIVO = PrincipiAttivi.ID"]
+      ]
     ]
   ]);
 

@@ -86,7 +86,7 @@ function array_list(array $arr, $delimiter = ", ") {
   return $out_str;
 }
 
-function listify(&$v) {
+function listify(&$v) { // TODO , $depth = 1
   if ($v === NULL) {
     $v = [];
   } else {
