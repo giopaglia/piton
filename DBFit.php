@@ -53,9 +53,6 @@ class DBFit {
        by processing a "BirthDate" sql column.
   */
   private $columns;
-
-  /* Name of the (categorical) column/attribute to predict (string) */
-  private $outputColumnName;
   
   /* Names (categorical) column/attribute to predict, together with
       additional join constraints for hierarchical prediction. */
@@ -126,7 +123,7 @@ class DBFit {
   }
 
   /** Read data & pre-process it */
-  private function readData($idVal = NULL) {
+  private function readData($idVal = NULL, $recursionPath = []) {
 
     echo "DBFit->readData()" . PHP_EOL;
     /* Checks */
@@ -137,50 +134,9 @@ class DBFit {
       die_error("Must specify the concerning tables, through ->setTables() or ->addTable().");
     }
     
-    /* Derive attributes */
+    $recursionLevel = count($recursionPath);
+    $outputColumnName = $this->getOutputColumnNames()[$recursionLevel];
 
-    $attributes = [];
-
-    /* Checks */
-    /* And place the output column at the FIRST spot */
-    $output_col_in_columns = false;
-    foreach ($this->columns as $i_col => $col) {
-      if ($this->getColumnName($i_col) == $this->outputColumnName) {
-        $output_col_in_columns = true;
-        array_splice($this->columns, $i_col, 1);
-        array_unshift($this->columns, $col);
-      }
-    }
-    if (!($output_col_in_columns)) {
-      die_error("The output column name (here \"" . $this->outputColumnName
-        . "\") must be in columns.");
-    }
-    // if($this->identifierColumnName !== NULL) {
-    //   $id_col_in_columns = false;
-    //   foreach ($this->columns as $i_col => $col) {
-    //     if ($this->getColumnName($i_col) == $this->identifierColumnName) {
-    //       $id_col_in_columns = true;
-    //     }
-    //   }
-    //   if (!($id_col_in_columns)) {
-    //     die_error("The identifier column name (here \"" . $this->identifierColumnName
-    //       . "\") must be in columns.");
-    //   }
-    // }
-    if (count($this->tables) > 1) {
-      foreach ($this->columns as $i_col => $col) {
-        if (!preg_match("/.*\..*/i", $this->getColumnName($i_col))) {
-          die_error("Invalid column name: '" . $this->getColumnName($i_col)
-            . "'. When reading more than one table, " .
-          "please specify column names in their 'table_name.column_name' format.");
-        }
-      }
-      if (!preg_match("/.*\..*/i", $this->identifierColumnName)) {
-        die_error("Invalid identifier column name: '"
-          . $this->identifierColumnName . "'. When reading more than one table, "
-          . "please specify column names in their 'table_name.column_name' format.");
-      }
-    }
     // var_dump($this->columns);
 
     /* If any WHERE/JOIN-ON constraint forces the equality between two columns,
@@ -195,15 +151,16 @@ class DBFit {
     foreach ($this->tables as $k => $table) {
       $constraints = array_merge($constraints, $this->getTableJoinCritera($k));
     }
+    // TODO ignore those terms that are like constants...
     foreach ($constraints as $constraint) {
       if(preg_match("/\s*([\S\.]+)\s*=\s*([\S\.]+)\s*/i", $constraint, $matches)) {
         $fst = $matches[1];
         $snd = $matches[2];
 
-        if (!in_array($fst, [$this->identifierColumnName, $this->outputColumnName])
+        if (!in_array($fst, [$this->identifierColumnName, $outputColumnName])
           && !in_array($fst, $columnsToIgnore)) {
           $columnsToIgnore[] = $fst;
-        } else if (!in_array($snd, [$this->identifierColumnName, $this->outputColumnName])
+        } else if (!in_array($snd, [$this->identifierColumnName, $outputColumnName])
           && !in_array($snd, $columnsToIgnore)) {
           $columnsToIgnore[] = $snd;
         } else {
@@ -213,23 +170,40 @@ class DBFit {
       }
     }
 
+    /* Derive the columns needed at this recursion level */
+    $columns = array_slice($this->outputColumns, 0, $recursionLevel+1);
+    $columns = array_merge($columns, $this->getColumns(false));
+    
+    $colsNeeded = array_slice($this->outputColumns, 0, $recursionLevel+1);
+    $colsNeeded = array_merge($colsNeeded, $this->getColumns(true));
+    $colsNeeded = array_map([$this, "getColumnName"], $colsNeeded);
+
+    var_dump($columns);
+
+    echo "Recursion level: " . $recursionLevel . PHP_EOL;
+    echo "Reading " . count($columns) . " columns..." . PHP_EOL;
+    echo "Recursion path: " . toString($recursionPath) . PHP_EOL;
+    echo "Identifier value: " . toString($idVal) . PHP_EOL;
+
     /* Create attributes from column info */
-    for ($i_col = 0; $i_col < count($this->columns); $i_col++) {
-      if (in_array($this->getColumnName($i_col), $columnsToIgnore)) {
+    $attributes = [];
+
+    foreach ($columns as &$column) {
+      if (in_array($this->getColumnName($column), $columnsToIgnore)) {
         $attribute = NULL;
       }
       else {
         /* Create attribute(s) for this column */
-        $attribute = $this->computeAttributesOfColumn($i_col);
+        $attribute = $this->computeAttributesOfColumn($column);
       }
       $attributes[] = $attribute;
     }
 
     /* Finally obtain data */
     
-    $sql = $this->getSQLSelectQuery(NULL, $idVal);
+    $sql = $this->getSQLSelectQuery($colsNeeded, $idVal, $recursionPath);
     $res = mysql_select($this->db, $sql);
-    $data = $this->readRawData($res, $attributes);
+    $data = $this->readRawData($res, $attributes, $columns);
 
     // echo count($data) . " rows retrieved" . PHP_EOL;
     // echo get_var_dump($data);
@@ -299,7 +273,7 @@ class DBFit {
     return $data;
   }
 
-  function &readRawData(object &$res, array $attributes) : array {
+  function &readRawData(object &$res, array &$attributes, array &$columns) : array {
 
     $data = [];
 
@@ -308,7 +282,7 @@ class DBFit {
       
       /* Pre-process data */
       $attr_vals = [];
-      for ($i_col = 0; $i_col < count($this->columns); $i_col++) {
+      foreach ($columns as $i_col => &$column) {
         $attribute = $attributes[$i_col];
         
         if ($attribute === NULL) {
@@ -317,7 +291,7 @@ class DBFit {
         }
         else {
           $attr_val = [];
-          $raw_val = $raw_row[$this->getColNickname($this->getColumnName($i_col))];
+          $raw_val = $raw_row[$this->getColNickname($this->getColumnName($column))];
 
           if ($raw_val === NULL) {
             foreach ($attribute as $attr) {
@@ -327,11 +301,11 @@ class DBFit {
           else {
             switch (true) {
               /* ForceBinary */
-              case $this->getColumnTreatmentType($i_col) == "ForceBinary":
+              case $this->getColumnTreatmentType($column) == "ForceBinary":
 
                 // TODO figure out: a null value means what?
                 /* Append k values, one for each of the classes */
-                $classes = $this->getColumnTreatmentArg($i_col, 0);
+                $classes = $this->getColumnTreatmentArg($column, 0);
                 foreach ($classes as $class) {
                   $val = intval($class == $raw_val);
                   $attr_val[] = $val;
@@ -339,11 +313,11 @@ class DBFit {
                 break;
                
               /* Text column */
-              case $this->getColumnTreatmentType($i_col) == "BinaryBagOfWords":
+              case $this->getColumnTreatmentType($column) == "BinaryBagOfWords":
 
                 // TODO check: a null text means null values for the binary bags, right?
                 /* Append k values, one for each word in the dictionary */
-                $dict = $this->getColumnTreatmentArg($i_col, 0);
+                $dict = $this->getColumnTreatmentArg($column, 0);
                 foreach ($dict as $word) {
                   $val = in_array($word, $this->text2words($raw_val));
                   $attr_val[] = $val;
@@ -353,7 +327,7 @@ class DBFit {
               default: /* Single value */
                 if (count($attribute) != 1) {
                   die_error("Something's off. Found multiple attributes for column "
-                    . $this->getColumnName($i_col)
+                    . $this->getColumnName($column)
                     . " ($i_col)" . get_var_dump($attribute));
                 }
                 $attribute = $attribute[0];
@@ -363,7 +337,7 @@ class DBFit {
                   $val = $attribute->getKey($raw_val);
                   if ($val === false) {
                     /* When forcing categorical, push the unfound values to the domain */
-                    if (in_array($this->getColumnTreatmentType($i_col), ["ForceCategorical", "ForceCategoricalIfNotEnum"])) {
+                    if (in_array($this->getColumnTreatmentType($column), ["ForceCategorical", "ForceCategoricalIfNotEnum"])) {
                       $attribute->pushDomainVal($raw_val);
                       $val = $attribute->getKey($raw_val);
                     }
@@ -373,16 +347,16 @@ class DBFit {
                   }
                 }
                 /* Dates & Datetime values */
-                else if (in_array($this->getColumnMySQLType($i_col), ["date", "datetime"])) {
+                else if (in_array($this->getColumnMySQLType($column), ["date", "datetime"])) {
                   $type_to_format = [
                     "date"     => "Y-m-d"
                   , "datetime" => "Y-m-d H:i:s"
                   ];
-                  $date = DateTime::createFromFormat($type_to_format[$this->getColumnMySQLType($i_col)], $raw_val);
+                  $date = DateTime::createFromFormat($type_to_format[$this->getColumnMySQLType($column)], $raw_val);
                   if (!($date !== false))
                     die_error("Incorrect date string \"$raw_val\"");
 
-                  switch ($this->getColumnTreatmentType($i_col)) {
+                  switch ($this->getColumnTreatmentType($column)) {
                     /* By default, DaysSince is used. */
                     case NULL:
                       // break;
@@ -399,8 +373,8 @@ class DBFit {
                       $val = intval($date->diff($today)->format("%R%y"));
                       break;
                     default:
-                    die_error("Unknown treatment for {$this->getColumnMySQLType($i_col)} column \"" .
-                      $this->getColumnTreatmentType($i_col) . "\"");
+                    die_error("Unknown treatment for {$this->getColumnMySQLType($column)} column \"" .
+                      $this->getColumnTreatmentType($column) . "\"");
                       break;
                   };
                 }
@@ -410,10 +384,10 @@ class DBFit {
           }
         }
         $attr_vals[] = $attr_val;
-      } // foreach ($this->columns as $i_col => $column)
+      } // foreach ($columns as $i_col => $column)
 
       // Check that the identifier column actually identifies single rows,
-      //  and merge rows, just in case.
+      //  and merge rows if needed.
       if ($this->identifierColumnName !== NULL) {
         $idVal = $raw_row[$this->getColNickname($this->identifierColumnName)];
         if (isset($data[$idVal])) {
@@ -421,9 +395,9 @@ class DBFit {
 
           foreach (zip($attr_vals_orig, $attr_vals) as $i_col => $z) {
             if ($z[0] !== $z[1]) {
-              if ($this->outputColumnName != $this->getColumnName($i_col)) {
+              if ($i_col !== 0) {
                 die_error("Found more than one row with same identifier value: '{$this->identifierColumnName}' = " . get_var_dump($idVal)
-                  . ", but merging on column " . $this->getColumnName($i_col)
+                  . ", but merging on column " . $this->getColumnName($columns[$i_col])
                   . " ($i_col) failed. "
                   . get_var_dump($z[0]) . get_var_dump($z[1])
                   . get_var_dump($attr_vals_orig) . get_var_dump($attr_vals)
@@ -441,7 +415,7 @@ class DBFit {
                     }
                     else {
                       die_error("Found more than one row with same identifier value: '{$this->identifierColumnName}' = " . get_var_dump($idVal)
-                      . ", but I don't know how to merge values for column " . $this->getColumnName($i_col)
+                      . ", but I don't know how to merge values for column " . $this->getColumnName($columns[$i_col])
                       . " ($i_col) of type '{$attribute[$a]->getType()}'. "
                       . "Suggestion: specify ForceBinary treatment for this column." //TODO
                       // . get_var_dump($z[0]) . get_var_dump($z[1])
@@ -466,6 +440,595 @@ class DBFit {
 
     return $data;
   }
+  /* TODO explain */
+  function getColumns($IncludeIdCol = false) {
+    $cols = [];
+    foreach ($this->columns as &$col) {
+      $cols[] = &$col;
+    }
+    if ($IncludeIdCol && $this->identifierColumnName !== NULL) {
+      if (!in_array($this->identifierColumnName, $this->getColumnNames(false))) {
+        $cols[] = $this->readColumn($this->identifierColumnName);
+      }
+    }
+    return $cols;
+  }
+
+  /* TODO explain */
+  function getColumnNames($IncludeIdCol = false) {
+    $cols = array_map([$this, "getColumnName"], $this->columns);
+    if ($IncludeIdCol && $this->identifierColumnName !== NULL) {
+      if (!in_array($this->identifierColumnName, $cols)) {
+        $cols[] = $this->identifierColumnName;
+      }
+    }
+    return $cols;
+  }
+
+  function getOutputColumnNames() {
+    return array_map([$this, "getColumnName"], $this->outputColumns);
+  }
+
+  /* Need a nickname for every column when using table.column format,
+      since PHP MySQL connctions do not allow to access result fields
+      using this format */
+  function getColNickname($colName) {
+    return str_replace(".", "_DOT_", $colName);
+  }
+
+  /* TODO explain */
+  function getSQLSelectQuery($colNames, $idVal = NULL, $recursionPath = []) {
+    if ($colNames === NULL) {
+      $colNames = $this->getColumnNames(true);
+    }
+    listify($colNames);
+    foreach ($colNames as &$col) {
+      $col = $col . " AS " . $this->getColNickname($col);
+    }
+
+    $sql = "SELECT " . mysql_list($colNames, "noop") . " FROM ";
+    
+    foreach ($this->tables as $k => $table) {
+      if ($k == 0) {
+      $sql .= $this->getTableName($k);
+      }
+      else {
+        $sql .= $this->getTableJoinType($k) . " " . $this->getTableName($k);
+        $crit = $this->getTableJoinCritera($k);
+        if (count($crit)) {
+          // TODO remove duplicate attributes
+          $sql .= " ON " . join(" AND ", $crit);
+        }
+      }
+      $sql .= " ";
+    }
+
+    $whereCriteria = [];
+    if ($this->whereCriteria !== NULL && count($this->whereCriteria)) {
+      $whereCriteria = array_merge($whereCriteria, $this->whereCriteria);
+    }
+    if ($idVal !== NULL) {
+      if($this->identifierColumnName === NULL)
+        die_error("An identifier column name must be set. Use ->setIdentifierColumnName()");
+      $whereCriteria[] = $this->identifierColumnName . " = $idVal";
+    }
+
+    if (count($whereCriteria)) {
+      $sql .= " WHERE " . join("AND ", $whereCriteria);
+    }
+
+    if ($this->limit !== NULL) {
+      if ($idVal === NULL) {
+        $sql .= " LIMIT {$this->limit}";
+      }
+      // else {
+      //   warn("Limit term ignored at predict time");
+      // }
+
+    }
+
+    return $sql;
+  }
+
+  function computeAttributesOfColumn(array &$column)
+  {
+    $attr_name = $this->getColumnAttrName($column);
+
+    switch(true) {
+      /* Forcing a categorical attribute */
+      case $this->getColumnTreatmentType($column) == "ForceCategorical":
+        $attribute = [new DiscreteAttribute($attr_name, "enum")];
+        break;
+      /* Enum column */
+      case $this->getColumnAttrType($column) == "enum":
+        $domain_arr_str = (preg_replace("/enum\((.*)\)/i", "[$1]", $this->getColumnMySQLType($column)));
+        eval("\$domain_arr = " . $domain_arr_str . ";");
+        $attribute = [new DiscreteAttribute($attr_name, "enum", $domain_arr)];
+        break;
+      /* Forcing a categorical attribute */
+      case $this->getColumnTreatmentType($column) == "ForceCategoricalIfNotEnum":
+        $attribute = [new DiscreteAttribute($attr_name, "enum")];
+        break;
+      /* Forcing a set of binary categorical attributes */
+      case $this->getColumnTreatmentType($column) == "ForceBinary":
+        
+        /* Find classes */
+        $classes = [];
+        $sql = $this->getSQLSelectQuery($this->getColumnName($column));
+        $res = mysql_select($this->db, $sql);
+
+        foreach ($res as $raw_row) {
+          $class = $raw_row[$this->getColNickname($this->getColumnName($column))];
+          $classes[$class] = 0;
+        }
+        $classes = array_keys($classes);
+
+        // var_dump($classes);
+        $attribute = [];
+
+        foreach ($classes as $class) {
+          $attribute[] = new DiscreteAttribute($attr_name . "/" . $class, "bool", ["0", "1"]);
+        }
+        $this->setColumnTreatmentArg($column, 0, $classes);
+
+        break;
+      /* Numeric column */
+      case in_array($this->getColumnAttrType($column), ["int", "float", "double"]):
+        $attribute = [new ContinuousAttribute($attr_name, $this->getColumnAttrType($column))];
+        break;
+      /* Boolean column */
+      case in_array($this->getColumnAttrType($column), ["bool", "boolean"]):
+        $attribute = [new DiscreteAttribute($attr_name, "bool", ["0", "1"])];
+        break;
+      /* Text column */
+      case $this->getColumnAttrType($column) == "text":
+        switch($this->getColumnTreatmentType($column)) {
+          case "BinaryBagOfWords":
+            /* Binary attributes indicating the presence of each word */
+            $generateDictAttrs = function($dict) use ($attr_name, &$column) {
+              $attribute = [];
+              foreach ($dict as $word) {
+                $attribute[] = new DiscreteAttribute("'$word' in $attr_name",
+                  "word_presence", ["N", "Y"]);
+              }
+              $this->setColumnTreatmentArg($column, 0, $dict);
+              return $attribute;
+            };
+
+            /* The argument can be the dictionary size (k), or more directly the dictionary */
+            if ( is_integer($this->getColumnTreatmentArg($column, 0))) {
+              $k = $this->getColumnTreatmentArg($column, 0);
+
+              /* Find $k most frequent words */
+              $word_counts = [];
+              $sql = $this->getSQLSelectQuery($this->getColumnName($column));
+              $res = mysql_select($this->db, $sql);
+              
+              if (!isset($this->stop_words)) {
+                $lang = "en";
+                $this->stop_words = explode("\n", file_get_contents($lang . "-stopwords.txt"));
+              }
+              foreach ($res as $raw_row) {
+                $text = $raw_row[$this->getColNickname($this->getColumnName($column))];
+                
+                $words = $this->text2words($text);
+
+                foreach ($words as $word) {
+                  if (!isset($word_counts[$word]))
+                    $word_counts[$word] = 0;
+                  $word_counts[$word] += 1;
+                }
+              }
+              // var_dump($word_counts);
+              
+              if (!count($word_counts)) {
+                warn("Couldn't derive a BinaryBagOfWords dictionary for attribute \"" .
+                  $this->getColumnName($column) . "\". This column will be ignored.");
+
+                $attribute = NULL;
+              } else {
+                $dict = [];
+                // TODO optimize this?
+                foreach (range(0, $k-1) as $i) {
+                  $max_count = max($word_counts);
+                  $max_word = array_search($max_count, $word_counts);
+                  $dict[] = $max_word;
+                  unset($word_counts[$max_word]);
+                  if (!count($word_counts)) {
+                    break;
+                  }
+                }
+                // var_dump($dict);
+                
+                if (count($dict) < $k) {
+                  warn("Couldn't derive a BinaryBagOfWords dictionary of size $k for attribute \"" 
+                    . $this->getColumnName($column) . "\". Dictionary of size "
+                    . count($dict) . " will be used.");
+                }
+                $attribute = $generateDictAttrs($dict);
+              }
+            }
+            else if (is_array($this->getColumnTreatmentArg($column, 0))) {
+              $dict = $this->getColumnTreatmentArg($column, 0);
+              $attribute = $generateDictAttrs($dict);
+            }
+            else {
+              die_error("Please specify a parameter (dictionary or dictionary size)"
+                . " for bag-of-words"
+                . " processing column '" . $this->getColumnName($column) . "'.");
+            }
+            break;
+          default:
+            die_error("Unknown treatment for text column \""
+               . $this->getColumnName($column) . "\" : "
+               . get_var_dump($this->getColumnTreatmentType($column)));
+            break;
+        }
+        break;
+      default:
+        die_error("Unknown column type: " . $this->getColumnMySQLType($column));
+        break;
+    }
+    return $attribute;
+  }
+  // TODO use Nlptools
+  function text2words($text) {
+    if ($text === NULL) {
+      return [];
+    }
+    $text = strtolower($text);
+    
+    # to keep letters only (remove punctuation and such)
+    $text = preg_replace('/[^a-z]+/i', '_', $text);
+    
+    # tokenize
+    $words = array_filter(explode("_", $text));
+
+    # remove stopwords
+    $words = array_diff($words, $this->stop_words);
+
+    # lemmatize
+    // lemmatize($text)
+
+    # stem
+    $words = array_map(["PorterStemmer", "Stem"], $words);
+    
+    return $words;
+  }
+
+
+  static function isEnumType(string $mysql_type) {
+    return preg_match("/enum.*/i", $mysql_type);
+  }
+
+  static function isTextType(string $mysql_type) {
+    return preg_match("/varchar.*/i", $mysql_type) ||
+           preg_match("/text.*/i", $mysql_type);
+  }
+
+
+  function getTableName(int $i) : string {
+    return $this->tables[$i]["name"];
+  }
+  function &getTableJoinCritera(int $i) {
+    return $this->tables[$i]["join_criteria"];
+  }
+  function &getTableJoinType(int $i) {
+    return $this->tables[$i]["join_type"];
+  }
+
+  function getColumnName(array &$col, bool $force_no_table_name = false) : string {
+    $n = $col["name"];
+    return $force_no_table_name && count(explode(".", $n)) > 1 ? explode(".", $n)[1] : $n;
+  }
+  function &getColumnTreatment(array &$col) {
+    if ($col["treatment"] !== NULL)
+      listify($col["treatment"]);
+    $tr = &$col["treatment"];
+    if (($tr === NULL) && $this->getColumnAttrType($col, $tr) === "text"
+           && isset($this->defaultOptions["TextTreatment"])) {
+      $this->setColumnTreatment($col, $this->defaultOptions["TextTreatment"]);
+      return $this->getColumnTreatment($col);
+    }
+
+    return $tr;
+  }
+  function getColumnTreatmentType(array &$col) {
+    $tr = $this->getColumnTreatment($col);
+    $t = !is_array($tr) ? $tr : $tr[0];
+    return $t;
+  }
+  function getColumnTreatmentArg(array &$col, int $j) {
+    $tr = $this->getColumnTreatment($col);
+    return !is_array($tr) || !isset($tr[1+$j]) ? NULL : $tr[1+$j];
+  }
+  function setColumnTreatment(array &$col, $val) {
+    $col["treatment"] = $val;
+  }
+  function setColumnTreatmentArg(array &$col, int $j, $val) {
+    $this->getColumnTreatment($col)[1+$j] = $val;
+  }
+  function getColumnAttrName(array &$col) {
+    return !array_key_exists("attr_name", $col) ?
+        $this->getColumnName($col, true) : $col["attr_name"];
+  }
+
+  function getColumnMySQLType(array &$col) {
+    return $col["mysql_type"];
+  }
+
+  function getColumnAttrType(array &$col, $tr = -1) {
+    $mysql_type = $this->getColumnMySQLType($col);
+    if (self::isEnumType($mysql_type)) {
+      return "enum";
+    }
+    else if (self::isTextType($mysql_type)) {
+      return "text";
+    } else {
+      if ($tr === -1) {
+        $tr = $this->getColumnTreatmentType($col);
+      }
+      if (isset(self::$col2attr_type[$mysql_type])) {
+        return self::$col2attr_type[$mysql_type][$tr];
+      } else {
+        die_error("Unknown column type: \"$mysql_type\"! Code must be expanded to cover this one!");
+      }
+    }
+  }
+
+
+  function getDb() : object
+  {
+    return $this->db;
+  }
+
+  function setDb(object $db) : self
+  {
+    $this->db = $db;
+    return $this;
+  }
+
+  function setTables($tables) : self
+  {
+    listify($tables);
+    $this->tables = [];
+    foreach ($tables as $table) {
+      $this->addTable($table);
+    }
+
+    return $this;
+  }
+
+  function addTable($tab) : self
+  {
+    $new_tab = [];
+    $new_tab["name"] = NULL;
+    $new_tab["join_criteria"] = [];
+    $new_tab["join_type"] = count($this->tables) ? "INNER JOIN" : "";
+
+    if (is_string($tab)) {
+      $new_tab["name"] = $tab;
+    } else if (is_array($tab)) {
+      $new_tab["name"] = $tab[0];
+      if (isset($tab[1])) {
+        if (!count($this->tables)) {
+          die_error("Join criteria can't be specified for the first specified table: "
+          . "\"{$tab[0]}\": ");
+        }
+
+        listify($tab[1]);
+        $new_tab["join_criteria"] = $tab[1];
+      }
+      if (isset($tab[2])) {
+        $new_tab["join_type"] = $tab[2];
+      }
+    } else {
+      die_error("Malformed table: " . toString($tab));
+    }
+
+    if (!is_array($this->tables)) {
+      die_error("Can't addTable at this time! Use ->setTables() instead.");
+    }
+    $this->tables[] = &$new_tab;
+    
+    return $this;
+  }
+
+  function setColumns($columns) : self
+  {
+    if ($columns === "*") {
+      /* Obtain column names from database */
+      $sql = "SELECT * FROM `information_schema`.`columns` WHERE `table_name` IN "
+            . mysql_set(array_map([$this, "getTableName"], range(0, count($this->tables)-1))) . " ";
+      $res = mysql_select($this->db, $sql);
+      
+      $colsNames = [];
+      foreach ($res as $raw_col) {
+        $colsNames[] = $raw_col["TABLE_NAME"].".".$raw_col["COLUMN_NAME"];
+      }
+      return $this->setColumns($colsNames);
+    } else {
+      listify($columns);
+      $this->columns = [];
+      foreach ($columns as $col) {
+        $this->addColumn($col);
+      }
+    }
+    return $this;
+  }
+
+  function addColumn($col) : self
+  {
+    if (!count($this->tables)) {
+      die_error("Must specify the concerning tables before the columns, through ->setTables() or ->addTable().");
+    }
+
+    if (!is_array($this->columns)) {
+      die_error("Can't addColumn at this time! Use ->setColumns() instead.");
+    }
+
+    $new_col = $this->readColumn($col);
+
+    $this->check_columnName($new_col["name"]);
+
+    if ($new_col["attr_name"] === NULL) {
+      $new_col["attr_name"] = $new_col["name"];
+    }
+
+    $new_col["mysql_type"] = $this->obtain_ColumnMySQLType($new_col["name"]);
+
+    $this->columns[] = &$new_col;
+
+    return $this;
+  }
+
+  function readColumn($col) : array {
+    $new_col = [];
+    $new_col["name"] = NULL;
+    $new_col["treatment"] = NULL;
+    $new_col["attr_name"] = NULL;
+    $new_col["mysql_type"] = NULL;
+
+    if (is_string($col)) {
+      $new_col["name"] = $col;
+    } else if (is_array($col)) {
+      if(!is_string($col[0])) {
+        die_error("Malformed column name: " . toString($col[0])
+          . ". The name must be a string.");
+      }
+      $new_col["name"] = $col[0];
+      if (isset($col[1])) {
+        listify($col[1]);
+        $new_col["treatment"] = $col[1];
+      }
+      if (isset($col[2])) {
+        if(!is_string($col[0])) {
+          die_error("Malformed target attribute name for column: " . toString($col[2])
+            . ". The target name must be a string.");
+        }
+        $new_col["attr_name"] = $col[2];
+      }
+    } else {
+      die_error("Malformed column term: " . toString($col));
+    }
+    return $new_col;
+  }
+  function setOutputColumns($outputColumns) : self
+  {
+    if ($outputColumns === NULL) {
+      $this->outputColumns = [];
+    } else {
+      listify($outputColumns);
+      $this->outputColumns = [];
+      foreach ($outputColumns as $col) {
+        $this->addOutputColumn($col);
+      }
+    }
+    return $this;
+  }
+
+  function addOutputColumn($col) : self
+  {
+    if (!count($this->columns)) {
+      die_error("You must set the columns in use before the output columns.");
+    }
+
+    if (!is_array($this->outputColumns)) {
+      die_error("Can't addOutputColumn at this time! Use ->setOutputColumns() instead.");
+    }
+
+    $new_col = [];
+    $new_col["name"] = NULL;
+    $new_col["treatment"] = "ForceCategoricalIfNotEnum";
+    $new_col["joins"] = [];
+    $new_col["mysql_type"] = NULL;
+
+    $i_col = count($this->outputColumns);
+
+    if (is_string($col)) {
+      $new_col["name"] = $col;
+    } else if (is_array($col)) {
+      if(!is_string($col[0])) {
+        die_error("Malformed output column name: " . get_var_dump($col[0])
+          . ". The name must be a string.");
+      }
+      $new_col["name"] = $col[0];
+
+      if ($i_col == 0) {
+        if (isset($col[1])) {
+          $new_col["treatment"] = $col[1];
+        }
+      }
+      else {
+        if (isset($col[1])) {
+          $new_col["joins"] = $col[1];
+        }
+        if (isset($col[2])) {
+          $new_col["treatment"] = $col[2];
+        }
+      }
+    } else {
+      die_error("Malformed output column term: " . toString($col));
+    }
+
+    $this->check_columnName($new_col["name"]);
+
+    if ($this->identifierColumnName !== NULL
+      && $new_col["name"] == $this->identifierColumnName) {
+      die_error("Output column ('" . $new_col["name"]
+        . "') cannot be used as identifier.");
+    }
+
+    if (in_array($new_col["name"], $this->getColumnNames(true))) {
+      die_error("Output column '" . $new_col["name"] .
+        "' cannot also belong to inputColumns."
+        // . get_var_dump($this->getColumnNames(true))
+        );
+    }
+
+    $new_col["mysql_type"] = $this->obtain_ColumnMySQLType($new_col["name"]);
+
+    $this->outputColumns[] = &$new_col;
+
+    return $this;
+  }
+
+  function check_columnName(string $colName) : self
+  { 
+    if (count($this->tables) > 1) {
+      if (!preg_match("/.*\..*/i", $colName)) {
+        die_error("Invalid column name: '"
+          . $colName . "'. When reading more than one table, "
+          . "please specify column names in their 'table_name.column_name' format.");
+      }
+    }
+
+    return $this;
+  }
+
+  function obtain_ColumnMySQLType(string $colName) : string
+  {
+    /* Obtain column type */
+    $sql = "SELECT * FROM `information_schema`.`columns` WHERE `table_name` IN "
+          . mysql_set(array_map([$this, "getTableName"], range(0, count($this->tables)-1))) . " ";
+    $res = mysql_select($this->db, $sql);
+
+    /* Find column */
+    foreach ($res as $col) {
+      if (in_array($colName,
+          [$col["TABLE_NAME"].".".$col["COLUMN_NAME"], $col["COLUMN_NAME"]])) {
+        $mysql_column = $col;
+        break;
+      }
+    }
+    if ($mysql_column === NULL) {
+      die_error("Couldn't retrieve information about column \""
+        . $colName . "\"");
+    }
+    return $mysql_column["COLUMN_TYPE"];
+  }
+  
+
   /**
    * Load an existing discriminative model.
    * Defaulted to the model trained the most recently
@@ -543,11 +1106,11 @@ class DBFit {
     // $this->model->save(join_paths(MODELS_FOLDER, date("Y-m-d_H:i:s")));
     
     $this->model->dumpToDB($this->db,
-      str_replace(".", "_", $this->getOutputColumnName()));
-      // . "_" . join("", array_map([$this, "getColumnName"], range(0, count($this->columns)-1))));
+      str_replace(".", "_", $this->getOutputColumnNames()[0]));
+      // . "_" . join("", array_map([$this, "getColumnName"], ...).);
    
     $this->model->saveToDB($this->db,
-     str_replace(".", "_", $this->getOutputColumnName())
+     str_replace(".", "_", $this->getOutputColumnNames()[0])
      , $testData);
 
   }
@@ -637,7 +1200,7 @@ class DBFit {
     echo "updateModel took " . ($end - $start) . " seconds to complete." . PHP_EOL;
     
     $start = microtime(TRUE);
-    $this->model->LoadFromDB($this->db, str_replace(".", "_", $this->getOutputColumnName()));
+    $this->model->LoadFromDB($this->db, str_replace(".", "_", $this->getOutputColumnNames()[0]));
     $end = microtime(TRUE);
     echo "LoadFromDB took " . ($end - $start) . " seconds to complete." . PHP_EOL;
 
@@ -649,565 +1212,10 @@ class DBFit {
     }
   }
 
-  /* TODO explain */
-  function getColumnNames($IncludeIdCol = false) {
-    $cols = array_map([$this, "getColumnName"], range(0, count($this->columns)-1));
-    if ($IncludeIdCol && $this->identifierColumnName !== NULL) {
-      if (!in_array($this->identifierColumnName, $cols)) {
-        $cols[] = $this->identifierColumnName;
-      }
-    }
-    return $cols;
-  }
-
-  /* Need a nickname for every column when using table.column format,
-      since PHP MySQL connctions do not allow to access result fields
-      using this format */
-  function getColNickname($colName) {
-    return str_replace(".", "_DOT_", $colName);
-  }
-
-  /* TODO explain */
-  function getSQLSelectQuery($cols = NULL, $idVal = NULL) {
-    if ($cols === NULL) {
-      $cols = $this->getColumnNames(true);
-    }
-    listify($cols);
-    foreach ($cols as &$col) {
-      $col = $col . " AS " . $this->getColNickname($col);
-    }
-
-    $sql = "SELECT " . mysql_list($cols, "noop") . " FROM ";
-    
-    foreach ($this->tables as $k => $table) {
-      if ($k == 0) {
-      $sql .= $this->getTableName($k);
-      }
-      else {
-        $sql .= $this->getTableJoinType($k) . " " . $this->getTableName($k);
-        $crit = $this->getTableJoinCritera($k);
-        if (count($crit)) {
-          // TODO remove duplicate attributes
-          $sql .= " ON " . join(" AND ", $crit);
-        }
-      }
-      $sql .= " ";
-    }
-
-    $whereCriteria = [];
-    if ($this->whereCriteria !== NULL && count($this->whereCriteria)) {
-      $whereCriteria = array_merge($whereCriteria, $this->whereCriteria);
-    }
-    if ($idVal !== NULL) {
-      if($this->identifierColumnName === NULL)
-        die_error("An identifier column name must be set. Use ->setIdentifierColumnName()");
-      $whereCriteria[] = $this->identifierColumnName . " = $idVal";
-    }
-
-    if (count($whereCriteria)) {
-      $sql .= " WHERE " . join("AND ", $whereCriteria);
-    }
-
-    if ($this->limit !== NULL) {
-      if ($idVal === NULL) {
-        $sql .= " LIMIT {$this->limit}";
-      }
-      // else {
-      //   warn("Limit term ignored at predict time");
-      // }
-
-    }
-
-    return $sql;
-  }
-
-  function computeAttributesOfColumn($i_col)
-  {
-    $attr_name = $this->getColumnAttrName($i_col);
-
-    switch(true) {
-      /* Forcing a categorical attribute */
-      case $this->getColumnTreatmentType($i_col) == "ForceCategorical":
-        $attribute = [new DiscreteAttribute($attr_name, "enum")];
-        break;
-      /* Enum column */
-      case $this->getColumnAttrType($i_col) == "enum":
-        $domain_arr_str = (preg_replace("/enum\((.*)\)/i", "[$1]", $this->getColumnMySQLType($i_col)));
-        eval("\$domain_arr = " . $domain_arr_str . ";");
-        $attribute = [new DiscreteAttribute($attr_name, "enum", $domain_arr)];
-        break;
-      /* Forcing a categorical attribute */
-      case $this->getColumnTreatmentType($i_col) == "ForceCategoricalIfNotEnum":
-        $attribute = [new DiscreteAttribute($attr_name, "enum")];
-        break;
-      /* Forcing a set of binary categorical attributes */
-      case $this->getColumnTreatmentType($i_col) == "ForceBinary":
-        
-        /* Find classes */
-        $classes = [];
-        $sql = $this->getSQLSelectQuery($this->getColumnName($i_col));
-        $res = mysql_select($this->db, $sql);
-
-        foreach ($res as $raw_row) {
-          $class = $raw_row[$this->getColNickname($this->getColumnName($i_col))];
-          $classes[$class] = 0;
-        }
-        $classes = array_keys($classes);
-
-        // var_dump($classes);
-        $attribute = [];
-
-        foreach ($classes as $class) {
-          $attribute[] = new DiscreteAttribute($attr_name . "/" . $class, "bool", ["0", "1"]);
-        }
-        $this->setColumnTreatmentArg($i_col, 0, $classes);
-
-        break;
-      /* Numeric column */
-      case in_array($this->getColumnAttrType($i_col), ["int", "float", "double"]):
-        $attribute = [new ContinuousAttribute($attr_name, $this->getColumnAttrType($i_col))];
-        break;
-      /* Boolean column */
-      case in_array($this->getColumnAttrType($i_col), ["bool", "boolean"]):
-        $attribute = [new DiscreteAttribute($attr_name, "bool", ["0", "1"])];
-        break;
-      /* Text column */
-      case $this->getColumnAttrType($i_col) == "text":
-        switch($this->getColumnTreatmentType($i_col)) {
-          case "BinaryBagOfWords":
-            /* Binary attributes indicating the presence of each word */
-            $generateDictAttrs = function($dict) use ($attr_name, $i_col) {
-              $attribute = [];
-              foreach ($dict as $word) {
-                $attribute[] = new DiscreteAttribute("'$word' in $attr_name",
-                  "word_presence", ["N", "Y"]);
-              }
-              $this->setColumnTreatmentArg($i_col, 0, $dict);
-              return $attribute;
-            };
-
-            /* The argument can be the dictionary size (k), or more directly the dictionary */
-            if ( is_integer($this->getColumnTreatmentArg($i_col, 0))) {
-              $k = $this->getColumnTreatmentArg($i_col, 0);
-
-              /* Find $k most frequent words */
-              $word_counts = [];
-              $sql = $this->getSQLSelectQuery($this->getColumnName($i_col));
-              $res = mysql_select($this->db, $sql);
-              
-              if (!isset($this->stop_words)) {
-                $lang = "en";
-                $this->stop_words = explode("\n", file_get_contents($lang . "-stopwords.txt"));
-              }
-              foreach ($res as $raw_row) {
-                $text = $raw_row[$this->getColNickname($this->getColumnName($i_col))];
-                
-                $words = $this->text2words($text);
-
-                foreach ($words as $word) {
-                  if (!isset($word_counts[$word]))
-                    $word_counts[$word] = 0;
-                  $word_counts[$word] += 1;
-                }
-              }
-              // var_dump($word_counts);
-              
-              if (!count($word_counts)) {
-                warn("Couldn't derive a BinaryBagOfWords dictionary for attribute \"" .
-                  $this->getColumnName($i_col) . "\". This column will be ignored.");
-
-                $attribute = NULL;
-              } else {
-                $dict = [];
-                // TODO optimize this?
-                foreach (range(0, $k-1) as $i) {
-                  $max_count = max($word_counts);
-                  $max_word = array_search($max_count, $word_counts);
-                  $dict[] = $max_word;
-                  unset($word_counts[$max_word]);
-                  if (!count($word_counts)) {
-                    break;
-                  }
-                }
-                // var_dump($dict);
-                
-                if (count($dict) < $k) {
-                  warn("Couldn't derive a BinaryBagOfWords dictionary of size $k for attribute \"" 
-                    . $this->getColumnName($i_col) . "\". Dictionary of size "
-                    . count($dict) . " will be used.");
-                }
-                $attribute = $generateDictAttrs($dict);
-              }
-            }
-            else if (is_array($this->getColumnTreatmentArg($i_col, 0))) {
-              $dict = $this->getColumnTreatmentArg($i_col, 0);
-              $attribute = $generateDictAttrs($dict);
-            }
-            else {
-              die_error("Please specify a parameter (dictionary or dictionary size)"
-                . " for bag-of-words"
-                . " processing column '" . $this->getColumnName($i_col) . "'.");
-            }
-            break;
-          default:
-            die_error("Unknown treatment for text column \""
-               . $this->getColumnName($i_col) . "\" : "
-               . get_var_dump($this->getColumnTreatmentType($i_col)));
-            break;
-        }
-        break;
-      default:
-        die_error("Unknown column type: " . $this->getColumnMySQLType($i_col));
-        break;
-    }
-    return $attribute;
-  }
-  // TODO use Nlptools
-  function text2words($text) {
-    if ($text === NULL) {
-      return [];
-    }
-    $text = strtolower($text);
-    
-    # to keep letters only (remove punctuation and such)
-    $text = preg_replace('/[^a-z]+/i', '_', $text);
-    
-    # tokenize
-    $words = array_filter(explode("_", $text));
-
-    # remove stopwords
-    $words = array_diff($words, $this->stop_words);
-
-    # lemmatize
-    // lemmatize($text)
-
-    # stem
-    $words = array_map(["PorterStemmer", "Stem"], $words);
-    
-    return $words;
-  }
-
-
-  static function isEnumType(string $mysql_type) {
-    return preg_match("/enum.*/i", $mysql_type);
-  }
-
-  static function isTextType(string $mysql_type) {
-    return preg_match("/varchar.*/i", $mysql_type) ||
-           preg_match("/text.*/i", $mysql_type);
-  }
-
-
-  function getTableName(int $i) : string {
-    return $this->tables[$i]["name"];
-  }
-  function &getTableJoinCritera(int $i) {
-    return $this->tables[$i]["join_criteria"];
-  }
-  function &getTableJoinType(int $i) {
-    return $this->tables[$i]["join_type"];
-  }
-
-  function getColumnName(int $i, bool $force_no_table_name = false) : string {
-    $n = $this->columns[$i]["name"];
-    return $force_no_table_name && count(explode(".", $n)) > 1 ? explode(".", $n)[1] : $n;
-  }
-  function &getColumnTreatment(int $i) {
-    if ($this->columns[$i]["treatment"] !== NULL)
-      listify($this->columns[$i]["treatment"]);
-    $tr = &$this->columns[$i]["treatment"];
-    if (($tr === NULL) && $this->getColumnAttrType($i, $tr) === "text"
-           && isset($this->defaultOptions["TextTreatment"])) {
-      $this->setColumnTreatment($i, $this->defaultOptions["TextTreatment"]);
-      return $this->getColumnTreatment($i);
-    }
-
-    return $tr;
-  }
-  function getColumnTreatmentType(int $i) {
-    $tr = $this->getColumnTreatment($i);
-    $t = !is_array($tr) ? $tr : $tr[0];
-    return $t;
-  }
-  function getColumnTreatmentArg(int $i, int $j) {
-    $tr = $this->getColumnTreatment($i);
-    return !is_array($tr) || !isset($tr[1+$j]) ? NULL : $tr[1+$j];
-  }
-  function setColumnTreatment(int $i, $val) {
-    $this->columns[$i]["treatment"] = $val;
-  }
-  function setColumnTreatmentArg(int $i, int $j, $val) {
-    $this->getColumnTreatment($i)[1+$j] = $val;
-  }
-  function getColumnAttrName(int $i) {
-    $col = $this->columns[$i];
-    return !array_key_exists("attr_name", $col) ?
-        $this->getColumnName($i, true) : $col["attr_name"];
-  }
-
-  function getColumnMySQLType(int $i) {
-    $col = $this->columns[$i];
-    return $col["mysql_type"];
-  }
-  function setColumnMySQLType(int $i, $val) {
-    $this->columns[$i]["mysql_type"] = $val;
-  }
-
-  function getColumnAttrType(int $i, $tr = -1) {
-    $mysql_type = $this->getColumnMySQLType($i);
-    if (self::isEnumType($mysql_type)) {
-      return "enum";
-    }
-    else if (self::isTextType($mysql_type)) {
-      return "text";
-    } else {
-      if ($tr === -1) {
-        $tr = $this->getColumnTreatmentType($i);
-      }
-      if (isset(self::$col2attr_type[$mysql_type])) {
-        return self::$col2attr_type[$mysql_type][$tr];
-      } else {
-        die_error("Unknokn column type: \"$mysql_type\"! Code must be expanded to cover this one!");
-      }
-    }
-  }
-
-
-  function getDb() : object
-  {
-    return $this->db;
-  }
-
-  function setDb(object $db) : self
-  {
-    $this->db = $db;
-    return $this;
-  }
-
-  function setTables($tables) : self
-  {
-    listify($tables);
-    $this->tables = [];
-    foreach ($tables as $table) {
-      $this->addTable($table);
-    }
-
-    return $this;
-  }
-
-  function addTable($tab) : self
-  {
-    $new_tab = [];
-    $new_tab["name"] = NULL;
-    $new_tab["join_criteria"] = [];
-    $new_tab["join_type"] = count($this->tables) ? "INNER JOIN" : "";
-
-    if (is_string($tab)) {
-      $new_tab["name"] = $tab;
-    } else if (is_array($tab)) {
-      $new_tab["name"] = $tab[0];
-      if (isset($tab[1])) {
-        if (!count($this->tables)) {
-          die_error("Join criteria can't be specified for the first specified table: "
-          . "\"{$tab[0]}\": ");
-        }
-
-        listify($tab[1]);
-        $new_tab["join_criteria"] = $tab[1];
-      }
-      if (isset($tab[2])) {
-        $new_tab["join_type"] = $tab[2];
-      }
-    } else {
-      die_error("Malformed table: " . toString($tab));
-    }
-
-    if (!is_array($this->tables)) {
-      die_error("Can't addTable at this time! Use ->setTables() instead.");
-    }
-    $this->tables[] = &$new_tab;
-    
-    return $this;
-  }
-
-  function setColumns($columns) : self
-  {
-    if (!count($this->tables)) {
-      die_error("Must specify the concerning tables before the columns, through ->setTables() or ->addTable().");
-    }
-
-    if ($columns === "*") {
-      /* Obtain column names from database */
-      $sql = "SELECT * FROM `information_schema`.`columns` WHERE `table_name` IN "
-            . mysql_set(array_map([$this, "getTableName"], range(0, count($this->tables)-1))) . " ";
-      $res = mysql_select($this->db, $sql);
-      
-      $colsNames = [];
-      foreach ($res as $raw_col) {
-        $colsNames[] = $raw_col["TABLE_NAME"].".".$raw_col["COLUMN_NAME"];
-      }
-      return $this->setColumns($colsNames);
-    } else {
-      listify($columns);
-      $this->columns = [];
-      foreach ($columns as $col) {
-        $this->addColumn($col);
-      }
-    }
-    return $this;
-  }
-
-  function addColumn($col) : self
-  {
-    if (!is_array($this->columns)) {
-      die_error("Can't addColumn at this time! Use ->setColumns() instead.");
-    }
-
-    $new_col = [];
-    $new_col["name"] = NULL;
-    $new_col["treatment"] = NULL;
-    $new_col["attr_name"] = NULL;
-    $new_col["mysql_type"] = NULL;
-
-    if (is_string($col)) {
-      $new_col["name"] = $col;
-    } else if (is_array($col)) {
-      if(!is_string($col[0])) {
-        die_error("Malformed column name: " . toString($col[0])
-          . ". The name must be a string.");
-      }
-      $new_col["name"] = $col[0];
-      if (isset($col[1])) {
-        listify($col[1]);
-        $new_col["treatment"] = $col[1];
-      }
-      if (isset($col[2])) {
-        if(!is_string($col[0])) {
-          die_error("Malformed target attribute name for column: " . toString($col[2])
-            . ". The target name must be a string.");
-        }
-        $new_col["attr_name"] = $col[2];
-      }
-    } else {
-      die_error("Malformed column term: " . toString($col));
-    }
-
-    if ($new_col["attr_name"] === NULL) {
-      $new_col["attr_name"] = $new_col["name"];
-    }
-
-    /* Obtain column type */
-    $sql = "SELECT * FROM `information_schema`.`columns` WHERE `table_name` IN "
-          . mysql_set(array_map([$this, "getTableName"], range(0, count($this->tables)-1))) . " ";
-    $res = mysql_select($this->db, $sql);
-
-    /* Find column */
-    foreach ($res as $col) {
-      if (in_array($new_col["name"],
-          [$col["TABLE_NAME"].".".$col["COLUMN_NAME"], $col["COLUMN_NAME"]])) {
-        $mysql_column = $col;
-        break;
-      }
-    }
-    if ($mysql_column === NULL) {
-      die_error("Couldn't retrieve information about column \""
-        . $new_col["name"] . "\"");
-    }
-    $new_col["mysql_type"] = $mysql_column["COLUMN_TYPE"];
-
-    $this->columns[] = &$new_col;
-
-    return $this;
-  }
-
-  function setOutputColumns($outputColumns) : self
-  {
-    if ($outputColumns === NULL) {
-      $this->outputColumns = [];
-    } else {
-      listify($outputColumns);
-      $this->outputColumns = [];
-      foreach ($outputColumns as $col) {
-        $this->addOutputColumn($col);
-      }
-    }
-    return $this;
-  }
-
-  function addOutputColumn($col) : self
-  {
-    if (!is_array($this->outputColumns)) {
-      die_error("Can't addOutputColumn at this time! Use ->setOutputColumns() instead.");
-    }
-
-    $new_col = [];
-    $new_col["name"] = NULL;
-    $new_col["joins"] = [];
-
-    if (is_string($col)) {
-      $new_col["name"] = $col;
-    } else if (is_array($col)) {
-      if(!is_string($col[0])) {
-        die_error("Malformed output column name: " . get_var_dump($col[0])
-          . ". The name must be a string.");
-      }
-
-      $new_col["name"] = $col[0];
-      if (isset($col[1])) {
-        $new_col["joins"] = $col[1];
-      }
-    } else {
-      die_error("Malformed output column term: " . toString($col));
-    }
-
-    if (!count($this->columns)) {
-      die_error("You must set the columns in use before the output columns.");
-    }
-    if (!in_array($new_col["name"], $this->getColumnNames(true))) {
-      warn("Output column '" . $new_col["name"] . "' not found in columns."
-        // . get_var_dump($this->getColumnNames(true))
-        );
-      // TODO fix this: the i-th output column doesn't have to be in columns,
-      //  it can even simply be introduced at that hierarchical level by means of
-      //  joins. Maybe at this point, even the first output column doesn't have
-      //  to appear in columns.
-    }
-    if ($this->identifierColumnName !== NULL
-      && $new_col["name"] == $this->identifierColumnName) {
-      die_error("Output column ('" . $new_col["name"]
-        . "') cannot be used as identifier.");
-    }
-
-    $this->outputColumns[] = &$new_col;
-
-    foreach ($this->columns as $i_col => $col) {
-      if ($this->getColumnName($i_col) == $new_col["name"]) {
-        if ($this->getColumnTreatment($i_col) === NULL) {
-          $this->setColumnTreatment($i_col, "ForceCategoricalIfNotEnum");
-          die_error("check this" . $this->getColumnTreatment($i_col));
-        }
-      }
-    }
-    return $this;
-  }
-
-  function getOutputColumnName() : string
-  {
-    die_error("TODO remove getOutputColumnName()");
-    return $this->outputColumnName;
-  }
-
-  function setOutputColumnName(?string $outputColumnName, $treatment = NULL) : self
+  function setOutputColumnName(?string $outputColumnName, $treatment = "ForceCategoricalIfNotEnum") : self
   {
     if ($outputColumnName !== NULL) {
-      foreach ($this->columns as $i_col => $col) {
-        if ($this->getColumnName($i_col) == $outputColumnName) {
-          $this->setColumnTreatment($i_col, $treatment);
-          die_error("check this" . $this->getColumnTreatment($i_col));
-        }
-      }
-      var_dump($outputColumnName);
-      return $this->setOutputColumns([[$outputColumnName]]);
+      return $this->setOutputColumns([[$outputColumnName, $treatment]]);
     }
     else {
       return $this->setOutputColumns([]);
@@ -1221,9 +1229,11 @@ class DBFit {
 
   function setIdentifierColumnName(?string $identifierColumnName) : self
   {
-    if ($this->outputColumnName !== NULL && $identifierColumnName !== NULL
-      && $this->outputColumnName == $identifierColumnName) {
-      die_error("Identifier column ('{$identifierColumnName}') cannot be considered as the output column.");
+    if ($identifierColumnName !== NULL) {
+      if(in_array($identifierColumnName, $this->getOutputColumnNames())) {
+        die_error("Identifier column ('{$identifierColumnName}') cannot be considered as the output column.");
+      }
+      $this->check_columnName($identifierColumnName);
     }
     $this->identifierColumnName = $identifierColumnName;
     return $this;

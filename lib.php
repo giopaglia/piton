@@ -62,6 +62,16 @@ function toString($a)
       return get_arr_dump($a);
       break;
     
+    case $a === NULL:
+      return "<i>NULL</i>";
+      break;
+    case $a === false:
+      return "<i><p style='color:red'>false</p></i>";
+      break;
+    case $a === true:
+      return "<i><p style='color:green'>true</p></i>";
+      break;
+    
     default:
       return strval($a);
       break;

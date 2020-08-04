@@ -27,10 +27,10 @@ TODOs:
 *                                                   *
 ****************************************************/
 
-testMed3();
-exit();
-testMed2();
-exit();
+// testMed3();
+// exit();
+// testMed2();
+// exit();
 testMed();
 exit();
 testSPAM();
@@ -453,12 +453,11 @@ function testMed() {
 "RaccomandazioniTerapeutiche.SOSPENSIONE_TERAPIA_CHECKBOX",
 "RaccomandazioniTerapeutiche.SOSPENSIONE_TERAPIA_FARMACO",
 "RaccomandazioniTerapeutiche.SOSPENSIONE_TERAPIA_MESI",
-"RaccomandazioniTerapeuticheUnitarie.TIPO",
 "Referti.DATA_ANNULLA",
 "Referti.MOTIVO_ANNULLA",
 "Referti.STATO",
 ]);
-  $db_fit->setLimit(10);
+  // $db_fit->setLimit(100);
   // $db_fit->setLimit(1000);
   $db_fit->setOutputColumnName("RaccomandazioniTerapeuticheUnitarie.TIPO", "ForceBinary");
   $lr = new PRip();
