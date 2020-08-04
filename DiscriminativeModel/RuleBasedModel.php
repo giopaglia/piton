@@ -94,6 +94,9 @@ abstract class DiscriminativeModel {
     $obj = unserialize($res->fetch_assoc()["dump"]);
     return $obj;
   }
+
+  /* Print a textual representation of the rule */
+  abstract function __toString () : string;
 }
 
 /*
@@ -322,6 +325,16 @@ class RuleBasedModel extends DiscriminativeModel {
   public function resetRules()
   {
     return $this->setRules([]);
+  }
+
+  /* Print a textual representation of the rule */
+  function __toString () : string {
+    $out_str = "";
+    $out_str .= "RuleBasedModel with rules: " . PHP_EOL;
+    foreach ($this->getRules() as $x => $rule) {
+      $out_str .= $x . ": " . $rule->toString() . PHP_EOL;
+    }
+    return $out_str;
   }
 }
 

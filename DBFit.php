@@ -67,11 +67,11 @@ class DBFit {
   /* An identifier column, used during sql-based prediction */
   private $identifierColumnName;
 
-  /* Optimizer in use for training the model */
+  /* Optimizer in use for training the models */
   private $learner;
 
-  /* Discriminative model trained/loaded */
-  private $model;
+  /* Discriminative models trained or loaded */
+  private $models;
 
   /* Training mode (e.g full training, or perform train/test split) */
   static private $defTrainingMode = [80, 20];
@@ -117,13 +117,13 @@ class DBFit {
     $this->whereCriteria = NULL;
     $this->limit = NULL;
 
-    $this->model = NULL;
+    $this->models = [];
     $this->learner = NULL;
     $this->trainingMode = NULL;
   }
 
   /** Read data & pre-process it */
-  private function readData($idVal = NULL, $recursionPath = []) {
+  private function readData($idVal = NULL, array $recursionPath = []) : array {
 
     echo "DBFit->readData()" . PHP_EOL;
     /* Checks */
@@ -506,7 +506,7 @@ class DBFit {
   }
 
   /* TODO explain */
-  function getSQLSelectQuery($colNames, $idVal = NULL, $recursionPath = []) {
+  function getSQLSelectQuery($colNames, $idVal = NULL, array $recursionPath = []) : string {
     if ($colNames === NULL) {
       $colNames = $this->getColumnNames(true);
     }
@@ -1074,28 +1074,29 @@ class DBFit {
   
 
   /**
-   * Load an existing discriminative model.
-   * Defaulted to the model trained the most recently
+   * Load an existing set of discriminative models.
+   * Defaulted to the models trained the most recently
    */
-  function loadModel(?string $path = NULL) {
-    echo "DBFit->loadModel($path)" . PHP_EOL;
+  // function loadModel(?string $path = NULL) {
+  //   echo "DBFit->loadModel($path)" . PHP_EOL;
     
-    /* Default path to that of the latest model */
-    if ($path === NULL) {
-      $models = filesin(MODELS_FOLDER);
-      if (count($models) == 0) {
-        die_error("loadModel: No model to load in folder: \"". MODELS_FOLDER . "\"");
-      }
-      sort($models, true);
-      $path = $models[0];
-      echo "$path";
-    }
+  //   die_error("TODO loadModel, load the full hierarchy");
+  //   /* Default path to that of the latest model */
+  //   if ($path === NULL) {
+  //     $models = filesin(MODELS_FOLDER);
+  //     if (count($models) == 0) {
+  //       die_error("loadModel: No model to load in folder: \"". MODELS_FOLDER . "\"");
+  //     }
+  //     sort($models, true);
+  //     $path = $models[0];
+  //     echo "$path";
+  //   }
 
-    $this->model = DiscriminativeModel::loadFromFile($path);
-  }
+  //   $this->models = [DiscriminativeModel::loadFromFile($path)];
+  // }
 
-  /* Train and test a model on the data, and save to database */
-  function updateModel($recursionPath = []) {
+  /* Train and test all the model tree on the available data, and save to database */
+  function updateModel(array $recursionPath = []) {
     echo "DBFit->updateModel(" . toString($recursionPath) . ")" . PHP_EOL;
     
     $recursionLevel = count($recursionPath);
@@ -1103,18 +1104,7 @@ class DBFit {
     if(!($this->learner instanceof Learner))
       die_error("Learner is not initialized. Use ->setLearner() or ->setLearningMethod()");
 
-    if(!($this->model instanceof DiscriminativeModel))
-      die_error("Model is not initialized");
-
     $dataframes = $this->readData(NULL, $recursionPath);
-
-    $name_chunks = [];
-    foreach ($recursionPath as $depth => $node) {
-      $name_chunks[] =
-        str_replace(".", ":", $this->getOutputColumnAttributes()[$depth][$node[0]]->getName())
-        . "=" . $node[1];
-    }
-    $path_name = join("-", $name_chunks);
 
     // TODO note since the four root problems are independent, we use  splits that can be different (due to randomization)
     foreach ($dataframes as $i_prob => $data) {
@@ -1126,25 +1116,22 @@ class DBFit {
       echo "TEST" . PHP_EOL . $testData->toString(true) . PHP_EOL;
       
       /* Train */
-      $this->model->fit($trainData, $this->learner);
+      $model_name = $this->getModelName($recursionPath, $i_prob);
+      $model = $this->learner->initModel();
+      $this->models[$model_name] = &$model;
+
+      $model->fit($trainData, $this->learner);
       
-      echo "Ultimately, here are the extracted rules: " . PHP_EOL;
-      foreach ($this->model->getRules() as $x => $rule) {
-        echo $x . ": " . $rule->toString() . PHP_EOL;
-      }
+      echo "Trained model '$model_name' : " . PHP_EOL . $model . PHP_EOL;
 
       /* Test */
-      $this->test($testData);
-      // $this->model->save(join_paths(MODELS_FOLDER, date("Y-m-d_H:i:s")));
+      $this->test($model, $testData);
+      // $model->save(join_paths(MODELS_FOLDER, date("Y-m-d_H:i:s")));
 
-      $model_name = $path_name . "__" . 
-        str_replace(".", ":",
-           $this->getOutputColumnAttributes()[count($recursionPath)][$i_prob]->getName());
-
-      $this->model->dumpToDB($this->db, $model_name);
+      $model->dumpToDB($this->db, $model_name);
         // . "_" . join("", array_map([$this, "getColumnName"], ...).);
      
-      $this->model->saveToDB($this->db, $model_name, $testData);
+      $model->saveToDB($this->db, $model_name, $testData);
 
       /* For each output class value, recurse and train the subtree */
       
@@ -1168,48 +1155,56 @@ class DBFit {
     }
   }
 
-  /* Use the model for predicting on a set of instances */
-  function predict(Instances $inputData) : array {
-    echo "DBFit->predict(" . $inputData->toString(true) . ")" . PHP_EOL;
-
-    if(!($this->model instanceof DiscriminativeModel))
-      die_error("Model is not initialized");
-
-    return $this->model->predict($inputData);
-  }
-
   /* Use the model for predicting the value of the output columns for a new instance,
       identified by the identifier column */
-  function predictByIdentifier(string $idVal) : array {
-    echo "DBFit->predictByIdentifier($idVal)" . PHP_EOL;
+  function predictByIdentifier(string $idVal, array $recursionPath = []) : array {
+    echo "DBFit->predictByIdentifier($idVal, " . toString($recursionPath) . ")" . PHP_EOL;
 
-    if(!($this->model instanceof DiscriminativeModel))
-      die_error("Model is not initialized");
+    $recursionLevel = count($recursionPath);
 
     if($this->identifierColumnName === NULL)
       die_error("In order to predictByIdentifier, an identifierColumnName must be set."
         . " Use ->setIdentifierColumnName()");
 
     $predictions = [];
+    
+    $dataframes = $this->readData($idVal, $recursionPath);
 
-    /* For each recursion level */
-    foreach ($this->outputColumns as $outputColumnName)
-    {
-      //TODO at prediction time you must load more models...
-      $dataframes = $this->readData($idVal);
+    foreach ($dataframes as $i_prob => $data) {
+      echo "Problem $i_prob/" . count($dataframes) . PHP_EOL;
 
-      foreach ($dataframes as $i_prob => $data) {
-        echo "Problem $i_prob/" . count($dataframes) . PHP_EOL;
+      if(false && $idVal !== NULL && $data->numInstances() !== 1) {
+        // TODO figure out, possible?
+        die_error("Found more than one instance at predict time. {$this->identifierColumnName} = $idVal");
+      }
 
-        if(false && $idVal !== NULL && $data->numInstances() !== 1) {
-          // TODO figure out, possible?
-          die_error("Found more than one instance at predict time. {$this->identifierColumnName} = $idVal");
+      /* Test */
+      $model_name = $this->getModelName($recursionPath, $i_prob);
+      if(!(isset($this->models[$model_name]))) {
+        die_error("Model '$model_name' is not initialized");
+      }
+      $model = $this->models[$model_name];
+      if(!($model instanceof DiscriminativeModel)) {
+        die_error("Something's off. Model '$model_name' is not a DiscriminativeModel. " . get_var_dump($model));
+      }
+      echo "Testing model '$model_name' : " . PHP_EOL . $model . PHP_EOL;
+
+      // var_dump($data);
+      $predictedVal = $model->predict($data);
+      echo("predictedVal: ");
+      var_dump($predictedVal);
+
+      if ($recursionLevel+1 == count($this->outputColumns)) {
+        echo "Test-time recursion stops here (recursionPath = " . toString($recursionPath)
+           . ", problem $i_prob/" . count($dataframes) . "). " . PHP_EOL;
+        $predictions[] = $predictedVal;
+      }
+      else {
+        die_error("TODO recursion");
+        $subPaths = $this->predictByIdentifier($idVal, $recursionPath);
+        foreach ($subPaths as $subPath) {
+          $predictions[] = array_merge([$predictedVal], $subPath);
         }
-
-        // var_dump($data);
-        $predict = $this->predict($data);
-        // var_dump($predict);
-        $predictions[] = $predict;
       }
     }
     echo "predictions " . PHP_EOL;
@@ -1217,8 +1212,37 @@ class DBFit {
     return $predictions;
   }
 
-  // Test the model
-  function test(Instances $testData) {
+  /* TODO explain */
+  function getModelName(array $recursionPath, int $i_prob) : string {
+    $name_chunks = [];
+    foreach ($recursionPath as $depth => $node) {
+      $name_chunks[] =
+        str_replace(".", ":", $this->getOutputColumnAttributes()[$depth][$node[0]]->getName())
+        . "=" . $node[1];
+    }
+    $path_name = join("-", $name_chunks);
+    return $path_name . "__" . 
+        str_replace(".", ":",
+           $this->getOutputColumnAttributes()[count($recursionPath)][$i_prob]->getName());
+
+  }
+  /* Use the model for predicting on a set of instances */
+  function predict(Instances $inputData) : array {
+    echo "DBFit->predict(" . $inputData->toString(true) . ")" . PHP_EOL;
+
+    if (count($this->models) > 1) {
+      die_error("Can't use predict with multiple models. By the way, TODO this function has to go.");
+    }
+    $model = $this->models[array_key_last($this->models)];
+    if(!($model instanceof DiscriminativeModel))
+      die_error("Model is not initialized");
+
+    die_error("TODO check if predict still works");
+    return $model->predict($inputData);
+  }
+
+  // Test a model
+  function test(DiscriminativeModel $model, Instances $testData) {
     echo "DBFit->test(" . $testData->toString(true) . ")" . PHP_EOL;
 
     $ground_truths = [];
@@ -1229,7 +1253,7 @@ class DBFit {
     }
 
     // $testData->dropOutputAttr();
-    $predictions = $this->predict($testData);
+    $predictions = $model->predict($testData);
     
     // echo "\$ground_truths : " . get_var_dump($ground_truths) . PHP_EOL;
     // echo "\$predictions : " . get_var_dump($predictions) . PHP_EOL;
@@ -1327,8 +1351,6 @@ class DBFit {
   function setLearner(Learner $learner) : self
   {
     $this->learner = $learner;
-
-    $this->model = $this->learner->initModel();
 
     return $this;
   }
