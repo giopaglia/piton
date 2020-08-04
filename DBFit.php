@@ -257,9 +257,9 @@ class DBFit {
       }
     }
 
-    echo "this->columns: " . PHP_EOL; var_dump($this->columns);
-    echo "attributes: " . PHP_EOL; var_dump($attributes);
-    echo "final_attributes: " . PHP_EOL; var_dump($final_attributes);
+    // echo "this->columns: " . PHP_EOL; var_dump($this->columns);
+    // echo "attributes: " . PHP_EOL; var_dump($attributes);
+    // echo "final_attributes: " . PHP_EOL; var_dump($final_attributes);
     
     // var_dump($final_data);
     
@@ -286,7 +286,7 @@ class DBFit {
       // var_dump($data);
       $dataframe = new Instances($attrs, $data);
       
-      echo $dataframe->toString(false);
+      // echo $dataframe->toString(false);
       
       if (DEBUGMODE && $idVal === NULL) {
         $dataframe->save_ARFF("instances");
@@ -428,7 +428,7 @@ class DBFit {
                   . ", but merging on column " . $this->getColumnName($columns[$i_col])
                   . " ($i_col) failed. "
                   . get_var_dump($z[0]) . get_var_dump($z[1])
-                  . get_var_dump($attr_vals_orig) . get_var_dump($attr_vals)
+                  // . get_var_dump($attr_vals_orig) . get_var_dump($attr_vals)
                   . "Suggestion: explicitly ask to ignore this column." //TODO
                   // ". The identifier column must unique identify each data instance."
                           //   // . get_var_dump($row) . "\n"
@@ -1124,7 +1124,8 @@ class DBFit {
 
       $model->fit($trainData, $this->learner);
       
-      echo "Trained model '$model_name' : " . PHP_EOL . $model . PHP_EOL;
+      echo "Trained model '$model_name'." . PHP_EOL;
+      // echo "Trained model '$model_name' : " . PHP_EOL . $model . PHP_EOL;
 
       /* Test */
       $this->test($model, $testData);
@@ -1175,7 +1176,7 @@ class DBFit {
 
     foreach ($dataframes as $i_prob => $data) {
       echo "Problem $i_prob/" . count($dataframes) . PHP_EOL;
-      echo "Data: " . $data->toString(true) . PHP_EOL;
+      // echo "Data: " . $data->toString(true) . PHP_EOL;
 
       if(false && $idVal !== NULL && $data->numInstances() !== 1) {
         // TODO figure out, possible?
@@ -1191,10 +1192,11 @@ class DBFit {
       if(!($model instanceof DiscriminativeModel)) {
         die_error("Something's off. Model '$model_name' is not a DiscriminativeModel. " . get_var_dump($model));
       }
-      echo "Testing model '$model_name' : " . PHP_EOL . $model . PHP_EOL;
+      echo "Testing model '$model_name'." . PHP_EOL;
+      // echo "Testing model '$model_name' : " . PHP_EOL . $model . PHP_EOL;
 
       // var_dump($data);
-      var_dump($model->getAttributes());
+      // var_dump($model->getAttributes());
       $predictedVal = $model->predict($data);
       echo("predictedVal: ");
       var_dump($predictedVal);
@@ -1421,7 +1423,7 @@ class DBFit {
       case is_array($this->trainingMode):
         $trRat = $this->trainingMode[0]/($this->trainingMode[0]+$this->trainingMode[1]);
         // TODO 
-        $data->randomize();
+        // $data->randomize();
         $rt = Instances::partition($data, $trRat);
         
         break;

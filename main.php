@@ -29,10 +29,10 @@ TODOs:
 
 // testMed3();
 // exit();
-// testMed2();
-// exit();
-// testMed();
-// exit();
+testMed2();
+exit();
+testMed();
+exit();
 testSPAM();
 exit();
 testSillyWithJoin();
@@ -219,7 +219,7 @@ function testMed3() {
 "Referti.STATO",
 ]);
   // $db_fit->setAllColumnsExcept("RaccomandazioniTerapeuticheUnitarie.ID");
-  $db_fit->setLimit(100);
+  // $db_fit->setLimit(100);
   // $db_fit->setLimit(1000);
   $db_fit->setOutputColumns([
     ["RaccomandazioniTerapeuticheUnitarie.TIPO"],
@@ -262,8 +262,22 @@ function testMed2() {
   $db_fit->setIdentifierColumnName("RaccomandazioniTerapeuticheUnitarie.ID");
   $db_fit->setDefaultOption("TextTreatment", ["BinaryBagOfWords", 10]);
   $db_fit->setColumns("*");
-  $db_fit->setLimit(10);
-  // $db_fit->setLimit(1000);
+  $db_fit->setColumns([
+    "RaccomandazioniTerapeutiche.DATA_ANNULLA",
+    "RaccomandazioniTerapeutiche.MOTIVO_ANNULLA",
+    "RaccomandazioniTerapeutiche.STATO",
+    "RaccomandazioniTerapeutiche.DATA_SALVA",
+    "RaccomandazioniTerapeutiche.ALTRO",
+    "RaccomandazioniTerapeutiche.ALTRO_CHECKBOX",
+    "RaccomandazioniTerapeutiche.SOSPENSIONE_TERAPIA_CHECKBOX",
+    "RaccomandazioniTerapeutiche.SOSPENSIONE_TERAPIA_FARMACO",
+    "RaccomandazioniTerapeutiche.SOSPENSIONE_TERAPIA_MESI",
+    "Referti.DATA_ANNULLA",
+    "Referti.MOTIVO_ANNULLA",
+    "Referti.STATO",
+  ]);
+  // $db_fit->setLimit(10);
+  // $db_fit->setLimit(100);
   $db_fit->setOutputColumnName("RaccomandazioniTerapeuticheUnitarie.TIPO"
   // , "ForceBinary"
   );
