@@ -178,7 +178,7 @@ class DBFit {
     $colsNeeded = array_merge($colsNeeded, $this->getColumns(true));
     $colsNeeded = array_map([$this, "getColumnName"], $colsNeeded);
 
-    var_dump($columns);
+    // var_dump($columns);
 
     echo "Recursion level: " . $recursionLevel . PHP_EOL;
     echo "Reading " . count($columns) . " columns..." . PHP_EOL;
@@ -233,14 +233,11 @@ class DBFit {
       $final_data[] = $row;
     }
     
-    $final_attributes = [];
-
-    foreach ($attributes[0] as $outputAttribute) {
-      if(!($outputAttribute instanceof DiscreteAttribute)) {
-        die_error("Output column(s) must be categorical! '"
-          . $outputAttribute->getName() . "' is not.");
-      }
+    if (!count($final_data)) {
+      die_error("No data instance found.");
     }
+
+    $final_attributes = [];
     foreach ($attributes as $attribute) {
       if ($attribute === NULL) {
         // Ignore attribute/value
@@ -257,20 +254,46 @@ class DBFit {
       }
     }
 
+    // var_dump($this->columns);
     // var_dump($final_attributes);
-    if (!count($final_data)) {
-      die_error("No data instance found.");
-    }
-    /* Build instances */
-    $data = new Instances($final_attributes, $final_data);
     
-    // echo $data->toString(false);
+    // var_dump($final_data);
     
-    if (DEBUGMODE && $idVal === NULL) {
-      $data->save_ARFF("instances");
+    /* Unpacking: generate many dataframes, each with a single output attribute (one per each of the output attributes fore this column) */
+    $dataframes = [];
+    $numOutputAttributes = count($attributes[0]);
+    var_dump($attributes[0]);
+    foreach ($attributes[0] as $i_attr => $outputAttribute) {
+      echo "Problem $i_attr/" . $numOutputAttributes . PHP_EOL;
+      if(!($outputAttribute instanceof DiscreteAttribute)) {
+        die_error("All output attributes must be categorical! '"
+          . $outputAttribute->getName() . "' ($i_attr) is not.");
+      }
+
+      /* Build instances for this output attribute */
+      $outputAttr = $final_attributes[$i_attr];
+      $outputVals = array_column($final_data, $i_attr);
+      $attrs = array_merge([$outputAttr], array_slice($final_attributes, $numOutputAttributes));
+      $data = [];
+      foreach ($final_data as $i => $row) {
+        $data[] = array_merge([$outputVals[$i]], array_slice($row, $numOutputAttributes));
+      }
+      // var_dump($attrs);
+      // var_dump($data);
+      $dataframe = new Instances($attrs, $data);
+      
+      echo $dataframe->toString(false);
+      
+      if (DEBUGMODE && $idVal === NULL) {
+        $dataframe->save_ARFF("instances");
+      }
+      
+      $dataframes[] = $dataframe;
     }
 
-    return $data;
+    echo count($dataframes) . " dataframes computed " . PHP_EOL;
+
+    return $dataframes;
   }
 
   function &readRawData(object &$res, array &$attributes, array &$columns) : array {
@@ -319,7 +342,7 @@ class DBFit {
                 /* Append k values, one for each word in the dictionary */
                 $dict = $this->getColumnTreatmentArg($column, 0);
                 foreach ($dict as $word) {
-                  $val = in_array($word, $this->text2words($raw_val));
+                  $val = intval(in_array($word, $this->text2words($raw_val)));
                   $attr_val[] = $val;
                 }
                 break;
@@ -334,6 +357,9 @@ class DBFit {
 
                 /* For categorical attributes, use the class index as value */
                 if ($attribute instanceof DiscreteAttribute) {
+                  if (is_bool($raw_val)) {
+                    $raw_val = intval($raw_val);
+                  }
                   $val = $attribute->getKey($raw_val);
                   if ($val === false) {
                     /* When forcing categorical, push the unfound values to the domain */
@@ -411,13 +437,13 @@ class DBFit {
                 if (is_array($attr_vals_orig[$i_col])) {
                   foreach (zip($z[0], $z[1]) as $a => $val) {
                     if ($attribute[$a]->getType() == "bool") {
-                      $attr_vals_orig[$i_col][$a] = $attr_vals_orig[$i_col][$a] && $z[1][$a];
+                      $attr_vals_orig[$i_col][$a] = intval($attr_vals_orig[$i_col][$a] && $z[1][$a]);
                     }
                     else {
                       die_error("Found more than one row with same identifier value: '{$this->identifierColumnName}' = " . get_var_dump($idVal)
                       . ", but I don't know how to merge values for column " . $this->getColumnName($columns[$i_col])
                       . " ($i_col) of type '{$attribute[$a]->getType()}'. "
-                      . "Suggestion: specify ForceBinary treatment for this column." //TODO
+                      . "Suggestion: specify ForceBinary/ForceCategorical treatment for this column." //TODO figure out which one
                       // . get_var_dump($z[0]) . get_var_dump($z[1])
                       // . get_var_dump($attr_vals_orig) . get_var_dump($attr_vals)
                       );
@@ -871,10 +897,6 @@ class DBFit {
 
     $this->check_columnName($new_col["name"]);
 
-    if ($new_col["attr_name"] === NULL) {
-      $new_col["attr_name"] = $new_col["name"];
-    }
-
     $new_col["mysql_type"] = $this->obtain_ColumnMySQLType($new_col["name"]);
 
     $this->columns[] = &$new_col;
@@ -911,6 +933,11 @@ class DBFit {
     } else {
       die_error("Malformed column term: " . toString($col));
     }
+    
+    if ($new_col["attr_name"] === NULL) {
+      $new_col["attr_name"] = $new_col["name"];
+    }
+
     return $new_col;
   }
   function setOutputColumns($outputColumns) : self
@@ -979,11 +1006,16 @@ class DBFit {
         . "') cannot be used as identifier.");
     }
 
-    if (in_array($new_col["name"], $this->getColumnNames(true))) {
-      die_error("Output column '" . $new_col["name"] .
-        "' cannot also belong to inputColumns."
-        // . get_var_dump($this->getColumnNames(true))
-        );
+    for ($i_col = count($this->columns)-1; $i_col >= 0; $i_col--) {
+      $col = $this->columns[$i_col];
+      if ($new_col["name"] == $this->getColumnName($col)) {
+        warn("Found output column '" . $new_col["name"] . "' in input columns. Removing...");
+        array_splice($this->columns, $i_col, 1);
+        // die_error("Output column '" . $new_col["name"] .
+        //   "' cannot also belong to inputColumns."
+        //   // . get_var_dump($this->getColumnNames(true))
+        //   );
+      }
     }
 
     $new_col["mysql_type"] = $this->obtain_ColumnMySQLType($new_col["name"]);
@@ -1051,8 +1083,10 @@ class DBFit {
   }
 
   /* Train and test a model on the data, and save to database */
-  function updateModel() {
-    echo "DBFit->updateModel()" . PHP_EOL;
+  function updateModel($recursionPath = []) {
+    echo "DBFit->updateModel(" . toString($recursionPath) . ")" . PHP_EOL;
+    
+    $recursionLevel = count($recursionPath);
 
     if(!($this->learner instanceof Learner))
       die_error("Learner is not initialized. Use ->setLearner() or ->setLearningMethod()");
@@ -1060,59 +1094,66 @@ class DBFit {
     if(!($this->model instanceof DiscriminativeModel))
       die_error("Model is not initialized");
 
-    $data = $this->readData();
+    $dataframes = $this->readData(NULL, $recursionPath);
 
-    if ($this->trainingMode === NULL) {
-      $this->trainingMode = $this->defTrainingMode;
-      echo "Training mode defaulted to " . toString($this->trainingMode);
+    $name_chunks = [];
+    foreach ($recursionPath as $node) {
+      $name_chunks[] =
+        str_replace(".", "_", $this->getOutputAttributes()[$node[0]])
+        . ":" . $node[1];
     }
+    $path_name = join("-", $name_chunks);
 
-    /* training modes */
-    switch (true) {
-      /* Full training: use data for both training and testing */
-      case $this->trainingMode == "FullTraining":
-        $trainData = $data;
-        $testData = $data;
-        break;
+    // TODO note since the four root problems are independent, we use  splits that can be different (due to randomization)
+    foreach ($dataframes as $i_prob => $data) {
+      echo "Problem $i_prob/" . count($dataframes) . PHP_EOL;
+
+      list($trainData, $testData) = $this->getDataSplit($data);
       
-      /* Train+test split */
-      case is_array($this->trainingMode):
-        $trRat = $this->trainingMode[0]/($this->trainingMode[0]+$this->trainingMode[1]);
-        // TODO 
-        $data->randomize();
-        list($trainData, $testData) = Instances::partition($data, $trRat);
-        
-        break;
+      echo "TRAIN" . PHP_EOL . $trainData->toString(true) . PHP_EOL;
+      echo "TEST" . PHP_EOL . $testData->toString(true) . PHP_EOL;
       
-      default:
-        die_error("Unknown training mode: " . toString($this->trainingMode));
-        break;
+      /* Train */
+      $this->model->fit($trainData, $this->learner);
+      
+      echo "Ultimately, here are the extracted rules: " . PHP_EOL;
+      foreach ($this->model->getRules() as $x => $rule) {
+        echo $x . ": " . $rule->toString() . PHP_EOL;
+      }
+
+      /* Test */
+      $this->test($testData);
+      // $this->model->save(join_paths(MODELS_FOLDER, date("Y-m-d_H:i:s")));
+
+      $model_name = $path_name . "__" . 
+        str_replace(".", "_",
+           $this->getOutputAttributes()[count($recursionPath)-1][$i_prob]);
+
+      $this->model->dumpToDB($this->db, $model_name);
+        // . "_" . join("", array_map([$this, "getColumnName"], ...).);
+     
+      $this->model->saveToDB($this->db, $model_name, $testData);
+
+      /* For each output class value, recurse and train the subtree */
+      
+      if ($recursionLevel+1 == count($this->outputColumns)) {
+        echo "Train-time recursion stops here (recursionPath = " . toString($recursionPath)
+           . ", problem $i_prob/" . count($dataframes) . "). " . PHP_EOL;
+      }
+      else {
+        die_error("TODO recursion");
+        // $outputAttribute = $this->getOutputAttribute($recursionLevel);
+        // echo "Branching at depth $recursionLevel on attribute\"" . $outputAttribute->getName() . "\" "
+        //   . " with domain " . toString($outputAttribute->getDomain())
+        //   . ". " . PHP_EOL;
+        // foreach ($outputAttribute->getDomain() as $classValue) {
+        //   echo "Recursion on classValue $classValue for attribute\""
+        //   . $outputAttribute->getName() . "\". " . PHP_EOL;
+        //   TODO don.t recurse when the outcome is false...
+        //   $this->updateModel(array_merge($recursionPath, [[$i_prob, $classValue]]));
+        // }
+      }
     }
-
-    echo "TRAIN" . PHP_EOL . $trainData->toString(true) . PHP_EOL;
-    echo "TEST" . PHP_EOL . $testData->toString(true) . PHP_EOL;
-    // die_error("TODO");
-    
-    /* Train */
-    $this->model->fit($trainData, $this->learner);
-    
-    echo "Ultimately, here are the extracted rules: " . PHP_EOL;
-    foreach ($this->model->getRules() as $x => $rule) {
-      echo $x . ": " . $rule->toString() . PHP_EOL;
-    }
-
-    /* Test */
-    $this->test($testData);
-    // $this->model->save(join_paths(MODELS_FOLDER, date("Y-m-d_H:i:s")));
-    
-    $this->model->dumpToDB($this->db,
-      str_replace(".", "_", $this->getOutputColumnNames()[0]));
-      // . "_" . join("", array_map([$this, "getColumnName"], ...).);
-   
-    $this->model->saveToDB($this->db,
-     str_replace(".", "_", $this->getOutputColumnNames()[0])
-     , $testData);
-
   }
 
   /* Use the model for predicting on a set of instances */
@@ -1137,19 +1178,30 @@ class DBFit {
       die_error("In order to predictByIdentifier, an identifierColumnName must be set."
         . " Use ->setIdentifierColumnName()");
 
-    $data = $this->readData($idVal);
+    $predictions = [];
 
-    if(false && $idVal !== NULL && count($data) !== 1) {
-      // TODO figure out, possible?
-      die_error("Found more than one instance at predict time. {$this->identifierColumnName} = $idVal");
+    /* For each recursion level */
+    foreach ($this->outputColumns as $outputColumnName)
+    {
+      //TODO at prediction time you must load more models...
+      $dataframes = $this->readData($idVal);
+
+      foreach ($dataframes as $i_prob => $data) {
+        echo "Problem $i_prob/" . count($dataframes) . PHP_EOL;
+
+        if(false && $idVal !== NULL && $data->numInstances() !== 1) {
+          // TODO figure out, possible?
+          die_error("Found more than one instance at predict time. {$this->identifierColumnName} = $idVal");
+        }
+
+        // var_dump($data);
+        $predict = $this->predict($data);
+        // var_dump($predict);
+        $predictions[] = $predict;
+      }
     }
-
-    // var_dump($data);
-    $predict = $this->predict($data);
-    // var_dump($predict);
-    $predictions = [$predict];
+    echo "predictions " . PHP_EOL;
     var_dump($predictions);
-
     return $predictions;
   }
 
@@ -1199,10 +1251,11 @@ class DBFit {
     $end = microtime(TRUE);
     echo "updateModel took " . ($end - $start) . " seconds to complete." . PHP_EOL;
     
-    $start = microtime(TRUE);
-    $this->model->LoadFromDB($this->db, str_replace(".", "_", $this->getOutputColumnNames()[0]));
-    $end = microtime(TRUE);
-    echo "LoadFromDB took " . ($end - $start) . " seconds to complete." . PHP_EOL;
+    // TODO
+    // $start = microtime(TRUE);
+    // $this->model->LoadFromDB($this->db, str_replace(".", "_", $this->getOutputAttributes()[0]));
+    // $end = microtime(TRUE);
+    // echo "LoadFromDB took " . ($end - $start) . " seconds to complete." . PHP_EOL;
 
     if ($this->identifierColumnName !== NULL) {
       $start = microtime(TRUE);
@@ -1306,6 +1359,37 @@ class DBFit {
   {
     $this->defaultOptions[$opt_name] = $opt;
     return $this;
+  }
+
+
+  function &getDataSplit(Instances &$data) : array {
+    if ($this->trainingMode === NULL) {
+      $this->trainingMode = $this->defTrainingMode;
+      echo "Training mode defaulted to " . toString($this->trainingMode);
+    }
+
+    $rt = NULL;
+    /* training modes */
+    switch (true) {
+      /* Full training: use data for both training and testing */
+      case $this->trainingMode == "FullTraining":
+        $rt = [$data, $data];
+        break;
+      
+      /* Train+test split */
+      case is_array($this->trainingMode):
+        $trRat = $this->trainingMode[0]/($this->trainingMode[0]+$this->trainingMode[1]);
+        // TODO 
+        $data->randomize();
+        $rt = Instances::partition($data, $trRat);
+        
+        break;
+      
+      default:
+        die_error("Unknown training mode: " . toString($this->trainingMode));
+        break;
+    }
+    return $rt;
   }
 
 }

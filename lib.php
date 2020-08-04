@@ -66,10 +66,10 @@ function toString($a)
       return "<i>NULL</i>";
       break;
     case $a === false:
-      return "<i><p style='color:red'>false</p></i>";
+      return "<i style='color:red'>false</i>";
       break;
     case $a === true:
-      return "<i><p style='color:green'>true</p></i>";
+      return "<i style='color:green'>true</i>";
       break;
     
     default:
@@ -205,7 +205,7 @@ function filesin($a, $full_path = false, $sortby=false)
 {
 	$a = safeSuffix($a, "/");
 	$ret = [];
-	foreach(array_slice(scandir($a), 2) as $item)
+	foreach (array_slice(scandir($a), 2) as $item)
 		if(is_file($a . $item))
 		{
 			$f = ($full_path ? $a : "") . $item;

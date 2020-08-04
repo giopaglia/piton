@@ -440,7 +440,7 @@ class Instances {
     fwrite($f, "@RELATION " . basename($path) . "\n\n");
 
     /* Attributes */
-    foreach($this->getAttributes() as $attr) {
+    foreach ($this->getAttributes() as $attr) {
       fwrite($f, "@ATTRIBUTE {$attr->getName()} {$attr->getARFFType()}");
       fwrite($f, "\n");
     }
@@ -530,7 +530,7 @@ class Instances {
             $x = "N/A";
           }
           else {
-            $x = "{$val}";
+            $x = toString($val);
           }
           $out_str .= str_pad($x, 7, " ", STR_PAD_BOTH) . "\t";
         }

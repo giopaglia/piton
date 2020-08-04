@@ -262,9 +262,11 @@ function testMed2() {
   $db_fit->setIdentifierColumnName("RaccomandazioniTerapeuticheUnitarie.ID");
   $db_fit->setDefaultOption("TextTreatment", ["BinaryBagOfWords", 10]);
   $db_fit->setColumns("*");
-  $db_fit->setLimit(100);
+  $db_fit->setLimit(10);
   // $db_fit->setLimit(1000);
-  $db_fit->setOutputColumnName("RaccomandazioniTerapeuticheUnitarie.TIPO");
+  $db_fit->setOutputColumnName("RaccomandazioniTerapeuticheUnitarie.TIPO"
+  // , "ForceBinary"
+  );
   $lr = new PRip();
   // $lr->setNumOptimizations(10); TODO
   $lr->setNumOptimizations(3);
@@ -457,9 +459,12 @@ function testMed() {
 "Referti.MOTIVO_ANNULLA",
 "Referti.STATO",
 ]);
+  $db_fit->setLimit(10);
   // $db_fit->setLimit(100);
   // $db_fit->setLimit(1000);
-  $db_fit->setOutputColumnName("RaccomandazioniTerapeuticheUnitarie.TIPO", "ForceBinary");
+  $db_fit->setOutputColumnName("RaccomandazioniTerapeuticheUnitarie.TIPO"
+     ,"ForceBinary"
+  );
   $lr = new PRip();
   // $lr->setNumOptimizations(10); TODO
   $lr->setNumOptimizations(3);
