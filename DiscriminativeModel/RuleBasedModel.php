@@ -39,7 +39,7 @@ abstract class DiscriminativeModel {
     //if (DEBUGMODE > 2) 
       echo "DiscriminativeModel->dumpToDB($tableName)" . PHP_EOL;
     prefixisify($tableName, "rules_");
-    $sql = "DROP TABLE IF EXISTS " . $tableName . "_dump";
+    $sql = "DROP TABLE IF EXISTS `{$tableName}_dump`";
 
     $stmt = $db->prepare($sql);
     if (!$stmt)
@@ -48,7 +48,7 @@ abstract class DiscriminativeModel {
       die_error("Query failed: $sql");
     $stmt->close();
 
-    $sql = "CREATE TABLE " . $tableName . "_dump (dump LONGTEXT)";
+    $sql = "CREATE TABLE `{$tableName}_dump` (dump LONGTEXT)";
 
     $stmt = $db->prepare($sql);
     if (!$stmt)
@@ -57,7 +57,7 @@ abstract class DiscriminativeModel {
       die_error("Query failed: $sql");
     $stmt->close();
 
-    $sql = "INSERT INTO " . $tableName . "_dump VALUES (?)";
+    $sql = "INSERT INTO `{$tableName}_dump` VALUES (?)";
 
     echo "SQL: $sql" . PHP_EOL;
     $stmt = $db->prepare($sql);
@@ -213,7 +213,7 @@ class RuleBasedModel extends DiscriminativeModel {
 
     prefixisify($tableName, "rules_");
 
-    $sql = "DROP TABLE IF EXISTS $tableName";
+    $sql = "DROP TABLE IF EXISTS `$tableName`";
 
     $stmt = $db->prepare($sql);
     if (!$stmt)
@@ -222,7 +222,7 @@ class RuleBasedModel extends DiscriminativeModel {
       die_error("Query failed: $sql");
     $stmt->close();
 
-    $sql = "CREATE TABLE $tableName ";
+    $sql = "CREATE TABLE `$tableName` ";
     $sql .= "(ID INT AUTO_INCREMENT PRIMARY KEY, class VARCHAR(256), rule TEXT, support float, confidence float, lift float, conviction float)";
     // $sql .= "(class VARCHAR(256) PRIMARY KEY, regola TEXT)"; TODO why primary
 
@@ -256,7 +256,7 @@ class RuleBasedModel extends DiscriminativeModel {
       echo $attribute->toString(false) . PHP_EOL;
     }
 
-    $sql = "INSERT INTO $tableName";
+    $sql = "INSERT INTO `$tableName`";
     if ($testData === NULL) {
       $sql .= " (class, rule)";
     } else {

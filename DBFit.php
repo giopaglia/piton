@@ -185,7 +185,7 @@ class DBFit {
     echo "Recursion path: " . toString($recursionPath) . PHP_EOL;
     echo "Identifier value: " . toString($idVal) . PHP_EOL;
 
-    /* Create attributes from column info */
+    /* Create attributes from column */
     $attributes = [];
 
     foreach ($columns as &$column) {
@@ -193,8 +193,7 @@ class DBFit {
         $attribute = NULL;
       }
       else {
-        /* Create attribute(s) for this column */
-        $attribute = $this->computeAttributesOfColumn($column);
+        $attribute = $this->getColumnAttributes($column);
       }
       $attributes[] = $attribute;
     }
@@ -495,6 +494,10 @@ class DBFit {
     return array_map([$this, "getColumnName"], $this->outputColumns);
   }
 
+  function getOutputColumnAttributes() {
+    return array_map([$this, "getColumnAttributes"], $this->outputColumns);
+  }
+
   /* Need a nickname for every column when using table.column format,
       since PHP MySQL connctions do not allow to access result fields
       using this format */
@@ -556,6 +559,7 @@ class DBFit {
     return $sql;
   }
 
+  /* Create attribute(s) for a column */
   function computeAttributesOfColumn(array &$column)
   {
     $attr_name = $this->getColumnAttrName($column);
@@ -563,17 +567,17 @@ class DBFit {
     switch(true) {
       /* Forcing a categorical attribute */
       case $this->getColumnTreatmentType($column) == "ForceCategorical":
-        $attribute = [new DiscreteAttribute($attr_name, "enum")];
+        $attributes = [new DiscreteAttribute($attr_name, "enum")];
         break;
       /* Enum column */
       case $this->getColumnAttrType($column) == "enum":
         $domain_arr_str = (preg_replace("/enum\((.*)\)/i", "[$1]", $this->getColumnMySQLType($column)));
         eval("\$domain_arr = " . $domain_arr_str . ";");
-        $attribute = [new DiscreteAttribute($attr_name, "enum", $domain_arr)];
+        $attributes = [new DiscreteAttribute($attr_name, "enum", $domain_arr)];
         break;
       /* Forcing a categorical attribute */
       case $this->getColumnTreatmentType($column) == "ForceCategoricalIfNotEnum":
-        $attribute = [new DiscreteAttribute($attr_name, "enum")];
+        $attributes = [new DiscreteAttribute($attr_name, "enum")];
         break;
       /* Forcing a set of binary categorical attributes */
       case $this->getColumnTreatmentType($column) == "ForceBinary":
@@ -590,21 +594,21 @@ class DBFit {
         $classes = array_keys($classes);
 
         // var_dump($classes);
-        $attribute = [];
+        $attributes = [];
 
         foreach ($classes as $class) {
-          $attribute[] = new DiscreteAttribute($attr_name . "/" . $class, "bool", ["0", "1"]);
+          $attributes[] = new DiscreteAttribute($attr_name . "/" . $class, "bool", ["0", "1"]);
         }
         $this->setColumnTreatmentArg($column, 0, $classes);
 
         break;
       /* Numeric column */
       case in_array($this->getColumnAttrType($column), ["int", "float", "double"]):
-        $attribute = [new ContinuousAttribute($attr_name, $this->getColumnAttrType($column))];
+        $attributes = [new ContinuousAttribute($attr_name, $this->getColumnAttrType($column))];
         break;
       /* Boolean column */
       case in_array($this->getColumnAttrType($column), ["bool", "boolean"]):
-        $attribute = [new DiscreteAttribute($attr_name, "bool", ["0", "1"])];
+        $attributes = [new DiscreteAttribute($attr_name, "bool", ["0", "1"])];
         break;
       /* Text column */
       case $this->getColumnAttrType($column) == "text":
@@ -612,13 +616,13 @@ class DBFit {
           case "BinaryBagOfWords":
             /* Binary attributes indicating the presence of each word */
             $generateDictAttrs = function($dict) use ($attr_name, &$column) {
-              $attribute = [];
+              $attributes = [];
               foreach ($dict as $word) {
-                $attribute[] = new DiscreteAttribute("'$word' in $attr_name",
+                $attributes[] = new DiscreteAttribute("'$word' in $attr_name",
                   "word_presence", ["N", "Y"]);
               }
               $this->setColumnTreatmentArg($column, 0, $dict);
-              return $attribute;
+              return $attributes;
             };
 
             /* The argument can be the dictionary size (k), or more directly the dictionary */
@@ -648,10 +652,10 @@ class DBFit {
               // var_dump($word_counts);
               
               if (!count($word_counts)) {
-                warn("Couldn't derive a BinaryBagOfWords dictionary for attribute \"" .
+                warn("Couldn't derive a BinaryBagOfWords dictionary for column \"" .
                   $this->getColumnName($column) . "\". This column will be ignored.");
 
-                $attribute = NULL;
+                $attributes = NULL;
               } else {
                 $dict = [];
                 // TODO optimize this?
@@ -667,16 +671,16 @@ class DBFit {
                 // var_dump($dict);
                 
                 if (count($dict) < $k) {
-                  warn("Couldn't derive a BinaryBagOfWords dictionary of size $k for attribute \"" 
+                  warn("Couldn't derive a BinaryBagOfWords dictionary of size $k for column \"" 
                     . $this->getColumnName($column) . "\". Dictionary of size "
                     . count($dict) . " will be used.");
                 }
-                $attribute = $generateDictAttrs($dict);
+                $attributes = $generateDictAttrs($dict);
               }
             }
             else if (is_array($this->getColumnTreatmentArg($column, 0))) {
               $dict = $this->getColumnTreatmentArg($column, 0);
-              $attribute = $generateDictAttrs($dict);
+              $attributes = $generateDictAttrs($dict);
             }
             else {
               die_error("Please specify a parameter (dictionary or dictionary size)"
@@ -695,7 +699,7 @@ class DBFit {
         die_error("Unknown column type: " . $this->getColumnMySQLType($column));
         break;
     }
-    return $attribute;
+    $column["attributes"] = &$attributes;
   }
   // TODO use Nlptools
   function text2words($text) {
@@ -781,6 +785,10 @@ class DBFit {
 
   function getColumnMySQLType(array &$col) {
     return $col["mysql_type"];
+  }
+
+  function getColumnAttributes(array &$col) {
+    return $col["attributes"];
   }
 
   function getColumnAttrType(array &$col, $tr = -1) {
@@ -898,6 +906,8 @@ class DBFit {
     $this->check_columnName($new_col["name"]);
 
     $new_col["mysql_type"] = $this->obtain_ColumnMySQLType($new_col["name"]);
+    
+    $this->computeAttributesOfColumn($new_col);
 
     $this->columns[] = &$new_col;
 
@@ -1020,6 +1030,8 @@ class DBFit {
 
     $new_col["mysql_type"] = $this->obtain_ColumnMySQLType($new_col["name"]);
 
+    $this->computeAttributesOfColumn($new_col);
+
     $this->outputColumns[] = &$new_col;
 
     return $this;
@@ -1097,10 +1109,10 @@ class DBFit {
     $dataframes = $this->readData(NULL, $recursionPath);
 
     $name_chunks = [];
-    foreach ($recursionPath as $node) {
+    foreach ($recursionPath as $depth => $node) {
       $name_chunks[] =
-        str_replace(".", "_", $this->getOutputAttributes()[$node[0]])
-        . ":" . $node[1];
+        str_replace(".", ":", $this->getOutputColumnAttributes()[$depth][$node[0]]->getName())
+        . "=" . $node[1];
     }
     $path_name = join("-", $name_chunks);
 
@@ -1126,8 +1138,8 @@ class DBFit {
       // $this->model->save(join_paths(MODELS_FOLDER, date("Y-m-d_H:i:s")));
 
       $model_name = $path_name . "__" . 
-        str_replace(".", "_",
-           $this->getOutputAttributes()[count($recursionPath)-1][$i_prob]);
+        str_replace(".", ":",
+           $this->getOutputColumnAttributes()[count($recursionPath)][$i_prob]->getName());
 
       $this->model->dumpToDB($this->db, $model_name);
         // . "_" . join("", array_map([$this, "getColumnName"], ...).);
@@ -1253,7 +1265,7 @@ class DBFit {
     
     // TODO
     // $start = microtime(TRUE);
-    // $this->model->LoadFromDB($this->db, str_replace(".", "_", $this->getOutputAttributes()[0]));
+    // $this->model->LoadFromDB($this->db, str_replace(".", ":", $this->getOutputColumnAttributes()[0]))->getName();
     // $end = microtime(TRUE);
     // echo "LoadFromDB took " . ($end - $start) . " seconds to complete." . PHP_EOL;
 
