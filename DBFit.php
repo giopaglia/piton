@@ -193,7 +193,10 @@ class DBFit {
         $attribute = NULL;
       }
       else {
-        // $this->computeAttributesOfColumn($column);
+        /* TODO figure out what's the best place where to assign column attributes */
+        if ($recursionLevel == 0) {
+          $this->computeAttributesOfColumn($column);
+        }
         $attribute = $this->getColumnAttributes($column);
       }
       $attributes[] = $attribute;
@@ -327,7 +330,6 @@ class DBFit {
               /* ForceBinary */
               case $this->getColumnTreatmentType($column) == "ForceBinary":
 
-                // TODO figure out: a null value means what?
                 /* Append k values, one for each of the classes */
                 $classes = $this->getColumnTreatmentArg($column, 0);
                 foreach ($classes as $class) {
@@ -339,7 +341,6 @@ class DBFit {
               /* Text column */
               case $this->getColumnTreatmentType($column) == "BinaryBagOfWords":
 
-                // TODO check: a null text means null values for the binary bags, right?
                 /* Append k values, one for each word in the dictionary */
                 $dict = $this->getColumnTreatmentArg($column, 0);
                 foreach ($dict as $word) {
@@ -438,13 +439,13 @@ class DBFit {
                 if (is_array($attr_vals_orig[$i_col])) {
                   foreach (zip($z[0], $z[1]) as $a => $val) {
                     if ($attribute[$a]->getType() == "bool") {
-                      $attr_vals_orig[$i_col][$a] = intval($attr_vals_orig[$i_col][$a] && $z[1][$a]);
+                      $attr_vals_orig[$i_col][$a] = intval($attr_vals_orig[$i_col][$a] || $z[1][$a]);
                     }
                     else {
                       die_error("Found more than one row with same identifier value: '{$this->identifierColumnName}' = " . get_var_dump($idVal)
                       . ", but I don't know how to merge values for column " . $this->getColumnName($columns[$i_col])
                       . " ($i_col) of type '{$attribute[$a]->getType()}'. "
-                      . "Suggestion: specify ForceBinary/ForceCategorical treatment for this column." //TODO figure out which one
+                      . "Suggestion: specify ForceBinary treatment for this column (this will break categorical attributes into k binary attributes, easily mergeable via OR operation)."
                       // . get_var_dump($z[0]) . get_var_dump($z[1])
                       // . get_var_dump($attr_vals_orig) . get_var_dump($attr_vals)
                       );
@@ -467,6 +468,7 @@ class DBFit {
 
     return $data;
   }
+
   /* TODO explain */
   function getColumns($IncludeIdCol = false) {
     $cols = [];
@@ -527,7 +529,6 @@ class DBFit {
         $sql .= $this->getTableJoinType($k) . " " . $this->getTableName($k);
         $crit = $this->getTableJoinCritera($k);
         if (count($crit)) {
-          // TODO remove duplicate attributes
           $sql .= " ON " . join(" AND ", $crit);
         }
       }
@@ -660,7 +661,7 @@ class DBFit {
                 $attributes = NULL;
               } else {
                 $dict = [];
-                // TODO optimize this?
+                // optimize this?
                 foreach (range(0, $k-1) as $i) {
                   $max_count = max($word_counts);
                   $max_word = array_search($max_count, $word_counts);
@@ -1108,7 +1109,7 @@ class DBFit {
 
     $dataframes = $this->readData(NULL, $recursionPath);
 
-    // TODO note since the four root problems are independent, we use  splits that can be different (due to randomization)
+    // TODO figure out, note: since the four root problems are independent, we use  splits that can be different (due to randomization)
     foreach ($dataframes as $i_prob => $data) {
       echo "Problem $i_prob/" . count($dataframes) . PHP_EOL;
 
@@ -1178,7 +1179,7 @@ class DBFit {
 
       if(false && $idVal !== NULL && $data->numInstances() !== 1) {
         // TODO figure out, possible?
-        die_error("Found more than one instance at predict time. {$this->identifierColumnName} = $idVal");
+        die_error("Found more than one instance at predict time. Is this wanted? {$this->identifierColumnName} = $idVal");
       }
 
       /* Test */

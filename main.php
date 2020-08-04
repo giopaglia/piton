@@ -31,8 +31,8 @@ TODOs:
 // exit();
 // testMed2();
 // exit();
-testMed();
-exit();
+// testMed();
+// exit();
 testSPAM();
 exit();
 testSillyWithJoin();
