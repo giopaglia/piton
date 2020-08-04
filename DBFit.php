@@ -137,6 +137,18 @@ class DBFit {
     $recursionLevel = count($recursionPath);
     $outputColumnName = $this->getOutputColumnNames()[$recursionLevel];
 
+    // var_dump($this->outputColumns);
+
+    // $columns = array_merge(, $this->getColumns(false));
+      /* TODO figure out what's the best place where to assign column attributes */
+    foreach ($this->outputColumns as &$column) {
+      $this->assignColumnAttributes($column, $idVal, $recursionPath);
+    }
+    foreach ($this->getColumns(false) as &$column) {
+      $this->assignColumnAttributes($column, $idVal, $recursionPath);
+    }
+    
+    // var_dump($this->outputColumns);
     // var_dump($this->columns);
 
     /* If any WHERE/JOIN-ON constraint forces the equality between two columns,
@@ -174,6 +186,9 @@ class DBFit {
     $columns = array_slice($this->outputColumns, 0, $recursionLevel+1);
     $columns = array_merge($columns, $this->getColumns(false));
     
+    // var_dump($columns[0]);
+    // var_dump($columns[10]);
+
     $colsNeeded = array_slice($this->outputColumns, 0, $recursionLevel+1);
     $colsNeeded = array_merge($colsNeeded, $this->getColumns(true));
     $colsNeeded = array_map([$this, "getColumnName"], $colsNeeded);
@@ -193,10 +208,6 @@ class DBFit {
         $attribute = NULL;
       }
       else {
-        /* TODO figure out what's the best place where to assign column attributes */
-        if ($recursionLevel == 0) {
-          $this->computeAttributesOfColumn($column);
-        }
         $attribute = $this->getColumnAttributes($column);
       }
       $attributes[] = $attribute;
@@ -519,9 +530,10 @@ class DBFit {
       $col = $col . " AS " . $this->getColNickname($col);
     }
 
-    $sql = "SELECT " . mysql_list($colNames, "noop") . " FROM ";
+    $sql = "SELECT " . mysql_list($colNames, "noop") . " FROM";
     
     foreach ($this->tables as $k => $table) {
+      $sql .= " ";
       if ($k == 0) {
       $sql .= $this->getTableName($k);
       }
@@ -532,7 +544,6 @@ class DBFit {
           $sql .= " ON " . join(" AND ", $crit);
         }
       }
-      $sql .= " ";
     }
 
     $whereCriteria = [];
@@ -563,7 +574,7 @@ class DBFit {
   }
 
   /* Create attribute(s) for a column */
-  function computeAttributesOfColumn(array &$column)
+  function assignColumnAttributes(array &$column, $idVal = NULL, array $recursionPath = [])
   {
     $attr_name = $this->getColumnAttrName($column);
 
@@ -587,7 +598,7 @@ class DBFit {
         
         /* Find classes */
         $classes = [];
-        $sql = $this->getSQLSelectQuery($this->getColumnName($column));
+        $sql = $this->getSQLSelectQuery($this->getColumnName($column), $idVal, $recursionPath);
         $res = mysql_select($this->db, $sql);
 
         foreach ($res as $raw_row) {
@@ -634,7 +645,7 @@ class DBFit {
 
               /* Find $k most frequent words */
               $word_counts = [];
-              $sql = $this->getSQLSelectQuery($this->getColumnName($column));
+              $sql = $this->getSQLSelectQuery($this->getColumnName($column), $idVal, $recursionPath);
               $res = mysql_select($this->db, $sql);
               
               if (!isset($this->stop_words)) {
@@ -791,6 +802,7 @@ class DBFit {
   }
 
   function getColumnAttributes(array &$col) {
+    var_dump($col);
     return $col["attributes"];
   }
 
@@ -908,9 +920,8 @@ class DBFit {
 
     $this->check_columnName($new_col["name"]);
 
-    $new_col["mysql_type"] = $this->obtain_ColumnMySQLType($new_col["name"]);
-    
-    $this->computeAttributesOfColumn($new_col);
+    $this->assignColumnMySQLType($new_col);
+    // $this->assignColumnAttributes($new_col);
 
     $this->columns[] = &$new_col;
 
@@ -980,7 +991,7 @@ class DBFit {
     $new_col = [];
     $new_col["name"] = NULL;
     $new_col["treatment"] = "ForceCategoricalIfNotEnum";
-    $new_col["joins"] = [];
+    $new_col["joinClauses"] = [];
     $new_col["mysql_type"] = NULL;
 
     $i_col = count($this->outputColumns);
@@ -1001,7 +1012,7 @@ class DBFit {
       }
       else {
         if (isset($col[1])) {
-          $new_col["joins"] = $col[1];
+          $new_col["joinClauses"] = $col[1];
         }
         if (isset($col[2])) {
           $new_col["treatment"] = $col[2];
@@ -1031,9 +1042,8 @@ class DBFit {
       }
     }
 
-    $new_col["mysql_type"] = $this->obtain_ColumnMySQLType($new_col["name"]);
-
-    $this->computeAttributesOfColumn($new_col);
+    $this->assignColumnMySQLType($new_col);
+    // $this->assignColumnAttributes($new_col);
 
     $this->outputColumns[] = &$new_col;
 
@@ -1053,16 +1063,24 @@ class DBFit {
     return $this;
   }
 
-  function obtain_ColumnMySQLType(string $colName) : string
+  function assignColumnMySQLType(array &$column)
   {
     /* Obtain column type */
+    $tables = array_map([$this, "getTableName"], range(0, count($this->tables)-1));
+    if (isset($column["joinClauses"])) {
+    // TODO maybe tables should also include all of the joinClauses of the previous output layers? Can't think of a use-case, though
+      $tables = array_merge($tables, array_column($column["joinClauses"], 0));
+    }
+    var_dump($tables);
+
     $sql = "SELECT * FROM `information_schema`.`columns` WHERE `table_name` IN "
-          . mysql_set(array_map([$this, "getTableName"], range(0, count($this->tables)-1))) . " ";
+          . mysql_set($tables) . " ";
     $res = mysql_select($this->db, $sql);
 
     /* Find column */
+    $mysql_column = NULL;
     foreach ($res as $col) {
-      if (in_array($colName,
+      if (in_array($column["name"],
           [$col["TABLE_NAME"].".".$col["COLUMN_NAME"], $col["COLUMN_NAME"]])) {
         $mysql_column = $col;
         break;
@@ -1070,9 +1088,9 @@ class DBFit {
     }
     if ($mysql_column === NULL) {
       die_error("Couldn't retrieve information about column \""
-        . $colName . "\"");
+        . $column["name"] . "\"");
     }
-    return $mysql_column["COLUMN_TYPE"];
+    $column["mysql_type"] = $mysql_column["COLUMN_TYPE"];
   }
   
 
@@ -1144,17 +1162,22 @@ class DBFit {
            . ", problem $i_prob/" . count($dataframes) . "). " . PHP_EOL;
       }
       else {
-        die_error("TODO recursion");
-        // $outputAttribute = $this->getOutputAttribute($recursionLevel);
-        // echo "Branching at depth $recursionLevel on attribute\"" . $outputAttribute->getName() . "\" "
-        //   . " with domain " . toString($outputAttribute->getDomain())
-        //   . ". " . PHP_EOL;
-        // foreach ($outputAttribute->getDomain() as $classValue) {
-        //   echo "Recursion on classValue $classValue for attribute\""
-        //   . $outputAttribute->getName() . "\". " . PHP_EOL;
-        //   TODO don.t recurse when the outcome is false...
-        //   $this->updateModel(array_merge($recursionPath, [[$i_prob, $classValue]]));
-        // }
+        $outputAttributes = $this->getOutputColumnAttributes()[$recursionLevel];
+        echo "outputAttributes";
+        var_dump($outputAttributes);
+        foreach ($outputAttributes as $i_prob => $outputAttribute) {
+        var_dump($outputAttribute);
+          echo "Branching at depth $recursionLevel on attribute\""
+            . $outputAttribute->getName() . "\" ($i_prob/"
+              . count($outputAttributes) . ")) "
+            . " with domain " . toString($outputAttribute->getDomain())
+            . ". " . PHP_EOL;
+          foreach ($outputAttribute->getDomain() as $classValue) {
+            echo "Recursion on classValue $classValue for attribute\""
+            . $outputAttribute->getName() . "\". " . PHP_EOL;
+            $this->updateModel(array_merge($recursionPath, [[$i_prob, $classValue]]));
+          }
+        }
       }
     }
   }
@@ -1222,9 +1245,9 @@ class DBFit {
   /* TODO explain */
   function getModelName(array $recursionPath, int $i_prob) : string {
     $name_chunks = [];
-    foreach ($recursionPath as $depth => $node) {
+    foreach ($recursionPath as $recursionLevel => $node) {
       $name_chunks[] =
-        str_replace(".", ":", $this->getOutputColumnAttributes()[$depth][$node[0]]->getName())
+        str_replace(".", ":", $this->getOutputColumnAttributes()[$recursionLevel][$node[0]]->getName())
         . "=" . $node[1];
     }
     $path_name = join("-", $name_chunks);
