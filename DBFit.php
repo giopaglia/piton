@@ -193,6 +193,7 @@ class DBFit {
         $attribute = NULL;
       }
       else {
+        // $this->computeAttributesOfColumn($column);
         $attribute = $this->getColumnAttributes($column);
       }
       $attributes[] = $attribute;
@@ -253,8 +254,9 @@ class DBFit {
       }
     }
 
-    // var_dump($this->columns);
-    // var_dump($final_attributes);
+    echo "this->columns: " . PHP_EOL; var_dump($this->columns);
+    echo "attributes: " . PHP_EOL; var_dump($attributes);
+    echo "final_attributes: " . PHP_EOL; var_dump($final_attributes);
     
     // var_dump($final_data);
     
@@ -270,7 +272,7 @@ class DBFit {
       }
 
       /* Build instances for this output attribute */
-      $outputAttr = $final_attributes[$i_attr];
+      $outputAttr = clone $final_attributes[$i_attr];
       $outputVals = array_column($final_data, $i_attr);
       $attrs = array_merge([$outputAttr], array_slice($final_attributes, $numOutputAttributes));
       $data = [];
@@ -699,7 +701,7 @@ class DBFit {
         die_error("Unknown column type: " . $this->getColumnMySQLType($column));
         break;
     }
-    $column["attributes"] = &$attributes;
+    $column["attributes"] = $attributes;
   }
   // TODO use Nlptools
   function text2words($text) {
@@ -1118,7 +1120,6 @@ class DBFit {
       /* Train */
       $model_name = $this->getModelName($recursionPath, $i_prob);
       $model = $this->learner->initModel();
-      $this->models[$model_name] = &$model;
 
       $model->fit($trainData, $this->learner);
       
@@ -1133,6 +1134,7 @@ class DBFit {
      
       $model->saveToDB($this->db, $model_name, $testData);
 
+      $this->models[$model_name] = $model;
       /* For each output class value, recurse and train the subtree */
       
       if ($recursionLevel+1 == count($this->outputColumns)) {
@@ -1172,6 +1174,7 @@ class DBFit {
 
     foreach ($dataframes as $i_prob => $data) {
       echo "Problem $i_prob/" . count($dataframes) . PHP_EOL;
+      echo "Data: " . $data->toString(true) . PHP_EOL;
 
       if(false && $idVal !== NULL && $data->numInstances() !== 1) {
         // TODO figure out, possible?
@@ -1190,6 +1193,7 @@ class DBFit {
       echo "Testing model '$model_name' : " . PHP_EOL . $model . PHP_EOL;
 
       // var_dump($data);
+      var_dump($model->getAttributes());
       $predictedVal = $model->predict($data);
       echo("predictedVal: ");
       var_dump($predictedVal);
@@ -1287,6 +1291,8 @@ class DBFit {
     $end = microtime(TRUE);
     echo "updateModel took " . ($end - $start) . " seconds to complete." . PHP_EOL;
     
+    echo "AVAILABLE MODELS" . PHP_EOL;
+    var_dump(array_keys($this->models));
     // TODO
     // $start = microtime(TRUE);
     // $this->model->LoadFromDB($this->db, str_replace(".", ":", $this->getOutputColumnAttributes()[0]))->getName();

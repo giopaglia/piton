@@ -330,9 +330,12 @@ class RuleBasedModel extends DiscriminativeModel {
   /* Print a textual representation of the rule */
   function __toString () : string {
     $out_str = "";
-    $out_str .= "RuleBasedModel with rules: " . PHP_EOL;
+    $out_str .= "RuleBasedModel with rules & attributes: " . PHP_EOL;
     foreach ($this->getRules() as $x => $rule) {
       $out_str .= $x . ": " . $rule->toString() . PHP_EOL;
+    }
+    foreach ($this->getAttributes() as $x => $attr) {
+      $out_str .= $x . ": " . $attr->toString() . PHP_EOL;
     }
     return $out_str;
   }
