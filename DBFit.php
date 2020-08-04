@@ -115,7 +115,6 @@ class DBFit {
     $this->db = $db;
     $this->tables = [];
     $this->columns = [];
-    $this->setOutputColumnName(NULL);
     $this->setOutputColumns([]);
     $this->setIdentifierColumnName(NULL);
     $this->whereCriteria = NULL;
@@ -1044,7 +1043,7 @@ class DBFit {
       $res = mysql_select($this->db, $sql);
       
       $colsNames = [];
-      foreach ($res->fetch_all() as $raw_col) {
+      foreach ($res as $raw_col) {
         $colsNames[] = $raw_col["TABLE_NAME"].".".$raw_col["COLUMN_NAME"];
       }
       return $this->setColumns($colsNames);
@@ -1102,9 +1101,8 @@ class DBFit {
           . mysql_set(array_map([$this, "getTableName"], range(0, count($this->tables)-1))) . " ";
     $res = mysql_select($this->db, $sql);
 
-    $raw_mysql_columns = $res->fetch_all();
     /* Find column */
-    foreach ($raw_mysql_columns as $col) {
+    foreach ($res as $col) {
       if (in_array($new_col["name"],
           [$col["TABLE_NAME"].".".$col["COLUMN_NAME"], $col["COLUMN_NAME"]])) {
         $mysql_column = $col;
@@ -1166,7 +1164,13 @@ class DBFit {
       die_error("You must set the columns in use before the output columns.");
     }
     if (!in_array($new_col["name"], $this->getColumnNames(true))) {
-      die_error("Output column '" . $new_col["name"] . "' not found in columns.");
+      warn("Output column '" . $new_col["name"] . "' not found in columns."
+        // . get_var_dump($this->getColumnNames(true))
+        );
+      // TODO fix this: the i-th output column doesn't have to be in columns,
+      //  it can even simply be introduced at that hierarchical level by means of
+      //  joins. Maybe at this point, even the first output column doesn't have
+      //  to appear in columns.
     }
     if ($this->identifierColumnName !== NULL
       && $new_col["name"] == $this->identifierColumnName) {
@@ -1195,13 +1199,19 @@ class DBFit {
 
   function setOutputColumnName(?string $outputColumnName, $treatment = NULL) : self
   {
-    foreach ($this->columns as $i_col => $col) {
-      if ($this->getColumnName($i_col) == $outputColumnName) {
-        $this->setColumnTreatment($i_col, $treatment);
-        die_error("check this" . $this->getColumnTreatment($i_col));
+    if ($outputColumnName !== NULL) {
+      foreach ($this->columns as $i_col => $col) {
+        if ($this->getColumnName($i_col) == $outputColumnName) {
+          $this->setColumnTreatment($i_col, $treatment);
+          die_error("check this" . $this->getColumnTreatment($i_col));
+        }
       }
+      var_dump($outputColumnName);
+      return $this->setOutputColumns([[$outputColumnName]]);
     }
-    return $this->setOutputColumns([[$outputColumnName]]);
+    else {
+      return $this->setOutputColumns([]);
+    }
   }
 
   // function getIdentifierColumnName() : string
