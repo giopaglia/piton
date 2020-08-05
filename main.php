@@ -59,7 +59,7 @@ function testMed3() {
     "Anamnesi",
     ["Referti", "Anamnesi.ID_REFERTO = Referti.ID"], 
     ["Diagnosi", "Diagnosi.ID_REFERTO = Referti.ID"], 
-    ["RaccomandazioniTerapeutiche", "RaccomandazioniTerapeutiche.ID_REFERTO = Referti.ID"], 
+    ["RaccomandazioniTerapeutiche", ["RaccomandazioniTerapeutiche.ID_REFERTO = Referti.ID"], "INNER JOIN"], 
     ["RaccomandazioniTerapeuticheUnitarie", "RaccomandazioniTerapeuticheUnitarie.ID_RACCOMANDAZIONE_TERAPEUTICA = RaccomandazioniTerapeutiche.ID"], 
     ["Pazienti", "Pazienti.ID = Referti.ID_PAZIENTE"]
   ]);
@@ -225,7 +225,7 @@ function testMed3() {
       "ForceBinary"],
     ["PrincipiAttivi.NOME",
       [
-        ["ElementiTerapici", "ElementiTerapici.ID_RACCOMANDAZIONE_TERAPEUTICA_UNITARIA = RaccomandazioniTerapeuticheUnitarie.ID"],
+        ["ElementiTerapici", ["ElementiTerapici.ID_RACCOMANDAZIONE_TERAPEUTICA_UNITARIA = RaccomandazioniTerapeuticheUnitarie.ID"]],
         ["PrincipiAttivi", "ElementiTerapici.ID_PRINCIPIO_ATTIVO = PrincipiAttivi.ID"]
       ]
     ]

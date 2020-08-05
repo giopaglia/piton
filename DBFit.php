@@ -77,9 +77,13 @@ class DBFit {
   static private $defTrainingMode = [80, 20];
   private $trainingMode;
 
+
   /* Default options TODO explain */
   private $defaultOptions = [];
-
+  
+  /* Default language for bag-of-words models TODO explain */
+  private $DefBOWLang = "en";
+  
   /* MAP: Mysql column type -> attr type */
   static $col2attr_type = [
     "datetime" => [
@@ -141,8 +145,9 @@ class DBFit {
 
     // $columns = array_merge(, $this->getColumns(false));
       /* TODO figure out what's the best place where to assign column attributes */
-    foreach ($this->outputColumns as &$column) {
-      $this->assignColumnAttributes($column, $idVal, $recursionPath);
+    // foreach (array_slice($this->outputColumns, $recursionLevel) as &$column) {
+    for ($i_col = $recursionLevel; $i_col < count($this->outputColumns); $i_col++) {
+      $this->assignColumnAttributes($this->outputColumns[$i_col], $idVal, $recursionPath);
     }
     foreach ($this->getColumns(false) as &$column) {
       $this->assignColumnAttributes($column, $idVal, $recursionPath);
@@ -160,8 +165,8 @@ class DBFit {
         $constraints[] = $criterion;
       }
     }
-    foreach ($this->tables as $k => $table) {
-      $constraints = array_merge($constraints, $this->getTableJoinCritera($k));
+    foreach ($this->tables as $table) {
+      $constraints = array_merge($constraints, $this->getTableJoinCritera($table));
     }
     // TODO ignore those terms that are like constants...
     foreach ($constraints as $constraint) {
@@ -247,10 +252,6 @@ class DBFit {
       $final_data[] = $row;
     }
     
-    if (!count($final_data)) {
-      die_error("No data instance found.");
-    }
-
     $final_attributes = [];
     foreach ($attributes as $attribute) {
       if ($attribute === NULL) {
@@ -510,6 +511,7 @@ class DBFit {
   }
 
   function getOutputColumnAttributes() {
+    var_dump($this->outputColumns);
     return array_map([$this, "getColumnAttributes"], $this->outputColumns);
   }
 
@@ -532,32 +534,48 @@ class DBFit {
 
     $sql = "SELECT " . mysql_list($colNames, "noop") . " FROM";
     
-    foreach ($this->tables as $k => $table) {
+    /* Join all input tables AND the output tables needed, depending on the recursion depth */
+    $tables = $this->tables;
+    for ($recursionLevel = 0; $recursionLevel < count($recursionPath)+1; $recursionLevel++) {
+      $tables = array_merge($tables, $this->getColumnTables($this->outputColumns[$recursionLevel]));
+    }
+    
+    // echo "tables" . PHP_EOL . get_var_dump($tables);
+
+    foreach ($tables as $k => $table) {
       $sql .= " ";
       if ($k == 0) {
-      $sql .= $this->getTableName($k);
+        $sql .= $this->getTableName($table);
       }
       else {
-        $sql .= $this->getTableJoinType($k) . " " . $this->getTableName($k);
-        $crit = $this->getTableJoinCritera($k);
+        $sql .= $this->getTableJoinType($table) . " " . $this->getTableName($table);
+        $crit = $this->getTableJoinCritera($table);
         if (count($crit)) {
           $sql .= " ON " . join(" AND ", $crit);
         }
       }
     }
 
-    $whereCriteria = [];
+    $whereClauses = [];
     if ($this->whereCriteria !== NULL && count($this->whereCriteria)) {
-      $whereCriteria = array_merge($whereCriteria, $this->whereCriteria);
+      $whereClauses = array_merge($whereClauses, $this->whereCriteria);
     }
     if ($idVal !== NULL) {
       if($this->identifierColumnName === NULL)
         die_error("An identifier column name must be set. Use ->setIdentifierColumnName()");
-      $whereCriteria[] = $this->identifierColumnName . " = $idVal";
+      $whereClauses[] = $this->identifierColumnName . " = $idVal";
+    }
+    foreach ($recursionPath as $recursionLevel => $node) {
+      // $this->getOutputColumnAttributes()[$recursionLevel][$node[0]]->getName();
+      // var_dump([$node[0], $node[1]]);
+      // var_dump($this->getOutputColumnAttributes()[$recursionLevel]);
+      // var_dump($this->getOutputColumnAttributes()[$recursionLevel][$node[0]]);
+      $whereClauses[] = $this->getOutputColumnNames()[$recursionLevel]
+      . " = '" . $node[1] . "'";
     }
 
-    if (count($whereCriteria)) {
-      $sql .= " WHERE " . join("AND ", $whereCriteria);
+    if (count($whereClauses)) {
+      $sql .= " WHERE " . join("AND ", $whereClauses);
     }
 
     if ($this->limit !== NULL) {
@@ -607,11 +625,14 @@ class DBFit {
         }
         $classes = array_keys($classes);
 
+        if (!count($classes)) {
+          die_error("Couldn't apply ForceBinary treatment to column " . $this->getColumnName($column) . ". No data instance found.");
+        }
         // var_dump($classes);
         $attributes = [];
 
         foreach ($classes as $class) {
-          $attributes[] = new DiscreteAttribute($attr_name . "/" . $class, "bool", ["0", "1"]);
+          $attributes[] = new DiscreteAttribute($attr_name . "/" . $class, "bool", ["NO_" . $class, $class]);
         }
         $this->setColumnTreatmentArg($column, 0, $classes);
 
@@ -649,8 +670,9 @@ class DBFit {
               $res = mysql_select($this->db, $sql);
               
               if (!isset($this->stop_words)) {
-                $lang = "en";
-                $this->stop_words = explode("\n", file_get_contents($lang . "-stopwords.txt"));
+                // TODO italian
+                // TODO possibility to specify for each column
+                $this->stop_words = explode("\n", file_get_contents($this->DefBOWLang . "-stopwords.txt"));
               }
               foreach ($res as $raw_row) {
                 $text = $raw_row[$this->getColNickname($this->getColumnName($column))];
@@ -713,6 +735,12 @@ class DBFit {
         die_error("Unknown column type: " . $this->getColumnMySQLType($column));
         break;
     }
+    
+    if (is_array($attributes) and !count($attributes)) {
+      die_error("Something's off. Attributes set for a column (here '"
+        . $this->getColumnName($column) . "') can't be empty: " . get_var_dump($attributes) . PHP_EOL . get_var_dump($column) . PHP_EOL);
+    }
+    
     $column["attributes"] = $attributes;
   }
   // TODO use Nlptools
@@ -751,14 +779,14 @@ class DBFit {
   }
 
 
-  function getTableName(int $i) : string {
-    return $this->tables[$i]["name"];
+  function getTableName(array $tab) : string {
+    return $tab["name"];
   }
-  function &getTableJoinCritera(int $i) {
-    return $this->tables[$i]["join_criteria"];
+  function &getTableJoinCritera(array $tab) {
+    return $tab["joinCriteria"];
   }
-  function &getTableJoinType(int $i) {
-    return $this->tables[$i]["join_type"];
+  function &getTableJoinType(array $tab) {
+    return $tab["joinType"];
   }
 
   function getColumnName(array &$col, bool $force_no_table_name = false) : string {
@@ -793,8 +821,9 @@ class DBFit {
     $this->getColumnTreatment($col)[1+$j] = $val;
   }
   function getColumnAttrName(array &$col) {
-    return !array_key_exists("attr_name", $col) ?
-        $this->getColumnName($col, true) : $col["attr_name"];
+    return $col["attr_name"];
+    // return !array_key_exists("attr_name", $col) ?
+    //     $this->getColumnName($col, true) : $col["attr_name"];
   }
 
   function getColumnMySQLType(array &$col) {
@@ -804,6 +833,10 @@ class DBFit {
   function getColumnAttributes(array &$col) {
     var_dump($col);
     return $col["attributes"];
+  }
+
+  function getColumnTables(array &$col) {
+    return $col["tables"];
   }
 
   function getColumnAttrType(array &$col, $tr = -1) {
@@ -850,10 +883,20 @@ class DBFit {
 
   function addTable($tab) : self
   {
+    if (!is_array($this->tables)) {
+      die_error("Can't addTable at this time! Use ->setTables() instead.");
+    }
+    
+    $this->tables[] = $this->readTable($tab);
+    
+    return $this;
+  }
+
+  function readTable($tab) : array {
     $new_tab = [];
     $new_tab["name"] = NULL;
-    $new_tab["join_criteria"] = [];
-    $new_tab["join_type"] = count($this->tables) ? "INNER JOIN" : "";
+    $new_tab["joinCriteria"] = [];
+    $new_tab["joinType"] = count($this->tables) ? "INNER JOIN" : "";
 
     if (is_string($tab)) {
       $new_tab["name"] = $tab;
@@ -866,29 +909,24 @@ class DBFit {
         }
 
         listify($tab[1]);
-        $new_tab["join_criteria"] = $tab[1];
+        $new_tab["joinCriteria"] = $tab[1];
       }
       if (isset($tab[2])) {
-        $new_tab["join_type"] = $tab[2];
+        $new_tab["joinType"] = $tab[2];
       }
     } else {
       die_error("Malformed table: " . toString($tab));
     }
 
-    if (!is_array($this->tables)) {
-      die_error("Can't addTable at this time! Use ->setTables() instead.");
-    }
-    $this->tables[] = &$new_tab;
-    
-    return $this;
+    return $new_tab;
   }
-
+  
   function setColumns($columns) : self
   {
     if ($columns === "*") {
       /* Obtain column names from database */
       $sql = "SELECT * FROM `information_schema`.`columns` WHERE `table_name` IN "
-            . mysql_set(array_map([$this, "getTableName"], range(0, count($this->tables)-1))) . " ";
+            . mysql_set(array_map([$this, "getTableName"], $this->tables)) . " ";
       $res = mysql_select($this->db, $sql);
       
       $colsNames = [];
@@ -948,7 +986,7 @@ class DBFit {
         $new_col["treatment"] = $col[1];
       }
       if (isset($col[2])) {
-        if(!is_string($col[0])) {
+        if(!is_string($col[2])) {
           die_error("Malformed target attribute name for column: " . toString($col[2])
             . ". The target name must be a string.");
         }
@@ -991,7 +1029,8 @@ class DBFit {
     $new_col = [];
     $new_col["name"] = NULL;
     $new_col["treatment"] = "ForceCategoricalIfNotEnum";
-    $new_col["joinClauses"] = [];
+    $new_col["tables"] = [];
+    $new_col["attr_name"] = NULL;
     $new_col["mysql_type"] = NULL;
 
     $i_col = count($this->outputColumns);
@@ -1012,16 +1051,27 @@ class DBFit {
       }
       else {
         if (isset($col[1])) {
-          $new_col["joinClauses"] = $col[1];
+          $new_col["tables"] = array_map([$this, "readTable"], $col[1]);
         }
         if (isset($col[2])) {
           $new_col["treatment"] = $col[2];
+        }
+        if (isset($col[3])) {
+          if(!is_string($col[3])) {
+            die_error("Malformed target attribute name for column: " . toString($col[3])
+              . ". The target name must be a string.");
+          }
+          $new_col["attr_name"] = $col[3];
         }
       }
     } else {
       die_error("Malformed output column term: " . toString($col));
     }
 
+    if ($new_col["attr_name"] === NULL) {
+      $new_col["attr_name"] = $new_col["name"];
+    }
+    
     $this->check_columnName($new_col["name"]);
 
     if ($this->identifierColumnName !== NULL
@@ -1066,15 +1116,15 @@ class DBFit {
   function assignColumnMySQLType(array &$column)
   {
     /* Obtain column type */
-    $tables = array_map([$this, "getTableName"], range(0, count($this->tables)-1));
-    if (isset($column["joinClauses"])) {
-    // TODO maybe tables should also include all of the joinClauses of the previous output layers? Can't think of a use-case, though
-      $tables = array_merge($tables, array_column($column["joinClauses"], 0));
+    $tables = $this->tables;
+    if (isset($column["tables"])) {
+    // TODO maybe tables should also include all of the tables of the previous output layers? Can't think of a use-case, though
+      $tables = array_merge($tables, $column["tables"]);
     }
-    var_dump($tables);
+    // var_dump($tables);
 
     $sql = "SELECT * FROM `information_schema`.`columns` WHERE `table_name` IN "
-          . mysql_set($tables) . " ";
+          . mysql_set(array_map([$this, "getTableName"], $tables)) . " ";
     $res = mysql_select($this->db, $sql);
 
     /* Find column */
@@ -1131,6 +1181,13 @@ class DBFit {
     foreach ($dataframes as $i_prob => $data) {
       echo "Problem $i_prob/" . count($dataframes) . PHP_EOL;
 
+      if (!$data->numInstances()) {
+        if ($recursionLevel == 0) {
+          die_error("No data instance found (at root level prediction).");
+        }
+        continue;
+      }
+      
       list($trainData, $testData) = $this->getDataSplit($data);
       
       echo "TRAIN" . PHP_EOL . $trainData->toString(true) . PHP_EOL;
@@ -1200,6 +1257,13 @@ class DBFit {
     foreach ($dataframes as $i_prob => $data) {
       echo "Problem $i_prob/" . count($dataframes) . PHP_EOL;
       // echo "Data: " . $data->toString(true) . PHP_EOL;
+
+      // if (!$data->numInstances()) {
+      //   if ($recursionLevel == 0) {
+      //     die_error("No data instance found (at root level prediction).");
+      //   }
+      //   continue;
+      // }
 
       if(false && $idVal !== NULL && $data->numInstances() !== 1) {
         // TODO figure out, possible?
