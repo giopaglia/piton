@@ -242,7 +242,7 @@ function testMed3() {
   $db_fit->predictByIdentifier(1);
   $db_fit->predictByIdentifier(2);
   $db_fit->predictByIdentifier(3);
-  $db_fit->predictByIdentifier(10);
+  // $db_fit->predictByIdentifier(10);
 }
 
 function testMed2() {

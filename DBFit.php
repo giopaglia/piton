@@ -604,10 +604,10 @@ class DBFit {
     return array_map([$this, "getColumnName"], $this->outputColumns);
   }
 
-  function getOutputColumnAttributes() {
-    // var_dump($this->outputColumns);
-    return array_map([$this, "getColumnAttributes"], $this->outputColumns);
-  }
+  // function getOutputColumnAttributes() {
+  //   // var_dump($this->outputColumns);
+  //   return array_map([$this, "getColumnAttributes"], $this->outputColumns);
+  // }
 
   /* Need a nickname for every column when using table.column format,
       since PHP MySQL connctions do not allow to access result fields
