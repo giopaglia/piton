@@ -367,7 +367,7 @@ class Instances {
     }
 
     if(count($attributes) && !$allowDataLoss) {
-      die_error("Some attributes were not requested in new attribute set in Instances->sortAttrsAs. If this is desired, please use the allowDataLoss flag. " . get_arr_dump($attributes));
+      warn("Some attributes were not requested in the new attribute set in Instances->sortAttrsAs. If this is desired, please use the allowDataLoss flag. " . get_arr_dump($attributes));
     }
 
     $this->data = $newData;

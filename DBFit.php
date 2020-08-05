@@ -144,7 +144,10 @@ class DBFit {
     // var_dump($this->outputColumns);
 
     // $columns = array_merge(, $this->getColumns(false));
-      /* TODO figure out what's the best place where to assign column attributes */
+    /* 
+      TODO figure out what's the best place where to assign column attributes
+      TODO Question: Should I recompute the attributes when I recurse? I think so, because I might profit from attributes that are more specific
+     */
     // foreach (array_slice($this->outputColumns, $recursionLevel) as &$column) {
     for ($i_col = $recursionLevel; $i_col < count($this->outputColumns); $i_col++) {
       $this->assignColumnAttributes($this->outputColumns[$i_col], $idVal, $recursionPath);
@@ -189,6 +192,9 @@ class DBFit {
 
     /* Derive the columns needed at this recursion level */
     $columns = array_slice($this->outputColumns, 0, $recursionLevel+1);
+    $thisOutputAttr = $columns[$recursionLevel];
+    array_splice($columns, $recursionLevel, 1);
+    array_unshift($columns, $thisOutputAttr);
     $columns = array_merge($columns, $this->getColumns(false));
     
     // var_dump($columns[0]);
@@ -278,9 +284,10 @@ class DBFit {
     /* Unpacking: generate many dataframes, each with a single output attribute (one per each of the output attributes fore this column) */
     $dataframes = [];
     $numOutputAttributes = count($attributes[0]);
-    var_dump($attributes[0]);
+    // echo "Output attributes: ";
+    // var_dump($attributes[0]);
     foreach ($attributes[0] as $i_attr => $outputAttribute) {
-      echo "Problem $i_attr/" . $numOutputAttributes . PHP_EOL;
+      // echo "Problem $i_attr/" . $numOutputAttributes . PHP_EOL;
       if(!($outputAttribute instanceof DiscreteAttribute)) {
         die_error("All output attributes must be categorical! '"
           . $outputAttribute->getName() . "' ($i_attr) is not.");
@@ -511,7 +518,7 @@ class DBFit {
   }
 
   function getOutputColumnAttributes() {
-    var_dump($this->outputColumns);
+    // var_dump($this->outputColumns);
     return array_map([$this, "getColumnAttributes"], $this->outputColumns);
   }
 
@@ -831,7 +838,7 @@ class DBFit {
   }
 
   function getColumnAttributes(array &$col) {
-    var_dump($col);
+    // var_dump($col);
     return $col["attributes"];
   }
 
@@ -1071,7 +1078,7 @@ class DBFit {
     if ($new_col["attr_name"] === NULL) {
       $new_col["attr_name"] = $new_col["name"];
     }
-    
+
     $this->check_columnName($new_col["name"]);
 
     if ($this->identifierColumnName !== NULL
@@ -1185,6 +1192,7 @@ class DBFit {
         if ($recursionLevel == 0) {
           die_error("No data instance found (at root level prediction).");
         }
+        echo "Skipping node due to lack of data." . PHP_EOL;
         continue;
       }
       
@@ -1204,12 +1212,13 @@ class DBFit {
 
       /* Test */
       $this->test($model, $testData);
-      // $model->save(join_paths(MODELS_FOLDER, date("Y-m-d_H:i:s")));
 
-      $model->dumpToDB($this->db, $model_name);
+      $model->save(join_paths(MODELS_FOLDER, date("Y-m-d_H:i:s") . $model_name));
+
+      // TODO $model->dumpToDB($this->db, $model_name);
         // . "_" . join("", array_map([$this, "getColumnName"], ...).);
      
-      $model->saveToDB($this->db, $model_name, $testData);
+      // TODO $model->saveToDB($this->db, $model_name, $testData);
 
       $this->models[$model_name] = $model;
       /* For each output class value, recurse and train the subtree */
@@ -1220,17 +1229,17 @@ class DBFit {
       }
       else {
         $outputAttributes = $this->getOutputColumnAttributes()[$recursionLevel];
-        echo "outputAttributes";
-        var_dump($outputAttributes);
+        // echo "outputAttributes";
+        // var_dump($outputAttributes);
         foreach ($outputAttributes as $i_prob => $outputAttribute) {
-        var_dump($outputAttribute);
-          echo "Branching at depth $recursionLevel on attribute\""
+        // var_dump($outputAttribute);
+          echo "Branching at depth $recursionLevel on attribute \""
             . $outputAttribute->getName() . "\" ($i_prob/"
               . count($outputAttributes) . ")) "
             . " with domain " . toString($outputAttribute->getDomain())
             . ". " . PHP_EOL;
           foreach ($outputAttribute->getDomain() as $classValue) {
-            echo "Recursion on classValue $classValue for attribute\""
+            echo "Recursion on classValue $classValue for attribute \""
             . $outputAttribute->getName() . "\". " . PHP_EOL;
             $this->updateModel(array_merge($recursionPath, [[$i_prob, $classValue]]));
           }
@@ -1308,16 +1317,22 @@ class DBFit {
 
   /* TODO explain */
   function getModelName(array $recursionPath, int $i_prob) : string {
+    $outAttrs = $this->getOutputColumnAttributes();
+
     $name_chunks = [];
     foreach ($recursionPath as $recursionLevel => $node) {
       $name_chunks[] =
-        str_replace(".", ":", $this->getOutputColumnAttributes()[$recursionLevel][$node[0]]->getName())
+        str_replace(".", ">", $outAttrs[$recursionLevel][$node[0]]->getName())
         . "=" . $node[1];
     }
     $path_name = join("-", $name_chunks);
-    return $path_name . "__" . 
-        str_replace(".", ":",
-           $this->getOutputColumnAttributes()[count($recursionPath)][$i_prob]->getName());
+    // var_dump($outAttrs);
+    // var_dump($recursionPath);
+    // var_dump(count($recursionPath));
+    // var_dump($outAttrs[count($recursionPath)]);
+    $currentLevelStr = str_replace(".", ":",
+           $outAttrs[count($recursionPath)][$i_prob]->getName());
+    return str_replace("/", ":", $path_name . "__" . $currentLevelStr);
 
   }
   /* Use the model for predicting on a set of instances */

@@ -219,7 +219,7 @@ function testMed3() {
 ]);
   // $db_fit->setAllColumnsExcept("RaccomandazioniTerapeuticheUnitarie.ID");
   $db_fit->setLimit(10);
-  // $db_fit->setLimit(100);
+  $db_fit->setLimit(100);
   $db_fit->setOutputColumns([
     ["RaccomandazioniTerapeuticheUnitarie.TIPO",
       "ForceBinary"],
