@@ -34,16 +34,16 @@ function mysql_backtick_str($str) { return "`$str`"; }
 
 function &mysql_select(object &$db, string $sql) : object {
 
-  echo "SQL: $sql" . PHP_EOL;
+  echo "SQL:" . PHP_EOL . $sql . PHP_EOL;
   $stmt = $db->prepare($sql);
   if (!$stmt)
-    die_error("Incorrect SQL query: $sql");
+    die_error("Incorrect SQL query:" . PHP_EOL . $sql);
   if (!$stmt->execute())
-    die_error("Query failed: $sql");
+    die_error("Query failed:" . PHP_EOL . $sql);
   $res = $stmt->get_result();
   $stmt->close();
   if (!($res !== false))
-    die_error("SQL query failed: $sql");
+    die_error("SQL query failed:" . PHP_EOL . $sql);
   return $res;
 }
 
