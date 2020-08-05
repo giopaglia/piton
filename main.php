@@ -228,7 +228,8 @@ function testMed3() {
       [
         ["ElementiTerapici", ["ElementiTerapici.ID_RACCOMANDAZIONE_TERAPEUTICA_UNITARIA = RaccomandazioniTerapeuticheUnitarie.ID"]],
         ["PrincipiAttivi", "ElementiTerapici.ID_PRINCIPIO_ATTIVO = PrincipiAttivi.ID"]
-      ]
+      ],
+      "ForceCategoricalBinary"
     ]
   ]);
 
