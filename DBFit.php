@@ -209,17 +209,20 @@ class DBFit {
     /* Refresh all attributes except for those at the previous levels, in order to profit from attributes that are more specific.
      */
     /*
-      TODO figure out what's the best place where to assign column attributes. Question: Should I recompute the attributes when I recurse? I think so, because I might profit from attributes that are more specific. But I need to fix the outputAttributes at the previous levels
+      TODO figure out what's the best place where to assign column attributes. Question: Should I recompute the attributes when I recurse? I think so, because I might profit from attributes that are more specific. But I need to fix the outputAttributes at the previous levels. Thus, I recompute the remaining outputLevels, as well as the input attributes. On the other end, why do I need to refresh the lower-level outputColumns? At prediction time, I don't have values for those!
      */
-    for ($i_col = $recursionLevel; $i_col < count($this->outputColumns); $i_col++) {
-      // var_dump($this->outputColumns[$i_col]);
-      $this->assignColumnAttributes($this->outputColumns[$i_col], NULL, $recursionPath);
-      // var_dump($this->outputColumns[$i_col]);
-    }
+    // for ($i_col = $recursionLevel; $i_col < count($this->outputColumns); $i_col++) {
+    //   // var_dump($this->outputColumns[$i_col]);
+    //   $this->assignColumnAttributes($this->outputColumns[$i_col], NULL, $recursionPath);
+    //   // var_dump($this->outputColumns[$i_col]);
+    // }
+    var_dump($this->outputColumns[$recursionLevel]);
+    $this->assignColumnAttributes($this->outputColumns[$recursionLevel], NULL, $recursionPath);
     foreach ($this->getColumns(false) as &$column) {
       $this->assignColumnAttributes($column, NULL, $recursionPath);
     }
     
+    var_dump($this->outputColumns[$recursionLevel]);
     // var_dump($this->outputColumns);
     // var_dump($this->columns);
 
@@ -271,11 +274,12 @@ class DBFit {
     // TODO figure out whether I should be using the previous outputColumns values,
     //  but I think they would hold the same value, and $recursionPath contains everything needed. I think they should be discarted. If so, then no need to include them in $columns and $colsNeeded.
     //  TODO the difference between columns and cols needed is just potentially the presence of the identifiercolumn. It'd be super simpler if we're sure that that column is not in $this->columns
-    $columns = array_slice($this->outputColumns, 0, $recursionLevel+1);
-    $thisOutputAttr = $columns[$recursionLevel];
-    array_splice($columns, $recursionLevel, 1);
-    array_unshift($columns, $thisOutputAttr);
-    $columns = array_merge($columns, $this->getColumns(false));
+    // $columns = array_slice($this->outputColumns, 0, $recursionLevel+1);
+    // $thisOutputAttr = $columns[$recursionLevel];
+    // array_splice($columns, $recursionLevel, 1);
+    // array_unshift($columns, $thisOutputAttr);
+    // $columns = array_merge($columns, $this->getColumns(false));
+    $columns = array_merge([$this->outputColumns[$recursionLevel]], $this->getColumns(false));
 
     // var_dump($columns);
 
@@ -1306,7 +1310,7 @@ class DBFit {
       return;
     }
 
-    $outputAttributes = $this->getOutputColumnAttributes()[$recursionLevel];
+    $outputAttributes = $this->getColumnAttributes($this->outputColumns[$recursionLevel]);
     
     // TODO figure out, note: since the four root problems are independent, we use  splits that can be different (due to randomization)
     foreach ($dataframes as $i_prob => $data) {
@@ -1381,7 +1385,7 @@ class DBFit {
     }
 
     $recursionLevel = count($recursionPath);
-    $outputAttributes = $this->getOutputColumnAttributes()[$recursionLevel];
+    $outputAttributes = $this->getColumnAttributes($this->outputColumns[$recursionLevel]);
 
     /* If no model was trained for the current node, stop the recursion */
     $atLeastOneModel = false;
@@ -1465,12 +1469,11 @@ class DBFit {
 
   /* TODO explain */
   function getModelName(array $recursionPath, int $i_prob) : string {
-    $outAttrs = $this->getOutputColumnAttributes();
 
     $name_chunks = [];
     foreach ($recursionPath as $recursionLevel => $node) {
       $name_chunks[] =
-        str_replace(".", ">", $outAttrs[$recursionLevel][$node[0]]->getName())
+        str_replace(".", ">", $this->getColumnAttributes($this->outputColumns[$recursionLevel])[$node[0]]->getName())
         . "=" . $node[1];
     }
     $path_name = join("-", $name_chunks);
@@ -1478,8 +1481,9 @@ class DBFit {
     // var_dump($recursionPath);
     // var_dump(count($recursionPath));
     // var_dump($outAttrs[count($recursionPath)]);
+    $recursionLevel = count($recursionPath);
     $currentLevelStr = str_replace(".", ":",
-           $outAttrs[count($recursionPath)][$i_prob]->getName());
+           $this->getColumnAttributes($this->outputColumns[$recursionLevel])[$i_prob]->getName());
     return str_replace("/", ":", $path_name . "__" . $currentLevelStr);
 
   }
