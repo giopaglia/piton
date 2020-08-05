@@ -90,7 +90,7 @@ class DBFit {
       // second outputColumn
       ["PrincipiAttivi.NOME",
         [
-          ["ElementiTerapici", ["report.ID = Raccomandations.reportID"]],
+          ["ElementiTerapici", ["report.ID = Recommandations.reportID"]],
           ["PrincipiAttivi", "ElementiTerapici.PrAttID = PrincipiAttivi.ID"]
         ]
       ]
@@ -105,7 +105,7 @@ class DBFit {
     - "patient.Age > 30"
     - ["patient.Age > 30", "patient.Name IS NOT NULL"]
   */
-  private $whereCriteria;
+  private $whereClauses;
 
   /* SQL LIMIT term in the SELECT query (integer) */
   private $limit;
@@ -176,7 +176,7 @@ class DBFit {
     $this->columns = [];
     $this->setOutputColumns([]);
     $this->setIdentifierColumnName(NULL);
-    $this->whereCriteria = NULL;
+    $this->whereClauses = NULL;
     $this->limit = NULL;
 
     $this->models = [];
@@ -188,9 +188,13 @@ class DBFit {
   private function readData($idVal = NULL, array $recursionPath = []) : array {
 
     echo "DBFit->readData($idVal, " . toString($recursionPath) . ")" . PHP_EOL;
+
     /* Checks */
     if (!count($this->columns)) {
-      die_error("Must specify the concerning columns, through ->setColumns() or ->addColumn().");
+      die_error("Must specify the concerning input columns, through ->setColumns() or ->addColumn().");
+    }
+    if (!count($this->outputColumns)) {
+      die_error("Must specify at least an output column, through ->setOutputColumns() or ->addOutputColumn().");
     }
     if (!count($this->tables)) {
       die_error("Must specify the concerning tables, through ->setTables() or ->addTable().");
@@ -201,12 +205,11 @@ class DBFit {
 
     // var_dump($this->outputColumns);
 
-    // $columns = array_merge(, $this->getColumns(false));
-    /* 
-      TODO figure out what's the best place where to assign column attributes
-      TODO Question: Should I recompute the attributes when I recurse? I think so, because I might profit from attributes that are more specific
+    /* Refresh all attributes except for those at the previous levels, in order to profit from attributes that are more specific.
      */
-    // foreach (array_slice($this->outputColumns, $recursionLevel) as &$column) {
+    /*
+      TODO figure out what's the best place where to assign column attributes. Question: Should I recompute the attributes when I recurse? I think so, because I might profit from attributes that are more specific. But I need to fix the outputAttributes at the previous levels
+     */
     for ($i_col = $recursionLevel; $i_col < count($this->outputColumns); $i_col++) {
       // var_dump($this->outputColumns[$i_col]);
       $this->assignColumnAttributes($this->outputColumns[$i_col], NULL, $recursionPath);
@@ -219,21 +222,13 @@ class DBFit {
     // var_dump($this->outputColumns);
     // var_dump($this->columns);
 
-    /* If any WHERE/JOIN-ON constraint forces the equality between two columns,
-        drop one of the resulting attributes. */
+    /* Ignore redundant columns by examining the SQL constaints */
     $columnsToIgnore = [];
-    $constraints = [];
-    if ($this->whereCriteria !== NULL && count($this->whereCriteria)) {
-      foreach ($this->whereCriteria as $criterion) {
-        $constraints[] = $criterion;
-      }
-    }
-    foreach ($this->tables as $table) {
-      $constraints = array_merge($constraints, $this->getTableJoinClauses($table));
-    }
-    // TODO ignore those terms that are like constants...
+    $constraints = $this->getSQLConstraints($idVal, $recursionPath);
     foreach ($constraints as $constraint) {
-      if(preg_match("/\s*([\S\.]+)\s*=\s*([\S\.]+)\s*/i", $constraint, $matches)) {
+      /* If any WHERE/JOIN-ON constraint forces the equality between two columns,
+        drop one of the resulting attributes. */
+      if(preg_match("/\s*([a-z\d_\.]+)\s*=\s*([a-z\d_\.]+)\s*/i", $constraint, $matches)) {
         $fst = $matches[1];
         $snd = $matches[2];
 
@@ -244,11 +239,32 @@ class DBFit {
           && !in_array($snd, $columnsToIgnore)) {
           $columnsToIgnore[] = $snd;
         } else {
-          // TODO
-          die_error("TODO unexpected case encountered when removing redundant columns.");
+          die_error("Unexpected case encountered when removing redundant columns."); // What to do here?
+        }
+      }
+      // Drop attribute when forcing equality to a constant (because then the attributes is not informative)
+      if(preg_match("/\s*([a-z\d_\.]+)\s*=\s*('[a-z\d_\.]*')\s*/i", $constraint, $matches)) {
+        $col = $matches[1];
+        if (!in_array($col, [$this->identifierColumnName, $outputColumnName])
+          && !in_array($col, $columnsToIgnore)) {
+          $columnsToIgnore[] = $col;
+        } else {
+          die_error("Unexpected case encountered when removing redundant columns.");
+        }
+      }
+      if(preg_match("/\s*('[a-z\d_\.]*')\s*=\s*([a-z\d_\.]+)\s*/i", $constraint, $matches)) {
+        $col = $matches[2];
+        if (!in_array($col, [$this->identifierColumnName, $outputColumnName])
+          && !in_array($col, $columnsToIgnore)) {
+          $columnsToIgnore[] = $col;
+        } else {
+          die_error("Unexpected case encountered when removing redundant columns.");
         }
       }
     }
+
+    echo "columnsToIgnore  ";
+    var_dump($columnsToIgnore);
 
     /* Derive the columns needed at this recursion level */
     $columns = array_slice($this->outputColumns, 0, $recursionLevel+1);
@@ -624,23 +640,7 @@ class DBFit {
       }
     }
 
-    $whereClauses = [];
-    if ($this->whereCriteria !== NULL && count($this->whereCriteria)) {
-      $whereClauses = array_merge($whereClauses, $this->whereCriteria);
-    }
-    if ($idVal !== NULL) {
-      if($this->identifierColumnName === NULL)
-        die_error("An identifier column name must be set. Use ->setIdentifierColumnName()");
-      $whereClauses[] = $this->identifierColumnName . " = $idVal";
-    }
-    foreach ($recursionPath as $recursionLevel => $node) {
-      // $this->getOutputColumnAttributes()[$recursionLevel][$node[0]]->getName();
-      // var_dump([$node[0], $node[1]]);
-      // var_dump($this->getOutputColumnAttributes()[$recursionLevel]);
-      // var_dump($this->getOutputColumnAttributes()[$recursionLevel][$node[0]]);
-      $whereClauses[] = $this->getOutputColumnNames()[$recursionLevel]
-      . " = '" . $node[1] . "'";
-    }
+    $whereClauses = $this->getSQLWhereClauses($idVal, $recursionPath);
 
     if (count($whereClauses)) {
       $sql .= " WHERE " . join(" AND ", $whereClauses);
@@ -658,6 +658,37 @@ class DBFit {
 
     return $sql;
   }
+
+  private function getSQLConstraints($idVal, array $recursionPath) : array {
+    $constraints = $this->getSQLWhereClauses($idVal, $recursionPath);
+    foreach ($this->tables as $table) {
+      $constraints = array_merge($constraints, $this->getTableJoinClauses($table));
+    }
+    return $constraints;
+  }
+
+  private function getSQLWhereClauses($idVal, array $recursionPath) : array {
+    $whereClauses = [];
+    if ($this->whereClauses !== NULL && count($this->whereClauses)) {
+      $whereClauses = array_merge($whereClauses, $this->whereClauses);
+    }
+    if ($idVal !== NULL) {
+      if($this->identifierColumnName === NULL)
+        die_error("An identifier column name must be set. Use ->setIdentifierColumnName()");
+      $whereClauses[] = $this->identifierColumnName . " = $idVal";
+    }
+    $outAttrs = $this->getOutputColumnNames();
+    foreach ($recursionPath as $recursionLevel => $node) {
+      // $this->getOutputColumnAttributes()[$recursionLevel][$node[0]]->getName();
+      // var_dump([$node[0], $node[1]]);
+      // var_dump($this->getOutputColumnAttributes()[$recursionLevel]);
+      // var_dump($this->getOutputColumnAttributes()[$recursionLevel][$node[0]]);
+      $whereClauses[] = $outAttrs[$recursionLevel]
+      . " = '" . $node[1] . "'";
+    }
+    return $whereClauses;
+  }
+
 
   /* Create attribute(s) for a column */
   function assignColumnAttributes(array &$column, $idVal = NULL, array $recursionPath = [])
@@ -1514,16 +1545,16 @@ class DBFit {
     return $this;
   }
 
-  function setWhereCriteria($whereCriteria) : self
+  function setWhereClauses($whereClauses) : self
   {
-    listify($whereCriteria);
-    foreach ($whereCriteria as $jc) {
+    listify($whereClauses);
+    foreach ($whereClauses as $jc) {
       if (!is_string($jc)) {
-        die_error("Non-string value encountered in whereCriteria: "
+        die_error("Non-string value encountered in whereClauses: "
         . "\"$jc\": ");
       }
     }
-    $this->whereCriteria = $whereCriteria;
+    $this->whereClauses = $whereClauses;
     return $this;
   }
 

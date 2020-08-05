@@ -220,6 +220,7 @@ function testMed3() {
   // $db_fit->setAllColumnsExcept("RaccomandazioniTerapeuticheUnitarie.ID");
   $db_fit->setLimit(10);
   $db_fit->setLimit(100);
+  $db_fit->setWhereClauses("Pazienti.SESSO = 'F'");
   $db_fit->setOutputColumns([
     ["RaccomandazioniTerapeuticheUnitarie.TIPO",
       "ForceCategoricalBinary"],
@@ -476,6 +477,7 @@ function testMed() {
   $db_fit->setLimit(10);
   // $db_fit->setLimit(100);
   // $db_fit->setLimit(1000);
+  $db_fit->setWhereClauses([]);
   $db_fit->setOutputColumnName("RaccomandazioniTerapeuticheUnitarie.TIPO"
      ,"ForceCategoricalBinary"
   );
@@ -519,14 +521,14 @@ function testSilly() {
 
   $table_names = ["patients"];
   $columns = ["ID", "Gender", ["BirthDate", "YearsSince", "Age"], "Sillyness"];
-  $where_criteria = NULL;
+  $whereClauses = NULL;
   $output_column_name = "Sillyness";
 
   $db_fit = new DBFit($db);
   $db_fit->setTrainingMode("FullTraining");
   $db_fit->setTables($table_names);
   $db_fit->setColumns($columns);
-  $db_fit->setWhereCriteria($where_criteria);
+  $db_fit->setWhereClauses($whereClauses);
   $db_fit->setOutputColumnName($output_column_name);
   // $db_fit->setModelType($model_type);
   $db_fit->setLearningMethod($learning_method);
@@ -543,7 +545,7 @@ function testWinery() {
     ["winery.country", "ForceCategorical"],
     ["winery.description", ["BinaryBagOfWords", 14]],
   ];
-  $where_criteria = [];
+  $whereClauses = [];
   $output_column_name = "winery.country";
 
   $db_fit = new DBFit($db);
@@ -551,7 +553,7 @@ function testWinery() {
   $db_fit->setTrainingMode([.8, .2]);
   $db_fit->setTables($table_names);
   $db_fit->setColumns($columns);
-  $db_fit->setWhereCriteria($where_criteria);
+  $db_fit->setWhereClauses($whereClauses);
   $db_fit->setLimit(100);
   $db_fit->setOutputColumnName($output_column_name);
   // $db_fit->setModelType($model_type);
@@ -579,14 +581,14 @@ function testSillyWithJoin() {
     ["reports.PatientID", NULL, "ID"],
     ["reports.DoctorIsFrares"]
   ];
-  $where_criteria = ["patients.ID = reports.PatientID"];
+  $whereClauses = ["patients.ID = reports.PatientID"];
   $output_column_name = "patients.Sillyness";
 
   $db_fit = new DBFit($db);
   $db_fit->setTrainingMode([.8, .2]);
   $db_fit->setTables($table_names);
   $db_fit->setColumns($columns);
-  $db_fit->setWhereCriteria($where_criteria);
+  $db_fit->setWhereClauses($whereClauses);
   $db_fit->setOutputColumnName($output_column_name);
   // $db_fit->setModelType($model_type);
   $db_fit->setLearningMethod($learning_method);
@@ -602,14 +604,14 @@ function testCovid() {
 
   $table_names = ["covid19_italy_province"];
   $columns = [["Date", "DaysSince", "DaysAgo"] , ["ProvinceCode", "ForceCategorical"], "Date", "TotalPositiveCases"];
-  $where_criteria = NULL;
+  $whereClauses = NULL;
   $output_column_name = "ProvinceCode";
 
   $db_fit = new DBFit($db);
   // $db_fit->setModelType($model_type);
   $db_fit->setTables($table_names);
   $db_fit->setColumns($columns);
-  $db_fit->setWhereCriteria($where_criteria);
+  $db_fit->setWhereClauses($whereClauses);
   $db_fit->setOutputColumnName($output_column_name);
   $db_fit->setLimit(1000);
   $db_fit->setLearningMethod($learning_method);
