@@ -222,7 +222,8 @@ class DBFit {
     // var_dump($this->outputColumns);
     // var_dump($this->columns);
 
-    /* Ignore redundant columns by examining the SQL constaints */
+    /* Select redundant columns by examining the SQL constaints,
+        to be ignored when creating the dataframe */
     $columnsToIgnore = [];
     $constraints = $this->getSQLConstraints($idVal, $recursionPath);
     foreach ($constraints as $constraint) {
@@ -263,20 +264,16 @@ class DBFit {
       }
     }
 
-    echo "columnsToIgnore  ";
-    var_dump($columnsToIgnore);
+    // echo "columnsToIgnore  "; var_dump($columnsToIgnore);
 
-    /* Derive the columns needed at this recursion level */
+    /* Derive the input columns & output columns needed for the dataframes at this recursion level */
     $columns = array_slice($this->outputColumns, 0, $recursionLevel+1);
     $thisOutputAttr = $columns[$recursionLevel];
     array_splice($columns, $recursionLevel, 1);
     array_unshift($columns, $thisOutputAttr);
     $columns = array_merge($columns, $this->getColumns(false));
-    
-    var_dump($columns[0]);
-    var_dump($columns[1]);
-    // var_dump($columns[10]);
 
+    /* Derive the columns needed for the SQL query */
     $colsNeeded = array_slice($this->outputColumns, 0, $recursionLevel+1);
     $colsNeeded = array_merge($colsNeeded, $this->getColumns(true));
     $colsNeeded = array_map([$this, "getColumnName"], $colsNeeded);
@@ -288,7 +285,7 @@ class DBFit {
     echo "Recursion path: " . toString($recursionPath) . PHP_EOL;
     echo "Identifier value: " . toString($idVal) . PHP_EOL;
 
-    /* Create attributes from column */
+    /* Obtain the attributes for each dataframe column */
     $attributes = [];
 
     foreach ($columns as &$column) {
@@ -302,7 +299,6 @@ class DBFit {
     }
 
     /* Finally obtain data */
-    
     $sql = $this->getSQLSelectQuery($colsNeeded, $idVal, $recursionPath);
     $res = mysql_select($this->db, $sql);
     $data = $this->readRawData($res, $attributes, $columns);
@@ -310,6 +306,7 @@ class DBFit {
     // echo count($data) . " rows retrieved" . PHP_EOL;
     // echo get_var_dump($data);
     
+    TODO document from here
     /* Deflate attribute and data arrays (breaking the symmetry with columns) */
     
     $final_data = [];
