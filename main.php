@@ -65,7 +65,7 @@ function testMed3() {
   ]);
 
   $db_fit->setIdentifierColumnName("Referti.ID");
-  $db_fit->setDefaultOption("TextTreatment", ["BinaryBagOfWords", 10]);
+  $db_fit->setDefaultOption("textTreatment", ["BinaryBagOfWords", 10]);
   $db_fit->setColumns([
 "Anamnesi.DATA_SALVA",
 "Anamnesi.DATA_ANNULLA",
@@ -222,7 +222,7 @@ function testMed3() {
   $db_fit->setLimit(100);
   $db_fit->setOutputColumns([
     ["RaccomandazioniTerapeuticheUnitarie.TIPO",
-      "ForceBinary"],
+      "ForceCategoricalBinary"],
     ["PrincipiAttivi.NOME",
       [
         ["ElementiTerapici", ["ElementiTerapici.ID_RACCOMANDAZIONE_TERAPEUTICA_UNITARIA = RaccomandazioniTerapeuticheUnitarie.ID"]],
@@ -260,7 +260,7 @@ function testMed2() {
     ["Pazienti", "Pazienti.ID = Referti.ID_PAZIENTE"]
   ]);
   $db_fit->setIdentifierColumnName("RaccomandazioniTerapeuticheUnitarie.ID");
-  $db_fit->setDefaultOption("TextTreatment", ["BinaryBagOfWords", 10]);
+  $db_fit->setDefaultOption("textTreatment", ["BinaryBagOfWords", 10]);
   $db_fit->setColumns("*");
   $db_fit->setColumns([
     "RaccomandazioniTerapeutiche.DATA_ANNULLA",
@@ -279,7 +279,7 @@ function testMed2() {
   // $db_fit->setLimit(10);
   // $db_fit->setLimit(100);
   $db_fit->setOutputColumnName("RaccomandazioniTerapeuticheUnitarie.TIPO"
-  // , "ForceBinary"
+  // , "ForceCategoricalBinary"
   );
   $lr = new PRip();
   // $lr->setNumOptimizations(10); TODO
@@ -321,7 +321,7 @@ function testMed() {
     ["Pazienti", "Pazienti.ID = Referti.ID_PAZIENTE"]
   ]);
   $db_fit->setIdentifierColumnName("Referti.ID");
-  $db_fit->setDefaultOption("TextTreatment", ["BinaryBagOfWords", 10]);
+  $db_fit->setDefaultOption("textTreatment", ["BinaryBagOfWords", 10]);
   $db_fit->setColumns([
 "Anamnesi.DATA_SALVA",
 "Anamnesi.DATA_ANNULLA",
@@ -477,7 +477,7 @@ function testMed() {
   // $db_fit->setLimit(100);
   // $db_fit->setLimit(1000);
   $db_fit->setOutputColumnName("RaccomandazioniTerapeuticheUnitarie.TIPO"
-     ,"ForceBinary"
+     ,"ForceCategoricalBinary"
   );
   $lr = new PRip();
   // $lr->setNumOptimizations(10); TODO

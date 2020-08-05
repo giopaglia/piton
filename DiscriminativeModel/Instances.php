@@ -338,7 +338,7 @@ class Instances {
           break;
         }
       }
-      if ($oldAttribute === NULL && !$allowDataLoss) {
+      if ($oldAttribute === NULL) {
         die_error("Couldn't find attribute '{$newAttribute->getName()}' in the current attribute list " . get_arr_dump($this->attributes) . " in Instances->sortAttrsAs");
       }
 

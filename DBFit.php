@@ -21,70 +21,128 @@ class DBFit {
   /* Database access (Object-Oriented MySQL style) */
   private $db;
 
-  /* Concerning database tables (array of terms.) (TODO strings but also not, explain) */
+  /*
+    Concerning database tables (array of table-terms, one for each table)
+    
+    *
+    
+    For each table, the name must be specified. The name alone is sufficient for
+    the first specified table, so the first term can be the name in the form of a string (e.g "patient"). For the remaining tables, join criteria can be specified, by means of 'joinClauses' and 'joinType'.
+    If one wants to specify these parameters, then the table-term should be an array [tableName, joinClauses=[], joinType="INNER JOIN"].
+    joinClauses is a list of 'MySQL constraint strings' such as "patent.ID = report.patientID", used in the JOIN operation. If a single constraint is desired, then joinClauses can also simply be the string represeting the constraint (as compared to the array containing the single constraint).
+    The join type, defaulted to "INNER JOIN", is the MySQL type of join.
+  */
   private $tables;
 
-  /* MySQL columns to read. This is an array of terms, one for each column.
-    For each column, the name must be specified, so a term can simply be
-     the name of the column (e.g "Age").
-    When dealing with more than one MySQL
-     table, it is mandatory that each column name references the table it belongs,
-     as in "patient.Age".
+  /*
+    Input columns. (array of column-terms, one for each column)
+
+    *
+    
+    For each column, the name must be specified, and it makes up sufficient information. As such, a term can simply be the name of the column (e.g "Age").
+    When dealing with more than one MySQL table, it is mandatory that each column name references the table it belongs, as in "patient.Age".
     Additional parameters can be supplied for managing the column pre-processing.
+    The generic form for a column-term is [columnName, treatment=NULL, attrName=columnName].
     - A "treatment" for a column determines how to derive an attribute from the
        column data. For example, "YearsSince" translates each value of
        a date/datetime column into an attribute value representing the number of
        years since the date. "DaysSince", "MonthsSince" are also available.
       "DaysSince" is the default treatment for dates/datetimes
-      "ForceCategorical" forces the corresponding attribute to be nominal, with
-       its domain consisting of the unique values found in the table for the column.
-      For text fields, "BinaryBagOfWords" can be used to generate k binary attributes
-       representing the presence of a frequent word in the field.
-      The column term when a treatment is desired must be an array
-       [columnName, treatment] (e.g ["BirthDate", "ForceCategorical"])
+      "ForceCategorical" forces the corresponding attribute to be nominal. If the column is an enum fields, the enum domain will be inherited, otherwise a domain will be built using the unique values found in the column.
+      "ForceCategoricalBinary" takes one step further and translates the nominal attribute to become a set of k binary attributes, with k the original number of classes.
+      (TODO generalize: "ForceBinary" generates k binary attributes from a generic nominal attribute of domain size k.)
+      For text fields, "BinaryBagOfWords" can be used to generate k binary attributes, each representing the presence of one of the most frequent words.
+      When a treatment is desired, the column-term must be an array
+       [columnName, treatment=NULL] (e.g ["BirthDate", "ForceCategorical"])
       Treatments may require/allow arguments, and these can be supplied through
        an array instead of a simple string. For example, "BinaryBagOfWords"
        requires a parameter k, representing the size of the dictionary.
        As an example, the following term requires BinaryBagOfWords with k=10:
        ["Description", ["BinaryBagOfWords", 10]].
-      A NULL treatment implies no such pre-processing step.
+      The treatment for input column is defaulted to NULL, which implies no such pre-processing step. Note that the module complains whenever it encounter
+        text fields with no treatment specified. When dealing with many text fields, consider setting the default option "textTreatment" via ->setDefaultOption(). For example, ->setDefaultOption("textTreatment", ["BinaryBagOfWords", 10]).
     - The name of the attribute derived from the column can also be specified:
        for instance, ["BirthDate", "YearsSince", "Age"] creates an "Age" attribute
        by processing a "BirthDate" sql column.
   */
   private $columns;
   
-  /* Names (categorical) column/attribute to predict, together with
-      additional join constraints for hierarchical prediction. */
+  /* Columns that are to be treated as output.
+      (array of outputColumn-terms, one for each column)
+
+    *
+  
+    This module supports hierarchical models. This means that a unique DBFit object can be used to train different models at predicting different output columns that are inter-related, with different sets of data.
+    In the simplest case, the user specifies a unique output column, from which M attributes are generated. Then, M models are generated, each predicting an attribute value, which is then used for deriving a value for the output column.
+    One can then take this a step further and, for each of the M models, independently train K models, where K is the number of output classes of the attribute, using data that is only relevant to that given output class and model. Generally, this hierarchical training and prediction structur takes the form of a tree with depth O (number of "nested" outputColumns).
+    Having said this, the outputColumns array specifies one column per each depth of the recursion tree.
+
+    outputColumn-terms are very similar to column-terms (see documentation for $this->columns a few lines above), with a few major differences:
+    - The default treatment is "ForceCategorical": note, in fact, that output columns must generate categorical attributes (this module only supports classification and not regression). Also consider using "ForceCategoricalBinary", which breaks a nominal class attribute into k disjoint binary attributes.
+    - From the second outputColumn onwards, one can introduce a new column derived by join operations (thus introducing tables that are not in $this->tables).
+    Additional join criteria can be specified via table-terms format (see documentation for $this->tables a few lines above) using the format [columnName, tables, treatment="ForceCategorical", TODO attrName=columnName].
+    Note that additional join criteria for the first outputColumn are not allowed, and should instead be specified into $this->tables; format expected for the first outputColumn is similar to column-terms: [columnName, treatment="ForceCategorical", attrName=columnName],
+
+    As such, the following is a valid outputColumns array:
+    [
+      // first outputColumn
+      ["report.Status", "ForceCategoricalBinary"],
+      // second outputColumn
+      ["PrincipiAttivi.NOME",
+        [
+          ["ElementiTerapici", ["report.ID = Raccomandations.reportID"]],
+          ["PrincipiAttivi", "ElementiTerapici.PrAttID = PrincipiAttivi.ID"]
+        ]
+      ]
+    ]
+
+  */
   private $outputColumns;
 
-  /* SQL WHERE clauses for the concerning tables (array of strings) */
+  /*
+    SQL WHERE clauses for the concerning tables (array of strings, or single string)
+    For example:
+    - "patient.Age > 30"
+    - ["patient.Age > 30", "patient.Name IS NOT NULL"]
+  */
   private $whereCriteria;
 
-  /* SQL LIMIT term in the SELECT query */
+  /* SQL LIMIT term in the SELECT query (integer) */
   private $limit;
 
-  /* An identifier column, used during sql-based prediction */
+  /* An identifier column, used during sql-based prediction
+    A value for the identifier column identifies a set of data rows that are to be compressed into a single data instance before use.
+  */
   private $identifierColumnName;
 
-  /* Optimizer in use for training the models */
+  /* Optimizer in use for training the models.
+    This can be set via ->setLearningMethod(string) (only "PRip" available atm),
+    or ->setLearner($learner)
+  */
   private $learner;
 
-  /* Discriminative models trained or loaded */
+  /* Array storing all the hierarchy of discriminative models trained (or loaded) */
   private $models;
 
-  /* Training mode (e.g full training, or perform train/test split) */
-  static private $defTrainingMode = [80, 20];
+  /*
+    Training mode.
+    Available values:
+    - "FullTraining" (trains and test onto the same 100% of data)
+    - [train_w, test_w] (train/test split according to these two weights)
+  */
   private $trainingMode;
 
+  /* Default options, to be set via ->setDefaultOption() */
+  private $defaultOptions = [
+    /* Default training mode in use */
+    "trainingMode"  => [80, 20],
+    /* Default text treatment. NULL treatment will raise error as soon as a text column is encountered. */
+    "textTreatment" => NULL,
+    /* Default language for text pre-processing */
+    "textLanguage" => "en"
+  ];
 
-  /* Default options TODO explain */
-  private $defaultOptions = [];
-  
-  /* Default language for bag-of-words models TODO explain */
-  private $DefBOWLang = "en";
-  
-  /* MAP: Mysql column type -> attr type */
+  /* Utility Map: Mysql column type -> attr type */
   static $col2attr_type = [
     "datetime" => [
       "" => "datetime"
@@ -171,7 +229,7 @@ class DBFit {
       }
     }
     foreach ($this->tables as $table) {
-      $constraints = array_merge($constraints, $this->getTableJoinCritera($table));
+      $constraints = array_merge($constraints, $this->getTableJoinClauses($table));
     }
     // TODO ignore those terms that are like constants...
     foreach ($constraints as $constraint) {
@@ -349,8 +407,8 @@ class DBFit {
           }
           else {
             switch (true) {
-              /* ForceBinary */
-              case $this->getColumnTreatmentType($column) == "ForceBinary":
+              /* ForceCategoricalBinary */
+              case $this->getColumnTreatmentType($column) == "ForceCategoricalBinary":
 
                 /* Append k values, one for each of the classes */
                 $classes = $this->getColumnTreatmentArg($column, 0);
@@ -387,7 +445,7 @@ class DBFit {
                   $val = $attribute->getKey($raw_val);
                   if ($val === false) {
                     /* When forcing categorical, push the unfound values to the domain */
-                    if (in_array($this->getColumnTreatmentType($column), ["ForceCategorical", "ForceCategoricalIfNotEnum"])) {
+                    if (in_array($this->getColumnTreatmentType($column), ["ForceCategorical"])) {
                       $attribute->pushDomainVal($raw_val);
                       $val = $attribute->getKey($raw_val);
                     }
@@ -467,7 +525,7 @@ class DBFit {
                       die_error("Found more than one row with same identifier value: '{$this->identifierColumnName}' = " . get_var_dump($idVal)
                       . ", but I don't know how to merge values for column " . $this->getColumnName($columns[$i_col])
                       . " ($i_col) of type '{$attribute[$a]->getType()}'. "
-                      . "Suggestion: specify ForceBinary treatment for this column (this will break categorical attributes into k binary attributes, easily mergeable via OR operation)."
+                      . "Suggestion: specify ForceBinary/ForceCategoricalBinary treatment for this column (this will break categorical attributes into k binary attributes, easily mergeable via OR operation)."
                       // . get_var_dump($z[0]) . get_var_dump($z[1])
                       // . get_var_dump($attr_vals_orig) . get_var_dump($attr_vals)
                       );
@@ -559,7 +617,7 @@ class DBFit {
       }
       else {
         $sql .= $this->getTableJoinType($table) . " " . $this->getTableName($table);
-        $crit = $this->getTableJoinCritera($table);
+        $crit = $this->getTableJoinClauses($table);
         if (count($crit)) {
           $sql .= " ON " . join(" AND ", $crit);
         }
@@ -604,25 +662,11 @@ class DBFit {
   /* Create attribute(s) for a column */
   function assignColumnAttributes(array &$column, $idVal = NULL, array $recursionPath = [])
   {
-    $attr_name = $this->getColumnAttrName($column);
+    $attrName = $this->getColumnAttrName($column);
 
     switch(true) {
-      /* Forcing a categorical attribute */
-      case $this->getColumnTreatmentType($column) == "ForceCategorical":
-        $attributes = [new DiscreteAttribute($attr_name, "enum")];
-        break;
-      /* Enum column */
-      case $this->getColumnAttrType($column) == "enum":
-        $domain_arr_str = (preg_replace("/enum\((.*)\)/i", "[$1]", $this->getColumnMySQLType($column)));
-        eval("\$domain_arr = " . $domain_arr_str . ";");
-        $attributes = [new DiscreteAttribute($attr_name, "enum", $domain_arr)];
-        break;
-      /* Forcing a categorical attribute */
-      case $this->getColumnTreatmentType($column) == "ForceCategoricalIfNotEnum":
-        $attributes = [new DiscreteAttribute($attr_name, "enum")];
-        break;
       /* Forcing a set of binary categorical attributes */
-      case $this->getColumnTreatmentType($column) == "ForceBinary":
+      case $this->getColumnTreatmentType($column) == "ForceCategoricalBinary":
         
         /* Find classes */
         $classes = [];
@@ -636,34 +680,44 @@ class DBFit {
         $classes = array_keys($classes);
 
         if (!count($classes)) {
-          die_error("Couldn't apply ForceBinary treatment to column " . $this->getColumnName($column) . ". No data instance found.");
+          die_error("Couldn't apply ForceCategoricalBinary treatment to column " . $this->getColumnName($column) . ". No data instance found.");
         }
         // var_dump($classes);
         $attributes = [];
 
         foreach ($classes as $class) {
-          $attributes[] = new DiscreteAttribute($attr_name . "/" . $class, "bool", ["NO_" . $class, $class]);
+          $attributes[] = new DiscreteAttribute($attrName . "/" . $class, "bool", ["NO_" . $class, $class]);
         }
         $this->setColumnTreatmentArg($column, 0, $classes);
 
         break;
+      /* Enum column */
+      case $this->getColumnAttrType($column) == "enum":
+        $domain_arr_str = (preg_replace("/enum\((.*)\)/i", "[$1]", $this->getColumnMySQLType($column)));
+        eval("\$domain_arr = " . $domain_arr_str . ";");
+        $attributes = [new DiscreteAttribute($attrName, "enum", $domain_arr)];
+        break;
+      /* Forcing a categorical attribute */
+      case $this->getColumnTreatmentType($column) == "ForceCategorical":
+        $attributes = [new DiscreteAttribute($attrName, "enum")];
+        break;
       /* Numeric column */
       case in_array($this->getColumnAttrType($column), ["int", "float", "double"]):
-        $attributes = [new ContinuousAttribute($attr_name, $this->getColumnAttrType($column))];
+        $attributes = [new ContinuousAttribute($attrName, $this->getColumnAttrType($column))];
         break;
       /* Boolean column */
       case in_array($this->getColumnAttrType($column), ["bool", "boolean"]):
-        $attributes = [new DiscreteAttribute($attr_name, "bool", ["0", "1"])];
+        $attributes = [new DiscreteAttribute($attrName, "bool", ["0", "1"])];
         break;
       /* Text column */
       case $this->getColumnAttrType($column) == "text":
         switch($this->getColumnTreatmentType($column)) {
           case "BinaryBagOfWords":
             /* Binary attributes indicating the presence of each word */
-            $generateDictAttrs = function($dict) use ($attr_name, &$column) {
+            $generateDictAttrs = function($dict) use ($attrName, &$column) {
               $attributes = [];
               foreach ($dict as $word) {
-                $attributes[] = new DiscreteAttribute("'$word' in $attr_name",
+                $attributes[] = new DiscreteAttribute("'$word' in $attrName",
                   "word_presence", ["N", "Y"]);
               }
               $this->setColumnTreatmentArg($column, 0, $dict);
@@ -682,7 +736,7 @@ class DBFit {
               if (!isset($this->stop_words)) {
                 // TODO italian
                 // TODO possibility to specify for each column
-                $this->stop_words = explode("\n", file_get_contents($this->DefBOWLang . "-stopwords.txt"));
+                $this->stop_words = explode("\n", file_get_contents($this->defaultOptions["textLanguage"] . "-stopwords.txt"));
               }
               foreach ($res as $raw_row) {
                 $text = $raw_row[$this->getColNickname($this->getColumnName($column))];
@@ -793,8 +847,8 @@ class DBFit {
   function getTableName(array $tab) : string {
     return $tab["name"];
   }
-  function &getTableJoinCritera(array $tab) {
-    return $tab["joinCriteria"];
+  function &getTableJoinClauses(array $tab) {
+    return $tab["joinClauses"];
   }
   function &getTableJoinType(array $tab) {
     return $tab["joinType"];
@@ -808,9 +862,13 @@ class DBFit {
     if ($col["treatment"] !== NULL)
       listify($col["treatment"]);
     $tr = &$col["treatment"];
-    if (($tr === NULL) && $this->getColumnAttrType($col, $tr) === "text"
-           && isset($this->defaultOptions["TextTreatment"])) {
-      $this->setColumnTreatment($col, $this->defaultOptions["TextTreatment"]);
+    if (($tr === NULL) && $this->getColumnAttrType($col, $tr) === "text") {
+      if ($this->defaultOptions["textTreatment"] !== NULL) {
+        $this->setColumnTreatment($col, $this->defaultOptions["textTreatment"]);
+      }
+      else {
+        die_error("Please, specify a default treatment for text fields using ->setDefaultOption(\"textTreatment\", ...). For example, ->setDefaultOption(\"textTreatment\", [\"BinaryBagOfWords\", 10])");
+      }
       return $this->getColumnTreatment($col);
     }
 
@@ -832,9 +890,9 @@ class DBFit {
     $this->getColumnTreatment($col)[1+$j] = $val;
   }
   function getColumnAttrName(array &$col) {
-    return $col["attr_name"];
-    // return !array_key_exists("attr_name", $col) ?
-    //     $this->getColumnName($col, true) : $col["attr_name"];
+    return $col["attrName"];
+    // return !array_key_exists("attrName", $col) ?
+    //     $this->getColumnName($col, true) : $col["attrName"];
   }
 
   function getColumnMySQLType(array &$col) {
@@ -906,7 +964,7 @@ class DBFit {
   function readTable($tab) : array {
     $new_tab = [];
     $new_tab["name"] = NULL;
-    $new_tab["joinCriteria"] = [];
+    $new_tab["joinClauses"] = [];
     $new_tab["joinType"] = count($this->tables) ? "INNER JOIN" : "";
 
     if (is_string($tab)) {
@@ -920,7 +978,7 @@ class DBFit {
         }
 
         listify($tab[1]);
-        $new_tab["joinCriteria"] = $tab[1];
+        $new_tab["joinClauses"] = $tab[1];
       }
       if (isset($tab[2])) {
         $new_tab["joinType"] = $tab[2];
@@ -981,7 +1039,7 @@ class DBFit {
     $new_col = [];
     $new_col["name"] = NULL;
     $new_col["treatment"] = NULL;
-    $new_col["attr_name"] = NULL;
+    $new_col["attrName"] = NULL;
     $new_col["mysql_type"] = NULL;
 
     if (is_string($col)) {
@@ -1001,14 +1059,14 @@ class DBFit {
           die_error("Malformed target attribute name for column: " . toString($col[2])
             . ". The target name must be a string.");
         }
-        $new_col["attr_name"] = $col[2];
+        $new_col["attrName"] = $col[2];
       }
     } else {
       die_error("Malformed column term: " . toString($col));
     }
     
-    if ($new_col["attr_name"] === NULL) {
-      $new_col["attr_name"] = $new_col["name"];
+    if ($new_col["attrName"] === NULL) {
+      $new_col["attrName"] = $new_col["name"];
     }
 
     return $new_col;
@@ -1039,9 +1097,9 @@ class DBFit {
 
     $new_col = [];
     $new_col["name"] = NULL;
-    $new_col["treatment"] = "ForceCategoricalIfNotEnum";
+    $new_col["treatment"] = "ForceCategorical";
     $new_col["tables"] = [];
-    $new_col["attr_name"] = NULL;
+    $new_col["attrName"] = NULL;
     $new_col["mysql_type"] = NULL;
 
     $i_col = count($this->outputColumns);
@@ -1072,15 +1130,15 @@ class DBFit {
             die_error("Malformed target attribute name for column: " . toString($col[3])
               . ". The target name must be a string.");
           }
-          $new_col["attr_name"] = $col[3];
+          $new_col["attrName"] = $col[3];
         }
       }
     } else {
       die_error("Malformed output column term: " . toString($col));
     }
 
-    if ($new_col["attr_name"] === NULL) {
-      $new_col["attr_name"] = $new_col["name"];
+    if ($new_col["attrName"] === NULL) {
+      $new_col["attrName"] = $new_col["name"];
     }
 
     $this->check_columnName($new_col["name"]);
@@ -1429,7 +1487,7 @@ class DBFit {
     }
   }
 
-  function setOutputColumnName(?string $outputColumnName, $treatment = "ForceCategoricalIfNotEnum") : self
+  function setOutputColumnName(?string $outputColumnName, $treatment = "ForceCategorical") : self
   {
     if ($outputColumnName !== NULL) {
       return $this->setOutputColumns([[$outputColumnName, $treatment]]);
@@ -1526,7 +1584,7 @@ class DBFit {
 
   function &getDataSplit(Instances &$data) : array {
     if ($this->trainingMode === NULL) {
-      $this->trainingMode = $this->defTrainingMode;
+      $this->trainingMode = $this->defaultOptions["trainingMode"];
       echo "Training mode defaulted to " . toString($this->trainingMode);
     }
 
