@@ -1,3 +1,4 @@
+*.out
 SI
 test.php
 models
