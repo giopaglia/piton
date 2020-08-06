@@ -142,7 +142,9 @@ class DBFit {
   private $defaultOptions = [
     /* Default training mode in use */
     "trainingMode"  => [80, 20],
-    /* Default text treatment. NULL treatment will raise error as soon as a text column is encountered. */
+    /* Default treatment for date/datetime columns. NULL treatment will raise error as soon as a date/datetime column is encountered. */
+    "dateTreatment" => NULL,
+    /* Default treatment for text columns. NULL treatment will raise error as soon as a text column is encountered. */
     "textTreatment" => NULL,
     /* Default language for text pre-processing */
     "textLanguage" => "en"
@@ -157,7 +159,7 @@ class DBFit {
     , "YearsSince" => "int"
     ]
   , "date" => [
-      "" => "int"
+      "" => "date"
     , "DaysSince" => "int"
     , "MonthsSince" => "int"
     , "YearsSince" => "int"
@@ -384,34 +386,43 @@ class DBFit {
     return $dataframes;
   }
 
+
+  /** Helper function for ->readData() that performs the pre-processing steps.
+      For each mysql data row, derive a new data row.
+      The identifier column is used to determine which rows to merge.
+   */
   function &readRawData(object &$res, array &$attributes, array &$columns) : array {
 
     $data = [];
 
+    /** For each data row... */
     foreach ($res as $raw_row) {
       // echo get_var_dump($raw_row) . PHP_EOL;
       
-      /* Pre-process data */
+      /* Pre-process row values according to the corresponding attribute */
       $attr_vals = [];
       foreach ($columns as $i_col => &$column) {
         $attribute = $attributes[$i_col];
         
         if ($attribute === NULL) {
-          // Ignore attribute/value
+          // Ignore column
           $attr_val = NULL;
         }
         else {
+          /* At this point, a value for a column is an array of values for the column's attributes */
           $attr_val = [];
           $raw_val = $raw_row[$this->getColNickname($this->getColumnName($column))];
 
           if ($raw_val === NULL) {
+            // Empty column -> empty vals for all the column's attributes
             foreach ($attribute as $attr) {
               $attr_val[] = NULL;
             }
           }
           else {
+            /* Apply treatment */
             switch (true) {
-              /* ForceCategoricalBinary */
+              /* ForceCategoricalBinary (multiple attributes & values) */
               case $this->getColumnTreatmentType($column) == "ForceCategoricalBinary":
 
                 /* Append k values, one for each of the classes */
@@ -422,7 +433,7 @@ class DBFit {
                 }
                 break;
                
-              /* Text column */
+              /* Text column (multiple attributes & values) */
               case $this->getColumnTreatmentType($column) == "BinaryBagOfWords":
 
                 /* Append k values, one for each word in the dictionary */
@@ -433,7 +444,8 @@ class DBFit {
                 }
                 break;
                
-              default: /* Single value */
+              default:
+                /* Single attribute & value */
                 if (count($attribute) != 1) {
                   die_error("Something's off. Found multiple attributes for column "
                     . $this->getColumnName($column)
@@ -444,11 +456,12 @@ class DBFit {
                 /* For categorical attributes, use the class index as value */
                 if ($attribute instanceof DiscreteAttribute) {
                   if (is_bool($raw_val)) {
+                    // does this happen?
                     $raw_val = intval($raw_val);
                   }
                   $val = $attribute->getKey($raw_val);
+                  /* When forcing categorical attributes, push the missing values to the domain; otherwise, any missing domain class will raise error */
                   if ($val === false) {
-                    /* When forcing categorical, push the unfound values to the domain */
                     if (in_array($this->getColumnTreatmentType($column), ["ForceCategorical"])) {
                       $attribute->pushDomainVal($raw_val);
                       $val = $attribute->getKey($raw_val);
@@ -464,31 +477,32 @@ class DBFit {
                     "date"     => "Y-m-d"
                   , "datetime" => "Y-m-d H:i:s"
                   ];
-                  $date = DateTime::createFromFormat($type_to_format[$this->getColumnMySQLType($column)], $raw_val);
-                  if (!($date !== false))
-                    die_error("Incorrect date string \"$raw_val\"");
-
-                  switch ($this->getColumnTreatmentType($column)) {
-                    /* By default, DaysSince is used. */
-                    case NULL:
-                      // break;
-                    case "DaysSince":
-                      $today = new DateTime("now");
-                      $val = intval($date->diff($today)->format("%R%a"));
-                      break;
-                    case "MonthsSince":
-                      $today = new DateTime("now");
-                      $val = intval($date->diff($today)->format("%R%m"));
-                      break;
-                    case "YearsSince":
-                      $today = new DateTime("now");
-                      $val = intval($date->diff($today)->format("%R%y"));
-                      break;
-                    default:
-                    die_error("Unknown treatment for {$this->getColumnMySQLType($column)} column \"" .
-                      $this->getColumnTreatmentType($column) . "\"");
-                      break;
-                  };
+                  $format = $type_to_format[$this->getColumnMySQLType($column)];
+                  $date = DateTime::createFromFormat($format, $raw_val);
+                  if ($date === false) {
+                    warn("Incorrect date string \"$raw_val\" (expected format: \"$format\")");
+                    $val = NULL;
+                  }
+                  else {
+                    switch ($this->getColumnTreatmentType($column)) {
+                      case "DaysSince":
+                        $today = new DateTime("now");
+                        $val = intval($date->diff($today)->format("%R%a"));
+                        break;
+                      case "MonthsSince":
+                        $today = new DateTime("now");
+                        $val = intval($date->diff($today)->format("%R%m"));
+                        break;
+                      case "YearsSince":
+                        $today = new DateTime("now");
+                        $val = intval($date->diff($today)->format("%R%y"));
+                        break;
+                      default:
+                      die_error("Unknown treatment for {$this->getColumnMySQLType($column)} column \"" .
+                        $this->getColumnTreatmentType($column) . "\"");
+                        break;
+                    };
+                  }
                 }
                 $attr_val = [$val];
                 break;
@@ -498,109 +512,72 @@ class DBFit {
         $attr_vals[] = $attr_val;
       } // foreach ($columns as $i_col => $column)
 
-      // Check that the identifier column actually identifies single rows,
-      //  and merge rows if needed.
-      if ($this->identifierColumnName !== NULL) {
+      /* Append row */
+      if ($this->identifierColumnName === NULL) {
+        $data[] = $attr_vals;
+      }
+      else {
+        /* Check that the identifier column actually identifies single rows,
+            and merge rows when needed. */
         $idVal = $raw_row[$this->getColNickname($this->identifierColumnName)];
-        if (isset($data[$idVal])) {
+        if (!isset($data[$idVal])) {
+          $data[$idVal] = $attr_vals;
+        }
+        else {
           $attr_vals_orig = &$data[$idVal];
 
+          /* Check differences between rows */
           foreach (zip($attr_vals_orig, $attr_vals) as $i_col => $z) {
-            if ($z[0] !== $z[1]) {
-              if ($i_col !== 0) {
-                die_error("Found more than one row with same identifier value: '{$this->identifierColumnName}' = " . get_var_dump($idVal)
-                  . ", but merging on column " . $this->getColumnName($columns[$i_col])
-                  . " ($i_col) failed. "
-                  . get_var_dump($z[0]) . get_var_dump($z[1])
+            if ($z[0] === $z[1]) {
+              continue;
+            }
+            /* Only merging output values is allowed */
+            if ($i_col !== 0) {
+              die_error("Found more than one row with same identifier value: '{$this->identifierColumnName}' = " . toString($idVal)
+                . ", but merging on column " . $this->getColumnName($columns[$i_col])
+                . " ($i_col) failed (it's not an output column). "
+                . get_var_dump($z[0]) . get_var_dump($z[1])
+                // . get_var_dump($attr_vals_orig) . get_var_dump($attr_vals)
+                . "Suggestion: explicitly ask to ignore this column."
+              );
+            }
+            $attribute = $attributes[$i_col];
+            if (is_array($attr_vals_orig[$i_col])) {
+              foreach (zip($z[0], $z[1]) as $a => $val) {
+                /* Only merging bool values by means of boolean-ORs is allowed */
+                if ($attribute[$a]->getType() == "bool") {
+                  $attr_vals_orig[$i_col][$a] = intval($attr_vals_orig[$i_col][$a] || $z[1][$a]);
+                }
+                else {
+                  die_error("Found more than one row with same identifier value: '{$this->identifierColumnName}' = " . toString($idVal)
+                  . ", but I don't know how to merge values for column " . $this->getColumnName($columns[$i_col])
+                  . " ($i_col) of type '{$attribute[$a]->getType()}'. "
+                  . "Suggestion: specify ForceBinary/ForceCategoricalBinary treatment for this column (this will break categorical attributes into k binary attributes, easily mergeable via OR operation)."
+                  // . get_var_dump($z[0]) . get_var_dump($z[1])
                   // . get_var_dump($attr_vals_orig) . get_var_dump($attr_vals)
-                  . "Suggestion: explicitly ask to ignore this column." //TODO
-                  // ". The identifier column must unique identify each data instance."
-                          //   // . get_var_dump($row) . "\n"
-                          );
-              }
-              else {
-                $attribute = $attributes[$i_col];
-                if (is_array($attr_vals_orig[$i_col])) {
-                  foreach (zip($z[0], $z[1]) as $a => $val) {
-                    if ($attribute[$a]->getType() == "bool") {
-                      $attr_vals_orig[$i_col][$a] = intval($attr_vals_orig[$i_col][$a] || $z[1][$a]);
-                    }
-                    else {
-                      die_error("Found more than one row with same identifier value: '{$this->identifierColumnName}' = " . get_var_dump($idVal)
-                      . ", but I don't know how to merge values for column " . $this->getColumnName($columns[$i_col])
-                      . " ($i_col) of type '{$attribute[$a]->getType()}'. "
-                      . "Suggestion: specify ForceBinary/ForceCategoricalBinary treatment for this column (this will break categorical attributes into k binary attributes, easily mergeable via OR operation)."
-                      // . get_var_dump($z[0]) . get_var_dump($z[1])
-                      // . get_var_dump($attr_vals_orig) . get_var_dump($attr_vals)
-                      );
-                    }
-                  }
-                } else if ($data[$idVal][$i_col] !== NULL) {
-                die_error("Something's off. Invalid attr_val = " . get_var_dump($data[$idVal][$i_col]));
+                  );
                 }
               }
+            } else if ($data[$idVal][$i_col] !== NULL) {
+            die_error("Something's off. Invalid attr_val = " . get_var_dump($data[$idVal][$i_col]));
             }
           };
           // 
-        } else {
-          $data[$idVal] = $attr_vals;
         }
-      } else {
-        $data[] = $attr_vals;
       }
     } // foreach ($res as $raw_row)
 
     return $data;
   }
 
-  /* TODO explain */
-  function getInputColumns($IncludeIdCol = false) {
-    $cols = [];
-    foreach ($this->inputColumns as &$col) {
-      $cols[] = &$col;
-    }
-    if ($IncludeIdCol && $this->identifierColumnName !== NULL) {
-      if (!in_array($this->identifierColumnName, $this->getInputColumnNames(false))) {
-        $cols[] = $this->readColumn($this->identifierColumnName);
-      }
-    }
-    return $cols;
-  }
-
-  /* TODO explain */
-  function getInputColumnNames($IncludeIdCol = false) {
-    $cols = array_map([$this, "getColumnName"], $this->inputColumns);
-    if ($IncludeIdCol && $this->identifierColumnName !== NULL) {
-      if (!in_array($this->identifierColumnName, $cols)) {
-        $cols[] = $this->identifierColumnName;
-      }
-    }
-    return $cols;
-  }
-
-  function getOutputColumnNames() {
-    return array_map([$this, "getColumnName"], $this->outputColumns);
-  }
-
-  // function getOutputColumnAttributes() {
-  //   // var_dump($this->outputColumns);
-  //   return array_map([$this, "getColumnAttributes"], $this->outputColumns);
-  // }
-
-  /* Need a nickname for every column when using table.column format,
-      since PHP MySQL connctions do not allow to access result fields
-      using this format */
-  function getColNickname($colName) {
-    return str_replace(".", "_DOT_", $colName);
-  }
-
-  /* TODO explain */
+  /* Generates SQL SELECT queries and interrogates the database. */
   function SQLSelectColumns(array $columns, $idVal = NULL, array $recursionPath = [],
     array $outputColumn = NULL, bool $silent = !DEBUGMODE) : object {
-    // if ($colNames === NULL) { ...columns
-    //   $colNames = $this->getInputColumnNames(true);
-    // }
-    // listify($colNames);
+
+    /* Build SQL query string */
+    $sql = "";
+
+    /* SELECT ... FROM */
     $cols_str = [];
 
     if ($outputColumn != NULL) {
@@ -619,27 +596,24 @@ class DBFit {
     }
 
     /* Add identifier column */
-    $name = $this->identifierColumnName;
-    $cols_str[] = $name . " AS " . $this->getColNickname($name);
+    if ($this->identifierColumnName !== NULL) {
+      $name = $this->identifierColumnName;
+      $cols_str[] = $name . " AS " . $this->getColNickname($name);
+    }
 
-    $sql = "SELECT " . mysql_list($cols_str, "noop") . " FROM";
+    $sql .= "SELECT " . mysql_list($cols_str, "noop");
     
     /* Join all input tables AND the output tables needed, depending on the recursion depth */
     $tables = $this->inputTables;
     if ($idVal === NULL) {
       $tables = array_merge($tables, $this->getColumnTables($this->outputColumns[count($recursionPath)]));
     }
-    // for ($recursionLevel = 0; $recursionLevel < count($recursionPath)+1; $recursionLevel++) {
-    // }
-    
-    /* Join all the tables needed */
-    // $tables = $this->tables;
-    // foreach ($columns as $col) {
-    //   $tables = array_merge($tables, $this->getColumnTables($col));
-    // }
-    
+
     // echo "tables" . PHP_EOL . get_var_dump($tables);
 
+
+    /* FROM */
+    $sql .= " FROM";
     foreach ($tables as $k => $table) {
       $sql .= " ";
       if ($k == 0) {
@@ -654,26 +628,31 @@ class DBFit {
       }
     }
 
+    /* WHERE */
     $whereClauses = $this->getSQLWhereClauses($idVal, $recursionPath);
 
     if (count($whereClauses)) {
       $sql .= " WHERE " . join(" AND ", $whereClauses);
     }
 
-    if ($this->limit !== NULL) {
-      if ($idVal === NULL) {
-        $sql .= " LIMIT {$this->limit}";
-      }
-      // else {
-      //   warn("Limit term ignored at predict time");
-      // }
-
+    /* LIMIT */
+    if ($idVal === NULL && $this->limit !== NULL) {
+      $sql .= " LIMIT {$this->limit}";
     }
 
+    /* Query database */
     $res = mysql_select($this->db, $sql, $silent);
     return $res;
   }
 
+  /* Need a nickname for every column when using table.column format,
+      since PHP MySQL connections do not allow to access result fields
+      using this notation. Therefore, each column is aliased to table_DOT_column */
+  function getColNickname($colName) {
+    return str_replace(".", "_DOT_", $colName);
+  }
+
+  /* Helper */
   private function getSQLConstraints($idVal, array $recursionPath) : array {
     $constraints = $this->getSQLWhereClauses($idVal, $recursionPath);
     foreach ($this->inputTables as $table) {
@@ -682,17 +661,18 @@ class DBFit {
     return $constraints;
   }
 
+  /* Helper */
   private function getSQLWhereClauses($idVal, array $recursionPath) : array {
     $whereClauses = [];
     if ($this->whereClauses !== NULL && count($this->whereClauses)) {
       $whereClauses = array_merge($whereClauses, $this->whereClauses);
     }
     if ($idVal !== NULL) {
-      if($this->identifierColumnName === NULL)
+      if($this->identifierColumnName !== NULL) {
         die_error("An identifier column name must be set. Use ->setIdentifierColumnName()");
+      }
       $whereClauses[] = $this->identifierColumnName . " = $idVal";
     }
-    // TODO not sure, but I believe the "recursion where clauses" are only needed at train time, in order to select data that is more specific, more relevant. At test time, they really serve no purpose, don't they. Or do they actually select relevant stuff? Maybe it depends on where the identifierColumn lays in the tree hierarchy
     if ($idVal === NULL) {
       $outAttrs = $this->getOutputColumnNames();
       foreach ($recursionPath as $recursionLevel => $node) {
@@ -707,20 +687,19 @@ class DBFit {
     return $whereClauses;
   }
 
-
-  /* Create attribute(s) for a column */
+  /* Create and assign the corresponding attribute(s) to a given column */
   function assignColumnAttributes(array &$column, array $recursionPath = [])
   {
+    /* Attribute base-name */
     $attrName = $this->getColumnAttrName($column);
 
     switch(true) {
       /* Forcing a set of binary categorical attributes */
       case $this->getColumnTreatmentType($column) == "ForceCategoricalBinary":
         
-        /* Find classes */
+        /* Find unique values */
         $classes = [];
         $res = $this->SQLSelectColumns([$column], NULL, $recursionPath, NULL, true);
-
         foreach ($res as $raw_row) {
           $class = $raw_row[$this->getColNickname($this->getColumnName($column))];
           $classes[$class] = 0;
@@ -732,9 +711,9 @@ class DBFit {
           $attributes = NULL;
         }
         else {
-          // var_dump($classes);
           $attributes = [];
-
+          
+          /* Create one attribute per different class */
           foreach ($classes as $class) {
             $attributes[] = new DiscreteAttribute($attrName . "/" . $class, "bool", ["NO_" . $class, $class]);
           }
@@ -763,7 +742,8 @@ class DBFit {
       case $this->getColumnAttrType($column) == "text":
         switch($this->getColumnTreatmentType($column)) {
           case "BinaryBagOfWords":
-            /* Binary attributes indicating the presence of each word */
+
+            /* Generate binary attributes indicating the presence of each word */
             $generateDictAttrs = function($dict) use ($attrName, &$column) {
               $attributes = [];
               foreach ($dict as $word) {
@@ -774,8 +754,12 @@ class DBFit {
               return $attributes;
             };
 
-            /* The argument can be the dictionary size (k), or more directly the dictionary */
-            if ( is_integer($this->getColumnTreatmentArg($column, 0))) {
+            /* The argument can be the dictionary size (k), or more directly the dictionary as an array of strings */
+            if (is_array($this->getColumnTreatmentArg($column, 0))) {
+              $dict = $this->getColumnTreatmentArg($column, 0);
+              $attributes = $generateDictAttrs($dict);
+            }
+            else if ( is_integer($this->getColumnTreatmentArg($column, 0))) {
               $k = $this->getColumnTreatmentArg($column, 0);
 
               /* Find $k most frequent words */
@@ -783,8 +767,6 @@ class DBFit {
               $res = $this->SQLSelectColumns([$column], NULL, $recursionPath, NULL, true);
               
               if (!isset($this->stop_words)) {
-                // TODO italian
-                // TODO possibility to specify for each column
                 $this->stop_words = explode("\n", file_get_contents($this->defaultOptions["textLanguage"] . "-stopwords.txt"));
               }
               foreach ($res as $raw_row) {
@@ -807,7 +789,6 @@ class DBFit {
                 $attributes = NULL;
               } else {
                 $dict = [];
-                // optimize this?
                 foreach (range(0, $k-1) as $i) {
                   $max_count = max($word_counts);
                   $max_word = array_search($max_count, $word_counts);
@@ -827,10 +808,6 @@ class DBFit {
                 $attributes = $generateDictAttrs($dict);
               }
             }
-            else if (is_array($this->getColumnTreatmentArg($column, 0))) {
-              $dict = $this->getColumnTreatmentArg($column, 0);
-              $attributes = $generateDictAttrs($dict);
-            }
             else {
               die_error("Please specify a parameter (dictionary or dictionary size)"
                 . " for bag-of-words"
@@ -849,18 +826,18 @@ class DBFit {
         break;
     }
     
+    /* Sanity check */
     if (is_array($attributes) and !count($attributes)) {
       die_error("Something's off. Attributes set for a column (here '"
         . $this->getColumnName($column) . "') can't be empty: " . get_var_dump($attributes) . PHP_EOL . get_var_dump($column) . PHP_EOL);
     }
+
+    /* Each column has a tree of attributes, because the set of attributes for the column depends on the recursion path. This is done in order to leverage predicates that are the most specific.  */
     $column["attributes"][$this->getPathRepr($recursionPath)] = $attributes;
     // var_dump($column);
   }
 
-  function getPathRepr(array $recursionPath) : string {
-    return array_list($recursionPath, ";");
-  }
-
+  // TODO document from here
   // TODO use Nlptools
   function text2words($text) {
     if ($text === NULL) {
@@ -886,6 +863,20 @@ class DBFit {
     return $words;
   }
 
+  /* Helpers */
+  function getOutputColumnNames() {
+    return array_map([$this, "getColumnName"], $this->outputColumns);
+  }
+
+  function getPathRepr(array $recursionPath) : string {
+    return array_list($recursionPath, ";");
+  }
+
+  // function getOutputColumnAttributes() {
+  //   // var_dump($this->outputColumns);
+  //   return array_map([$this, "getColumnAttributes"], $this->outputColumns);
+  // }
+  
 
   static function isEnumType(string $mysql_type) {
     return preg_match("/enum.*/i", $mysql_type);
@@ -915,14 +906,25 @@ class DBFit {
     if ($col["treatment"] !== NULL)
       listify($col["treatment"]);
     $tr = &$col["treatment"];
-    if (($tr === NULL) && $this->getColumnAttrType($col, $tr) === "text") {
-      if ($this->defaultOptions["textTreatment"] !== NULL) {
-        $this->setColumnTreatment($col, $this->defaultOptions["textTreatment"]);
+    if ($tr === NULL) {
+      if($this->getColumnAttrType($col, $tr) === "text") {
+        if ($this->defaultOptions["textTreatment"] !== NULL) {
+          $this->setColumnTreatment($col, $this->defaultOptions["textTreatment"]);
+        }
+        else {
+          die_error("Please, specify a default treatment for text fields using ->setDefaultOption(\"textTreatment\", ...). For example, ->setDefaultOption(\"textTreatment\", [\"BinaryBagOfWords\", 10])");
+        }
+        return $this->getColumnTreatment($col);
       }
-      else {
-        die_error("Please, specify a default treatment for text fields using ->setDefaultOption(\"textTreatment\", ...). For example, ->setDefaultOption(\"textTreatment\", [\"BinaryBagOfWords\", 10])");
+      else if(in_array($this->getColumnAttrType($col, $tr), ["date", "datetime"])) {
+        if ($this->defaultOptions["dateTreatment"] !== NULL) {
+          $this->setColumnTreatment($col, $this->defaultOptions["dateTreatment"]);
+        }
+        else {
+          die_error("Please, specify a default treatment for date fields using ->setDefaultOption(\"dateTreatment\", ...). For example, ->setDefaultOption(\"dateTreatment\", \"DaysSince\")");
+        }
+        return $this->getColumnTreatment($col);
       }
-      return $this->getColumnTreatment($col);
     }
 
     return $tr;
@@ -1697,6 +1699,31 @@ class DBFit {
         break;
     }
     return $rt;
+  }
+
+  /* TODO explain */
+  function getInputColumns($IncludeIdCol = false) {
+    $cols = [];
+    foreach ($this->inputColumns as &$col) {
+      $cols[] = &$col;
+    }
+    if ($IncludeIdCol && $this->identifierColumnName !== NULL) {
+      if (!in_array($this->identifierColumnName, $this->getInputColumnNames(false))) {
+        $cols[] = $this->readColumn($this->identifierColumnName);
+      }
+    }
+    return $cols;
+  }
+
+  /* TODO explain */
+  function getInputColumnNames($IncludeIdCol = false) {
+    $cols = array_map([$this, "getColumnName"], $this->inputColumns);
+    if ($IncludeIdCol && $this->identifierColumnName !== NULL) {
+      if (!in_array($this->identifierColumnName, $cols)) {
+        $cols[] = $this->identifierColumnName;
+      }
+    }
+    return $cols;
   }
 
 }
