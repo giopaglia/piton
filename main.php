@@ -65,6 +65,7 @@ function testMed3() {
 
   $db_fit->setIdentifierColumnName("Referti.ID");
   $db_fit->setDefaultOption("textTreatment", ["BinaryBagOfWords", 10]);
+  $db_fit->setDefaultOption("textLanguage", "it");
   $db_fit->setInputColumns([
 "Anamnesi.DATA_SALVA",
 "Anamnesi.DATA_ANNULLA",

@@ -176,7 +176,7 @@ class DBFit {
 
   function __construct(object $db) {
     echo "DBFit(DB)" . PHP_EOL;
-    if(!(get_class($db) == "mysqli"))
+    if (!(get_class($db) == "mysqli"))
       die_error("DBFit requires a mysqli object, but got object of type "
         . get_class($db) . ".");
     $this->db = $db;
@@ -225,7 +225,7 @@ class DBFit {
     foreach ($constraints as $constraint) {
       /* If any WHERE/JOIN-ON constraint forces the equality between two columns,
         drop one of the resulting attributes. */
-      if(preg_match("/\s*([a-z\d_\.]+)\s*=\s*([a-z\d_\.]+)\s*/i", $constraint, $matches)) {
+      if (preg_match("/\s*([a-z\d_\.]+)\s*=\s*([a-z\d_\.]+)\s*/i", $constraint, $matches)) {
         $fst = $matches[1];
         $snd = $matches[2];
 
@@ -240,7 +240,7 @@ class DBFit {
         }
       }
       // Drop attribute when forcing equality to a constant (because then the attributes is not informative)
-      if(preg_match("/\s*([a-z\d_\.]+)\s*=\s*('[a-z\d_\.]*')\s*/i", $constraint, $matches)) {
+      if (preg_match("/\s*([a-z\d_\.]+)\s*=\s*('[a-z\d_\.]*')\s*/i", $constraint, $matches)) {
         $col = $matches[1];
         if (!in_array($col, [$this->identifierColumnName, $outputColumnName])
           && !in_array($col, $columnsToIgnore)) {
@@ -249,7 +249,7 @@ class DBFit {
           die_error("Unexpected case encountered when removing redundant columns.");
         }
       }
-      if(preg_match("/\s*('[a-z\d_\.]*')\s*=\s*([a-z\d_\.]+)\s*/i", $constraint, $matches)) {
+      if (preg_match("/\s*('[a-z\d_\.]*')\s*=\s*([a-z\d_\.]+)\s*/i", $constraint, $matches)) {
         $col = $matches[2];
         if (!in_array($col, [$this->identifierColumnName, $outputColumnName])
           && !in_array($col, $columnsToIgnore)) {
@@ -276,13 +276,13 @@ class DBFit {
     $dataframes = [];
     
     /* Check that some data is found and the output attributes were correctly computed */
-    if(!is_array($outputAttributes)) {
+    if (!is_array($outputAttributes)) {
       warn("Couldn't derive output attributes for output column {$this->getColumnName($outputColumn)}!");
     }
     else {
       /* Check that the output attributes are discrete (i.e nominal) */
       foreach ($outputAttributes as $i_attr => $outputAttribute) {
-        if(!($outputAttribute instanceof DiscreteAttribute)) {
+        if (!($outputAttribute instanceof DiscreteAttribute)) {
           die_error("All output attributes must be categorical! '"
             . $outputAttribute->getName() . "' ($i_attr-th of output column {$this->getColumnName($outputColumn)}) is not.");
         }
@@ -437,9 +437,10 @@ class DBFit {
               case $this->getColumnTreatmentType($column) == "BinaryBagOfWords":
 
                 /* Append k values, one for each word in the dictionary */
+                $lang = $this->defaultOptions["textLanguage"];
                 $dict = $this->getColumnTreatmentArg($column, 0);
                 foreach ($dict as $word) {
-                  $val = intval(in_array($word, $this->text2words($raw_val)));
+                  $val = intval(in_array($word, $this->text2words($raw_val, $lang)));
                   $attr_val[] = $val;
                 }
                 break;
@@ -668,8 +669,8 @@ class DBFit {
       $whereClauses = array_merge($whereClauses, $this->whereClauses);
     }
     if ($idVal !== NULL) {
-      if($this->identifierColumnName === NULL) {
-        die_error("An identifier column name must be set. Use ->setIdentifierColumnName()");
+      if ($this->identifierColumnName === NULL) {
+        die_error("An identifier column name must be set. Please, use ->setIdentifierColumnName()");
       }
       $whereClauses[] = $this->identifierColumnName . " = $idVal";
     }
@@ -766,18 +767,24 @@ class DBFit {
               $word_counts = [];
               $res = $this->SQLSelectColumns([$column], NULL, $recursionPath, NULL, true);
               
+              $lang = $this->defaultOptions["textLanguage"];
               if (!isset($this->stop_words)) {
-                $this->stop_words = explode("\n", file_get_contents($this->defaultOptions["textLanguage"] . "-stopwords.txt"));
+                $this->stop_words = [];
+              }
+              if (!isset($this->stop_words[$lang])) {
+                $this->stop_words[$lang] = explode("\n", file_get_contents($lang . "-stopwords.txt"));
               }
               foreach ($res as $raw_row) {
                 $text = $raw_row[$this->getColNickname($this->getColumnName($column))];
                 
-                $words = $this->text2words($text);
+                if ($text !== NULL) {
+                  $words = $this->text2words($text, $lang);
 
-                foreach ($words as $word) {
-                  if (!isset($word_counts[$word]))
-                    $word_counts[$word] = 0;
-                  $word_counts[$word] += 1;
+                  foreach ($words as $word) {
+                    if (!isset($word_counts[$word]))
+                      $word_counts[$word] = 0;
+                    $word_counts[$word] += 1;
+                  }
                 }
               }
               // var_dump($word_counts);
@@ -837,12 +844,244 @@ class DBFit {
     // var_dump($column);
   }
 
-  // TODO document from here
-  // TODO use Nlptools
-  function text2words($text) {
-    if ($text === NULL) {
+  /* Train and test all the model tree on the available data, and save to database */
+  function updateModel(array $recursionPath = []) {
+    echo "DBFit->updateModel(" . toString($recursionPath) . ")" . PHP_EOL;
+    
+    $recursionLevel = count($recursionPath);
+
+    if (!($this->learner instanceof Learner)) {
+      die_error("Learner is not initialized. Please, use ->setLearner() or ->setLearningMethod()");
+    }
+
+    /* Read the dataframes specific to this recursion path */
+    $dataframes = $this->readData(NULL, $recursionPath);
+    
+    /* Check: if no data available stop recursion */
+    if (!count($dataframes)) {
+      echo "Train-time recursion stops here due to lack of data (recursionPath = " . toString($recursionPath)
+         . "). " . PHP_EOL;
+      if ($recursionLevel == 0) {
+        die_error("Training failed! Couldn't find data.");
+      }
+      return;
+    }
+
+    /* Obtain output attributes */
+    $outputAttributes = $this->getColumnAttributes($this->outputColumns[$recursionLevel], $recursionPath);
+    
+    /* For each attribute, train subtree */
+    foreach ($dataframes as $i_prob => $data) {
+      echo "Problem $i_prob/" . count($dataframes) . PHP_EOL;
+      $outputAttribute = $outputAttributes[$i_prob];
+
+      /* If no data available, skip training */
+      if (!$data->numInstances()) {
+        echo "Skipping node due to lack of data." . PHP_EOL;
+        if ($recursionLevel == 0) {
+          die_error("Training failed! No data instance found.");
+        }
+        continue;
+      }
+      
+      /* Obtain and train, test set */
+      list($trainData, $testData) = $this->getDataSplit($data);
+      
+      echo "TRAIN" . PHP_EOL . $trainData->toString(true) . PHP_EOL;
+      echo "TEST" . PHP_EOL . $testData->toString(true) . PHP_EOL;
+      
+      /* Train */
+      $model_name = $this->getModelName($recursionPath, $i_prob);
+      $model = $this->learner->initModel();
+
+      $model->fit($trainData, $this->learner);
+      
+      echo "Trained model '$model_name'." . PHP_EOL;
+
+      /* Test */
+      $this->test($model, $testData);
+
+      echo $model . PHP_EOL;
+
+      /* Save model */
+
+      $model->save(join_paths(MODELS_FOLDER, $model_name));
+      // $model->save(join_paths(MODELS_FOLDER, date("Y-m-d_H:i:s") . $model_name));
+
+      // TODO $model->saveToDB($this->db, $model_name, $testData);
+      // TODO $model->dumpToDB($this->db, $model_name);
+        // . "_" . join("", array_map([$this, "getColumnName"], ...).);
+
+      $this->models[$model_name] = clone $model;
+      
+      
+      /* Recursion base case */
+      if ($recursionLevel+1 == count($this->outputColumns)) {
+        echo "Train-time recursion stops here (recursionPath = " . toString($recursionPath)
+           . ", problem $i_prob/" . count($dataframes) . ") : '$model_name'. " . PHP_EOL;
+      }
+      else {
+        /* Recursive step: for each output class value, recurse and train the subtree */
+        echo "Branching at depth $recursionLevel on attribute \""
+          . $outputAttribute->getName() . "\" ($i_prob/"
+            . count($outputAttributes) . ")) "
+          . " with domain " . toString($outputAttribute->getDomain())
+          . ". " . PHP_EOL;
+        foreach ($outputAttribute->getDomain() as $classValue) {
+          echo "Recursion on classValue $classValue for attribute \""
+          . $outputAttribute->getName() . "\". " . PHP_EOL;
+          $this->updateModel(array_merge($recursionPath, [[$i_prob, $classValue]]));
+        }
+      }
+    }
+  }
+
+  /**
+   * TODO
+   * Load an existing set of models.
+   * Defaulted to the models trained the most recently
+   */
+  // function loadModel(?string $path = NULL) {
+  //   echo "DBFit->loadModel($path)" . PHP_EOL;
+    
+  //   die_error("TODO loadModel, load the full hierarchy");
+  //   /* Default path to that of the latest model */
+  //   if ($path === NULL) {
+  //     $models = filesin(MODELS_FOLDER);
+  //     if (count($models) == 0) {
+  //       die_error("loadModel: No model to load in folder: \"". MODELS_FOLDER . "\"");
+  //     }
+  //     sort($models, true);
+  //     $path = $models[0];
+  //     echo "$path";
+  //   }
+
+  //   $this->models = [DiscriminativeModel::loadFromFile($path)];
+  // }
+
+  /* Use the models for predicting the values of the output columns for a new instance,
+      identified by the identifier column */
+  function predictByIdentifier(string $idVal, array $recursionPath = []) : array {
+    echo "DBFit->predictByIdentifier($idVal, " . toString($recursionPath) . ")" . PHP_EOL;
+
+    /* Check */
+    if ($this->identifierColumnName === NULL) {
+      die_error("In order to use ->predictByIdentifier(), an identifier column must be set. Please, use ->setIdentifierColumnName()");
+    }
+
+    $recursionLevel = count($recursionPath);
+
+    /* Recursion base case */
+    if ($recursionLevel == count($this->outputColumns)) {
+      echo "Prediction-time recursion stops here due to reached bottom (recursionPath = " . toString($recursionPath) . ":" . PHP_EOL;
       return [];
     }
+
+    $outputAttributes = $this->getColumnAttributes($this->outputColumns[$recursionLevel], $recursionPath);
+
+    /* If no model was trained for the current node, stop the recursion */
+    if ($outputAttributes === NULL) {
+      echo "Prediction-time recursion stops here due to lack of a model (recursionPath = " . toString($recursionPath) . ":" . PHP_EOL;
+      return [];
+    }
+    else {
+      /* Check if the models needed were trained */
+      // TODO: note that atm, unless this module is misused, either all models should be there, or none of them should
+      $atLeastOneModel = false;
+      foreach ($outputAttributes as $i_prob => $outputAttribute) {
+        $model_name = $this->getModelName($recursionPath, $i_prob);
+        if ((isset($this->models[$model_name]))) {
+          $atLeastOneModel = true;
+        }
+      }
+      if (!$atLeastOneModel) {
+        echo "Prediction-time recursion stops here due to lack of models (recursionPath = " . toString($recursionPath) . ":" . PHP_EOL;
+
+        foreach ($outputAttributes as $i_prob => $outputAttribute) {
+          $model_name = $this->getModelName($recursionPath, $i_prob);
+          echo "$model_name" . PHP_EOL;
+        }
+        return [];
+      }
+    }
+    
+    $predictions = [];
+    
+    /* Read the dataframes specific to this recursion path */
+    $dataframes = $this->readData($idVal, $recursionPath);
+
+    /* Check: if no data available stop recursion */
+    if (!count($dataframes)) {
+      echo "Prediction-time recursion stops here due to lack of data (recursionPath = " . toString($recursionPath)
+         . "). " . PHP_EOL;
+      if ($recursionLevel == 0) {
+        die_error("Couldn't compute output attribute (at root level prediction-time).");
+      }
+      return [];
+    }
+
+    /* For each attribute, predict subtree */
+    foreach ($dataframes as $i_prob => $data) {
+      echo "Problem $i_prob/" . count($dataframes) . PHP_EOL;
+      // echo "Data: " . $data->toString(true) . PHP_EOL;
+
+      /* If no data available, skip training */
+      if (!$data->numInstances()) {
+        die_error("No data instance found at prediction time. "
+          . "Path: " . toString($recursionPath));
+        continue;
+      }
+
+      /* Check that a unique data instance is retrieved */
+      if ($data->numInstances() !== 1) {
+        die_error("Found more than one instance at predict time. Is this wanted? Id: {$this->identifierColumnName} = $idVal");
+      }
+
+      /* Retrieve model */
+      $model_name = $this->getModelName($recursionPath, $i_prob);
+      if (!(isset($this->models[$model_name]))) {
+        die_error("Model '$model_name' is not initialized");
+      }
+      $model = $this->models[$model_name];
+      if (!($model instanceof DiscriminativeModel)) {
+        die_error("Something's off. Model '$model_name' is not a DiscriminativeModel. " . get_var_dump($model));
+      }
+
+      echo "Using model '$model_name' for prediction." . PHP_EOL;
+      // echo $model . PHP_EOL;
+
+      // var_dump($data->getAttributes());
+      // var_dump($model->getAttributes());
+      
+      /* Perform local prediction */
+      $predictedVal = $model->predict($data);
+      $predictedVal = $predictedVal[0];
+      echo "predicted value: \"$predictedVal\"" . PHP_EOL;
+
+      /* Recursive step: recurse and predict the subtree of this predicted value */
+      $predictions[] = [[$outputAttributes[$i_prob]->getName(), $predictedVal], $this->predictByIdentifier($idVal,
+          array_merge($recursionPath, [[$i_prob, $predictedVal]]))];
+    }
+
+    /* At root level, finally prints the whole prediction tree */
+    if ($recursionLevel == 0) {
+      echo "Predictions: " . PHP_EOL;
+      foreach ($predictions as $i_prob => $pred) {
+        echo "[$i_prob]: " . toString($pred) . PHP_EOL;
+      }
+      echo PHP_EOL;
+    }
+
+    return $predictions;
+  }
+
+
+  // TODO document from here
+  // TODO use Nlptools
+  function text2words(string $text, string $lang) : array {
+    // if ($text === NULL) {
+    //   return [];
+    // }
     $text = strtolower($text);
     
     # to keep letters only (remove punctuation and such)
@@ -852,13 +1091,15 @@ class DBFit {
     $words = array_filter(explode("_", $text));
 
     # remove stopwords
-    $words = array_diff($words, $this->stop_words);
+    $words = array_diff($words, $this->stop_words[$lang]);
 
     # lemmatize
     // lemmatize($text)
 
     # stem
-    $words = array_map(["PorterStemmer", "Stem"], $words);
+    if ($lang == "en") {
+      $words = array_map(["PorterStemmer", "Stem"], $words);
+    }
     
     return $words;
   }
@@ -907,7 +1148,7 @@ class DBFit {
       listify($col["treatment"]);
     $tr = &$col["treatment"];
     if ($tr === NULL) {
-      if($this->getColumnAttrType($col, $tr) === "text") {
+      if ($this->getColumnAttrType($col, $tr) === "text") {
         if ($this->defaultOptions["textTreatment"] !== NULL) {
           $this->setColumnTreatment($col, $this->defaultOptions["textTreatment"]);
         }
@@ -916,7 +1157,7 @@ class DBFit {
         }
         return $this->getColumnTreatment($col);
       }
-      else if(in_array($this->getColumnAttrType($col, $tr), ["date", "datetime"])) {
+      else if (in_array($this->getColumnAttrType($col, $tr), ["date", "datetime"])) {
         if ($this->defaultOptions["dateTreatment"] !== NULL) {
           $this->setColumnTreatment($col, $this->defaultOptions["dateTreatment"]);
         }
@@ -1101,7 +1342,7 @@ class DBFit {
     if (is_string($col)) {
       $new_col["name"] = $col;
     } else if (is_array($col)) {
-      if(!is_string($col[0])) {
+      if (!is_string($col[0])) {
         die_error("Malformed column name: " . toString($col[0])
           . ". The name must be a string.");
       }
@@ -1111,7 +1352,7 @@ class DBFit {
         $new_col["treatment"] = $col[1];
       }
       if (isset($col[2])) {
-        if(!is_string($col[2])) {
+        if (!is_string($col[2])) {
           die_error("Malformed target attribute name for column: " . toString($col[2])
             . ". The target name must be a string.");
         }
@@ -1162,7 +1403,7 @@ class DBFit {
     if (is_string($col)) {
       $new_col["name"] = $col;
     } else if (is_array($col)) {
-      if(!is_string($col[0])) {
+      if (!is_string($col[0])) {
         die_error("Malformed output column name: " . get_var_dump($col[0])
           . ". The name must be a string.");
       }
@@ -1181,7 +1422,7 @@ class DBFit {
         $new_col["treatment"] = $col[2];
       }
       if (isset($col[3])) {
-        if(!is_string($col[3])) {
+        if (!is_string($col[3])) {
           die_error("Malformed target attribute name for column: " . toString($col[3])
             . ". The target name must be a string.");
         }
@@ -1267,218 +1508,6 @@ class DBFit {
   }
   
 
-  /**
-   * Load an existing set of discriminative models.
-   * Defaulted to the models trained the most recently
-   */
-  // function loadModel(?string $path = NULL) {
-  //   echo "DBFit->loadModel($path)" . PHP_EOL;
-    
-  //   die_error("TODO loadModel, load the full hierarchy");
-  //   /* Default path to that of the latest model */
-  //   if ($path === NULL) {
-  //     $models = filesin(MODELS_FOLDER);
-  //     if (count($models) == 0) {
-  //       die_error("loadModel: No model to load in folder: \"". MODELS_FOLDER . "\"");
-  //     }
-  //     sort($models, true);
-  //     $path = $models[0];
-  //     echo "$path";
-  //   }
-
-  //   $this->models = [DiscriminativeModel::loadFromFile($path)];
-  // }
-
-  /* Train and test all the model tree on the available data, and save to database */
-  function updateModel(array $recursionPath = []) {
-    echo "DBFit->updateModel(" . toString($recursionPath) . ")" . PHP_EOL;
-    
-    $recursionLevel = count($recursionPath);
-
-    if(!($this->learner instanceof Learner))
-      die_error("Learner is not initialized. Use ->setLearner() or ->setLearningMethod()");
-
-    $dataframes = $this->readData(NULL, $recursionPath);
-    
-    // TODO move the recursion out of the loop? Also consider what's best memorywise
-    if (!count($dataframes)) {
-      echo "Train-time recursion stops here due to lack of data (recursionPath = " . toString($recursionPath)
-         . "). " . PHP_EOL;
-      if ($recursionLevel == 0) {
-        die_error("Couldn't compute output attribute (at root level train-time).");
-      }
-      return;
-    }
-
-    $outputAttributes = $this->getColumnAttributes($this->outputColumns[$recursionLevel], $recursionPath);
-    
-    // TODO figure out, note: since the four root problems are independent, we use  splits that can be different (due to randomization)
-    foreach ($dataframes as $i_prob => $data) {
-      echo "Problem $i_prob/" . count($dataframes) . PHP_EOL;
-      $outputAttribute = $outputAttributes[$i_prob];
-
-      if (!$data->numInstances()) {
-        echo "Skipping node due to lack of data." . PHP_EOL;
-        if ($recursionLevel == 0) {
-          die_error("No training data instance found (at root level prediction-time).");
-        }
-        continue;
-      }
-      
-      list($trainData, $testData) = $this->getDataSplit($data);
-      
-      echo "TRAIN" . PHP_EOL . $trainData->toString(true) . PHP_EOL;
-      echo "TEST" . PHP_EOL . $testData->toString(true) . PHP_EOL;
-      
-      /* Train */
-      $model_name = $this->getModelName($recursionPath, $i_prob);
-      $model = $this->learner->initModel();
-
-      $model->fit($trainData, $this->learner);
-      
-      echo "Trained model '$model_name'." . PHP_EOL;
-      // echo "Trained model '$model_name' : " . PHP_EOL . $model . PHP_EOL;
-
-      /* Test */
-      $this->test($model, $testData);
-
-      $model->save(join_paths(MODELS_FOLDER, $model_name));
-      // $model->save(join_paths(MODELS_FOLDER, date("Y-m-d_H:i:s") . $model_name));
-
-      // TODO $model->dumpToDB($this->db, $model_name);
-        // . "_" . join("", array_map([$this, "getColumnName"], ...).);
-     
-      // TODO $model->saveToDB($this->db, $model_name, $testData);
-
-      $this->models[$model_name] = $model;
-      
-      /* Recursive step: for each output class value, recurse and train the subtree */
-      if ($recursionLevel+1 == count($this->outputColumns)) {
-        echo "Train-time recursion stops here (recursionPath = " . toString($recursionPath)
-           . ", problem $i_prob/" . count($dataframes) . ") : '$model_name'. " . PHP_EOL;
-      }
-      else {
-        // echo "outputAttributes";
-        // var_dump($outputAttributes);
-        echo "Branching at depth $recursionLevel on attribute \""
-          . $outputAttribute->getName() . "\" ($i_prob/"
-            . count($outputAttributes) . ")) "
-          . " with domain " . toString($outputAttribute->getDomain())
-          . ". " . PHP_EOL;
-        foreach ($outputAttribute->getDomain() as $classValue) {
-          echo "Recursion on classValue $classValue for attribute \""
-          . $outputAttribute->getName() . "\". " . PHP_EOL;
-          $this->updateModel(array_merge($recursionPath, [[$i_prob, $classValue]]));
-        }
-      }
-    }
-  }
-
-  /* Use the model for predicting the value of the output columns for a new instance,
-      identified by the identifier column */
-  function predictByIdentifier(string $idVal, array $recursionPath = []) : array {
-    echo "DBFit->predictByIdentifier($idVal, " . toString($recursionPath) . ")" . PHP_EOL;
-
-    if($this->identifierColumnName === NULL) {
-      die_error("In order to predictByIdentifier, an identifierColumnName must be set."
-        . " Use ->setIdentifierColumnName()");
-    }
-
-    $recursionLevel = count($recursionPath);
-
-    if ($recursionLevel == count($this->outputColumns)) {
-      echo "Prediction-time recursion stops here due to reached bottom (recursionPath = " . toString($recursionPath) . ":" . PHP_EOL;
-      return [];
-    }
-
-    $outputAttributes = $this->getColumnAttributes($this->outputColumns[$recursionLevel], $recursionPath);
-
-    /* If no model was trained for the current node, stop the recursion */
-    if ($outputAttributes !== NULL) {
-      $atLeastOneModel = false;
-      foreach ($outputAttributes as $i_prob => $outputAttribute) {
-        $model_name = $this->getModelName($recursionPath, $i_prob);
-        if((isset($this->models[$model_name]))) {
-          $atLeastOneModel = true;
-        }
-      }
-      if (!$atLeastOneModel) {
-        echo "Prediction-time recursion stops here due to lack of models (recursionPath = " . toString($recursionPath) . ":" . PHP_EOL;
-
-        foreach ($outputAttributes as $i_prob => $outputAttribute) {
-          $model_name = $this->getModelName($recursionPath, $i_prob);
-          echo "$model_name" . PHP_EOL;
-        }
-        return [];
-      }
-    }
-    else {
-      echo "Prediction-time recursion stops here due to lack of a model (recursionPath = " . toString($recursionPath) . ":" . PHP_EOL;
-      return [];
-    }
-    
-    $predictions = [];
-    
-    $dataframes = $this->readData($idVal, $recursionPath);
-
-    // TODO move the recursion out of the loop? Also consider what's best memorywise
-    if (!count($dataframes)) {
-      echo "Prediction-time recursion stops here due to lack of data (recursionPath = " . toString($recursionPath)
-         . "). " . PHP_EOL;
-      if ($recursionLevel == 0) {
-        die_error("Couldn't compute output attribute (at root level prediction-time).");
-      }
-      return [];
-    }
-
-    foreach ($dataframes as $i_prob => $data) {
-      echo "Problem $i_prob/" . count($dataframes) . PHP_EOL;
-      // echo "Data: " . $data->toString(true) . PHP_EOL;
-
-      if (!$data->numInstances()) {
-        die_error("No data instance found at prediction time. "
-          . "Path: " . toString($recursionPath));
-        continue;
-      }
-
-      if($idVal !== NULL && $data->numInstances() !== 1) {
-        // TODO figure out, possible?
-        die_error("Found more than one instance at predict time. Is this wanted? {$this->identifierColumnName} = $idVal");
-      }
-
-      /* Retrieve model */
-      $model_name = $this->getModelName($recursionPath, $i_prob);
-      if(!(isset($this->models[$model_name]))) {
-        die_error("Model '$model_name' is not initialized");
-      }
-      $model = $this->models[$model_name];
-      if(!($model instanceof DiscriminativeModel)) {
-        die_error("Something's off. Model '$model_name' is not a DiscriminativeModel. " . get_var_dump($model));
-      }
-      echo "Using model '$model_name' for prediction." . PHP_EOL;
-      // echo "Testing model '$model_name' : " . PHP_EOL . $model . PHP_EOL;
-
-      // var_dump($data);
-      // var_dump($model->getAttributes());
-      $predictedVal = $model->predict($data);
-      // Assuming a unique data instance is found
-      $predictedVal = $predictedVal[0];
-      echo "predictedVal: \"$predictedVal\"" . PHP_EOL;
-
-      $predictions[] = [[$outputAttributes[$i_prob]->getName(), $predictedVal], $this->predictByIdentifier($idVal,
-          array_merge($recursionPath, [[$i_prob, $predictedVal]]))];
-    }
-
-    if($recursionLevel == 0) {
-      echo "Predictions: " . PHP_EOL;
-      foreach ($predictions as $i_prob => $pred) {
-        echo "[$i_prob]: " . toString($pred) . PHP_EOL;
-      }
-      echo PHP_EOL;
-    }
-    return $predictions;
-  }
-
   /* TODO explain */
   function getModelName(array $recursionPath, int $i_prob) : string {
 
@@ -1507,7 +1536,7 @@ class DBFit {
       die_error("Can't use predict with multiple models. By the way, TODO this function has to go.");
     }
     $model = $this->models[array_key_last($this->models)];
-    if(!($model instanceof DiscriminativeModel))
+    if (!($model instanceof DiscriminativeModel))
       die_error("Model is not initialized");
 
     die_error("TODO check if predict still works");
@@ -1594,7 +1623,7 @@ class DBFit {
   function setIdentifierColumnName(?string $identifierColumnName) : self
   {
     if ($identifierColumnName !== NULL) {
-      if(in_array($identifierColumnName, $this->getOutputColumnNames())) {
+      if (in_array($identifierColumnName, $this->getOutputColumnNames())) {
         die_error("Identifier column ('{$identifierColumnName}') cannot be considered as the output column.");
       }
       $this->check_columnName($identifierColumnName);
@@ -1637,7 +1666,7 @@ class DBFit {
 
   function setLearningMethod(string $learningMethod) : self
   {
-    if(!($learningMethod == "PRip"))
+    if (!($learningMethod == "PRip"))
       die_error("Only \"PRip\" is available as a learning method");
 
     $learner = new PRip();

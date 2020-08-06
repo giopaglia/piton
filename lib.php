@@ -118,7 +118,7 @@ function array_equiv(array $A, array $B) {
 # Source: https://stackoverflow.com/a/173479/5646732
 function isAssoc(array $arr)
 {
-  if(array() === $arr) return false;
+  if (array() === $arr) return false;
   return array_keys($arr) !== range(0, count($arr) - 1);
 }
 
@@ -208,16 +208,16 @@ function filesin($a, $full_path = false, $sortby=false)
 	$a = safeSuffix($a, "/");
 	$ret = [];
 	foreach (array_slice(scandir($a), 2) as $item)
-		if(is_file($a . $item))
+		if (is_file($a . $item))
 		{
 			$f = ($full_path ? $a : "") . $item;
-			if($sortby==false)
+			if ($sortby==false)
 				$ret[] = $f;
-			else if($sortby=="mtime")
+			else if ($sortby=="mtime")
 				$ret[$f] = filemtime($a . "/" . $f);
 		}
 	
-	if($sortby=="mtime")
+	if ($sortby=="mtime")
 	{
 		arsort($ret);
 		$ret = array_keys($ret);
