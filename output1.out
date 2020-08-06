@@ -1,0 +1,684 @@
+
+
+DBFit(DB)
+DBFit->test_all_capabilities()
+DBFit->updateModel([])
+DBFit->readData(NULL, [])
+WARNING! Couldn't derive a BinaryBagOfWords dictionary for column "Anamnesi.MOTIVO_ANNULLA". This column will be ignored.
+WARNING! Couldn't derive a BinaryBagOfWords dictionary for column "Anamnesi.TERAPIA_OSTEOPROTETTIVA_SPECIFICA". This column will be ignored.
+WARNING! Couldn't derive a BinaryBagOfWords dictionary for column "Diagnosi.MOTIVO_ANNULLA". This column will be ignored.
+WARNING! Couldn't derive a BinaryBagOfWords dictionary of size 10 for column "Pazienti.SESSO". Dictionary of size 1 will be used.
+WARNING! Couldn't derive a BinaryBagOfWords dictionary of size 10 for column "Pazienti.ETNIA". Dictionary of size 3 will be used.
+WARNING! Couldn't derive a BinaryBagOfWords dictionary of size 10 for column "RaccomandazioniTerapeutiche.SOSPENSIONE_TERAPIA_FARMACO". Dictionary of size 5 will be used.
+Recursion level: 0(path: [])
+Identifier value: NULL
+6 dataframes computed 
+Problem 0/6
+TRAIN
+Instances{1083 instances; 322+1 attributes (classAttribute: RaccomandazioniTerapeuticheUnitarie.TIPO/Terapie osteoprotettive)}
+TEST
+Instances{271 instances; 322+1 attributes (classAttribute: RaccomandazioniTerapeuticheUnitarie.TIPO/Terapie osteoprotettive)}
+Trained model '__RaccomandazioniTerapeuticheUnitarie:TIPO:Terapie osteoprotettive'.
+DBFit->test(Instances{271 instances; 322+1 attributes (classAttribute: RaccomandazioniTerapeuticheUnitarie.TIPO/Terapie osteoprotettive)})
+Test accuracy: 0.80442804428044
+Branching at depth 0 on attribute "RaccomandazioniTerapeuticheUnitarie.TIPO/Terapie osteoprotettive" (0/6))  with domain [NO_Terapie osteoprotettive, Terapie osteoprotettive]. 
+Recursion on classValue NO_Terapie osteoprotettive for attribute "RaccomandazioniTerapeuticheUnitarie.TIPO/Terapie osteoprotettive". 
+DBFit->updateModel([[0, NO_Terapie osteoprotettive]])
+DBFit->readData(NULL, [[0, NO_Terapie osteoprotettive]])
+WARNING! Couldn't apply ForceCategoricalBinary treatment to column PrincipiAttivi.NOME. No data instance found.
+WARNING! Couldn't derive a BinaryBagOfWords dictionary for column "Anamnesi.MOTIVO_ANNULLA". This column will be ignored.
+WARNING! Couldn't derive a BinaryBagOfWords dictionary for column "Anamnesi.TERAPIA_OSTEOPROTETTIVA_SPECIFICA". This column will be ignored.
+WARNING! Couldn't derive a BinaryBagOfWords dictionary for column "Diagnosi.MOTIVO_ANNULLA". This column will be ignored.
+Recursion level: 1(path: [[0, NO_Terapie osteoprotettive]])
+Identifier value: NULL
+WARNING! Couldn't derive output attributes for output column PrincipiAttivi.NOME!
+Train-time recursion stops here due to lack of data (recursionPath = [[0, NO_Terapie osteoprotettive]]). 
+Recursion on classValue Terapie osteoprotettive for attribute "RaccomandazioniTerapeuticheUnitarie.TIPO/Terapie osteoprotettive". 
+DBFit->updateModel([[0, Terapie osteoprotettive]])
+DBFit->readData(NULL, [[0, Terapie osteoprotettive]])
+WARNING! Couldn't derive a BinaryBagOfWords dictionary for column "Anamnesi.MOTIVO_ANNULLA". This column will be ignored.
+WARNING! Couldn't derive a BinaryBagOfWords dictionary for column "Anamnesi.TERAPIA_OSTEOPROTETTIVA_SPECIFICA". This column will be ignored.
+WARNING! Couldn't derive a BinaryBagOfWords dictionary for column "Diagnosi.MOTIVO_ANNULLA". This column will be ignored.
+Recursion level: 1(path: [[0, Terapie osteoprotettive]])
+Identifier value: NULL
+9 dataframes computed 
+Problem 0/9
+TRAIN
+Instances{374 instances; 322+1 attributes (classAttribute: PrincipiAttivi.NOME/Teriparatide)}
+TEST
+Instances{94 instances; 322+1 attributes (classAttribute: PrincipiAttivi.NOME/Teriparatide)}
+Trained model 'RaccomandazioniTerapeuticheUnitarie>TIPO:Terapie osteoprotettive=Terapie osteoprotettive__PrincipiAttivi:NOME:Teriparatide'.
+DBFit->test(Instances{94 instances; 322+1 attributes (classAttribute: PrincipiAttivi.NOME/Teriparatide)})
+Test accuracy: 0.9468085106383
+Train-time recursion stops here (recursionPath = [[0, Terapie osteoprotettive]], problem 0/9) : 'RaccomandazioniTerapeuticheUnitarie>TIPO:Terapie osteoprotettive=Terapie osteoprotettive__PrincipiAttivi:NOME:Teriparatide'. 
+Problem 1/9
+TRAIN
+Instances{374 instances; 322+1 attributes (classAttribute: PrincipiAttivi.NOME/Risedronato)}
+TEST
+Instances{94 instances; 322+1 attributes (classAttribute: PrincipiAttivi.NOME/Risedronato)}
+Trained model 'RaccomandazioniTerapeuticheUnitarie>TIPO:Terapie osteoprotettive=Terapie osteoprotettive__PrincipiAttivi:NOME:Risedronato'.
+DBFit->test(Instances{94 instances; 322+1 attributes (classAttribute: PrincipiAttivi.NOME/Risedronato)})
+Test accuracy: 0.92553191489362
+Train-time recursion stops here (recursionPath = [[0, Terapie osteoprotettive]], problem 1/9) : 'RaccomandazioniTerapeuticheUnitarie>TIPO:Terapie osteoprotettive=Terapie osteoprotettive__PrincipiAttivi:NOME:Risedronato'. 
+Problem 2/9
+TRAIN
+Instances{374 instances; 322+1 attributes (classAttribute: PrincipiAttivi.NOME/Clodronato)}
+TEST
+Instances{94 instances; 322+1 attributes (classAttribute: PrincipiAttivi.NOME/Clodronato)}
+Trained model 'RaccomandazioniTerapeuticheUnitarie>TIPO:Terapie osteoprotettive=Terapie osteoprotettive__PrincipiAttivi:NOME:Clodronato'.
+DBFit->test(Instances{94 instances; 322+1 attributes (classAttribute: PrincipiAttivi.NOME/Clodronato)})
+Test accuracy: 0.91489361702128
+Train-time recursion stops here (recursionPath = [[0, Terapie osteoprotettive]], problem 2/9) : 'RaccomandazioniTerapeuticheUnitarie>TIPO:Terapie osteoprotettive=Terapie osteoprotettive__PrincipiAttivi:NOME:Clodronato'. 
+Problem 3/9
+TRAIN
+Instances{374 instances; 322+1 attributes (classAttribute: PrincipiAttivi.NOME/Denosumab)}
+TEST
+Instances{94 instances; 322+1 attributes (classAttribute: PrincipiAttivi.NOME/Denosumab)}
+Trained model 'RaccomandazioniTerapeuticheUnitarie>TIPO:Terapie osteoprotettive=Terapie osteoprotettive__PrincipiAttivi:NOME:Denosumab'.
+DBFit->test(Instances{94 instances; 322+1 attributes (classAttribute: PrincipiAttivi.NOME/Denosumab)})
+Test accuracy: 0.75531914893617
+Train-time recursion stops here (recursionPath = [[0, Terapie osteoprotettive]], problem 3/9) : 'RaccomandazioniTerapeuticheUnitarie>TIPO:Terapie osteoprotettive=Terapie osteoprotettive__PrincipiAttivi:NOME:Denosumab'. 
+Problem 4/9
+TRAIN
+Instances{374 instances; 322+1 attributes (classAttribute: PrincipiAttivi.NOME/Alendronato)}
+TEST
+Instances{94 instances; 322+1 attributes (classAttribute: PrincipiAttivi.NOME/Alendronato)}
+Trained model 'RaccomandazioniTerapeuticheUnitarie>TIPO:Terapie osteoprotettive=Terapie osteoprotettive__PrincipiAttivi:NOME:Alendronato'.
+DBFit->test(Instances{94 instances; 322+1 attributes (classAttribute: PrincipiAttivi.NOME/Alendronato)})
+Test accuracy: 0.64893617021277
+Train-time recursion stops here (recursionPath = [[0, Terapie osteoprotettive]], problem 4/9) : 'RaccomandazioniTerapeuticheUnitarie>TIPO:Terapie osteoprotettive=Terapie osteoprotettive__PrincipiAttivi:NOME:Alendronato'. 
+Problem 5/9
+TRAIN
+Instances{374 instances; 322+1 attributes (classAttribute: PrincipiAttivi.NOME/Zoledronato)}
+TEST
+Instances{94 instances; 322+1 attributes (classAttribute: PrincipiAttivi.NOME/Zoledronato)}
+Trained model 'RaccomandazioniTerapeuticheUnitarie>TIPO:Terapie osteoprotettive=Terapie osteoprotettive__PrincipiAttivi:NOME:Zoledronato'.
+DBFit->test(Instances{94 instances; 322+1 attributes (classAttribute: PrincipiAttivi.NOME/Zoledronato)})
+Test accuracy: 0.98936170212766
+Train-time recursion stops here (recursionPath = [[0, Terapie osteoprotettive]], problem 5/9) : 'RaccomandazioniTerapeuticheUnitarie>TIPO:Terapie osteoprotettive=Terapie osteoprotettive__PrincipiAttivi:NOME:Zoledronato'. 
+Problem 6/9
+TRAIN
+Instances{374 instances; 322+1 attributes (classAttribute: PrincipiAttivi.NOME/Ibandronato)}
+TEST
+Instances{94 instances; 322+1 attributes (classAttribute: PrincipiAttivi.NOME/Ibandronato)}
+Trained model 'RaccomandazioniTerapeuticheUnitarie>TIPO:Terapie osteoprotettive=Terapie osteoprotettive__PrincipiAttivi:NOME:Ibandronato'.
+DBFit->test(Instances{94 instances; 322+1 attributes (classAttribute: PrincipiAttivi.NOME/Ibandronato)})
+Test accuracy: 1
+Train-time recursion stops here (recursionPath = [[0, Terapie osteoprotettive]], problem 6/9) : 'RaccomandazioniTerapeuticheUnitarie>TIPO:Terapie osteoprotettive=Terapie osteoprotettive__PrincipiAttivi:NOME:Ibandronato'. 
+Problem 7/9
+TRAIN
+Instances{374 instances; 322+1 attributes (classAttribute: PrincipiAttivi.NOME/Bazedoxifene)}
+TEST
+Instances{94 instances; 322+1 attributes (classAttribute: PrincipiAttivi.NOME/Bazedoxifene)}
+Trained model 'RaccomandazioniTerapeuticheUnitarie>TIPO:Terapie osteoprotettive=Terapie osteoprotettive__PrincipiAttivi:NOME:Bazedoxifene'.
+DBFit->test(Instances{94 instances; 322+1 attributes (classAttribute: PrincipiAttivi.NOME/Bazedoxifene)})
+Test accuracy: 0.85106382978723
+Train-time recursion stops here (recursionPath = [[0, Terapie osteoprotettive]], problem 7/9) : 'RaccomandazioniTerapeuticheUnitarie>TIPO:Terapie osteoprotettive=Terapie osteoprotettive__PrincipiAttivi:NOME:Bazedoxifene'. 
+Problem 8/9
+TRAIN
+Instances{374 instances; 322+1 attributes (classAttribute: PrincipiAttivi.NOME/Raloxifene)}
+TEST
+Instances{94 instances; 322+1 attributes (classAttribute: PrincipiAttivi.NOME/Raloxifene)}
+Trained model 'RaccomandazioniTerapeuticheUnitarie>TIPO:Terapie osteoprotettive=Terapie osteoprotettive__PrincipiAttivi:NOME:Raloxifene'.
+DBFit->test(Instances{94 instances; 322+1 attributes (classAttribute: PrincipiAttivi.NOME/Raloxifene)})
+Test accuracy: 1
+Train-time recursion stops here (recursionPath = [[0, Terapie osteoprotettive]], problem 8/9) : 'RaccomandazioniTerapeuticheUnitarie>TIPO:Terapie osteoprotettive=Terapie osteoprotettive__PrincipiAttivi:NOME:Raloxifene'. 
+Problem 1/6
+TRAIN
+Instances{1083 instances; 322+1 attributes (classAttribute: RaccomandazioniTerapeuticheUnitarie.TIPO/Vitamina D Supplementazione)}
+TEST
+Instances{271 instances; 322+1 attributes (classAttribute: RaccomandazioniTerapeuticheUnitarie.TIPO/Vitamina D Supplementazione)}
+Trained model '__RaccomandazioniTerapeuticheUnitarie:TIPO:Vitamina D Supplementazione'.
+DBFit->test(Instances{271 instances; 322+1 attributes (classAttribute: RaccomandazioniTerapeuticheUnitarie.TIPO/Vitamina D Supplementazione)})
+Test accuracy: 0.82656826568266
+Branching at depth 0 on attribute "RaccomandazioniTerapeuticheUnitarie.TIPO/Vitamina D Supplementazione" (1/6))  with domain [NO_Vitamina D Supplementazione, Vitamina D Supplementazione]. 
+Recursion on classValue NO_Vitamina D Supplementazione for attribute "RaccomandazioniTerapeuticheUnitarie.TIPO/Vitamina D Supplementazione". 
+DBFit->updateModel([[1, NO_Vitamina D Supplementazione]])
+DBFit->readData(NULL, [[1, NO_Vitamina D Supplementazione]])
+WARNING! Couldn't apply ForceCategoricalBinary treatment to column PrincipiAttivi.NOME. No data instance found.
+WARNING! Couldn't derive a BinaryBagOfWords dictionary for column "Anamnesi.MOTIVO_ANNULLA". This column will be ignored.
+WARNING! Couldn't derive a BinaryBagOfWords dictionary for column "Anamnesi.TERAPIA_OSTEOPROTETTIVA_SPECIFICA". This column will be ignored.
+WARNING! Couldn't derive a BinaryBagOfWords dictionary for column "Diagnosi.MOTIVO_ANNULLA". This column will be ignored.
+Recursion level: 1(path: [[1, NO_Vitamina D Supplementazione]])
+Identifier value: NULL
+WARNING! Couldn't derive output attributes for output column PrincipiAttivi.NOME!
+Train-time recursion stops here due to lack of data (recursionPath = [[1, NO_Vitamina D Supplementazione]]). 
+Recursion on classValue Vitamina D Supplementazione for attribute "RaccomandazioniTerapeuticheUnitarie.TIPO/Vitamina D Supplementazione". 
+DBFit->updateModel([[1, Vitamina D Supplementazione]])
+DBFit->readData(NULL, [[1, Vitamina D Supplementazione]])
+WARNING! Couldn't derive a BinaryBagOfWords dictionary for column "Anamnesi.MOTIVO_ANNULLA". This column will be ignored.
+WARNING! Couldn't derive a BinaryBagOfWords dictionary for column "Anamnesi.TERAPIA_OSTEOPROTETTIVA_SPECIFICA". This column will be ignored.
+WARNING! Couldn't derive a BinaryBagOfWords dictionary for column "Diagnosi.MOTIVO_ANNULLA". This column will be ignored.
+Recursion level: 1(path: [[1, Vitamina D Supplementazione]])
+Identifier value: NULL
+2 dataframes computed 
+Problem 0/2
+TRAIN
+Instances{968 instances; 322+1 attributes (classAttribute: PrincipiAttivi.NOME/Colecalciferolo)}
+TEST
+Instances{242 instances; 322+1 attributes (classAttribute: PrincipiAttivi.NOME/Colecalciferolo)}
+Trained model 'RaccomandazioniTerapeuticheUnitarie>TIPO:Vitamina D Supplementazione=Vitamina D Supplementazione__PrincipiAttivi:NOME:Colecalciferolo'.
+DBFit->test(Instances{242 instances; 322+1 attributes (classAttribute: PrincipiAttivi.NOME/Colecalciferolo)})
+Test accuracy: 0.78925619834711
+Train-time recursion stops here (recursionPath = [[1, Vitamina D Supplementazione]], problem 0/2) : 'RaccomandazioniTerapeuticheUnitarie>TIPO:Vitamina D Supplementazione=Vitamina D Supplementazione__PrincipiAttivi:NOME:Colecalciferolo'. 
+Problem 1/2
+TRAIN
+Instances{968 instances; 322+1 attributes (classAttribute: PrincipiAttivi.NOME/Calcifediolo)}
+TEST
+Instances{242 instances; 322+1 attributes (classAttribute: PrincipiAttivi.NOME/Calcifediolo)}
+Trained model 'RaccomandazioniTerapeuticheUnitarie>TIPO:Vitamina D Supplementazione=Vitamina D Supplementazione__PrincipiAttivi:NOME:Calcifediolo'.
+DBFit->test(Instances{242 instances; 322+1 attributes (classAttribute: PrincipiAttivi.NOME/Calcifediolo)})
+Test accuracy: 0.76859504132231
+Train-time recursion stops here (recursionPath = [[1, Vitamina D Supplementazione]], problem 1/2) : 'RaccomandazioniTerapeuticheUnitarie>TIPO:Vitamina D Supplementazione=Vitamina D Supplementazione__PrincipiAttivi:NOME:Calcifediolo'. 
+Problem 2/6
+TRAIN
+Instances{1083 instances; 322+1 attributes (classAttribute: RaccomandazioniTerapeuticheUnitarie.TIPO/Calcio supplementazione)}
+TEST
+Instances{271 instances; 322+1 attributes (classAttribute: RaccomandazioniTerapeuticheUnitarie.TIPO/Calcio supplementazione)}
+Trained model '__RaccomandazioniTerapeuticheUnitarie:TIPO:Calcio supplementazione'.
+DBFit->test(Instances{271 instances; 322+1 attributes (classAttribute: RaccomandazioniTerapeuticheUnitarie.TIPO/Calcio supplementazione)})
+Test accuracy: 0.75645756457565
+Branching at depth 0 on attribute "RaccomandazioniTerapeuticheUnitarie.TIPO/Calcio supplementazione" (2/6))  with domain [NO_Calcio supplementazione, Calcio supplementazione]. 
+Recursion on classValue NO_Calcio supplementazione for attribute "RaccomandazioniTerapeuticheUnitarie.TIPO/Calcio supplementazione". 
+DBFit->updateModel([[2, NO_Calcio supplementazione]])
+DBFit->readData(NULL, [[2, NO_Calcio supplementazione]])
+WARNING! Couldn't apply ForceCategoricalBinary treatment to column PrincipiAttivi.NOME. No data instance found.
+WARNING! Couldn't derive a BinaryBagOfWords dictionary for column "Anamnesi.MOTIVO_ANNULLA". This column will be ignored.
+WARNING! Couldn't derive a BinaryBagOfWords dictionary for column "Anamnesi.TERAPIA_OSTEOPROTETTIVA_SPECIFICA". This column will be ignored.
+WARNING! Couldn't derive a BinaryBagOfWords dictionary for column "Diagnosi.MOTIVO_ANNULLA". This column will be ignored.
+Recursion level: 1(path: [[2, NO_Calcio supplementazione]])
+Identifier value: NULL
+WARNING! Couldn't derive output attributes for output column PrincipiAttivi.NOME!
+Train-time recursion stops here due to lack of data (recursionPath = [[2, NO_Calcio supplementazione]]). 
+Recursion on classValue Calcio supplementazione for attribute "RaccomandazioniTerapeuticheUnitarie.TIPO/Calcio supplementazione". 
+DBFit->updateModel([[2, Calcio supplementazione]])
+DBFit->readData(NULL, [[2, Calcio supplementazione]])
+WARNING! Couldn't derive a BinaryBagOfWords dictionary for column "Anamnesi.MOTIVO_ANNULLA". This column will be ignored.
+WARNING! Couldn't derive a BinaryBagOfWords dictionary for column "Anamnesi.TERAPIA_OSTEOPROTETTIVA_SPECIFICA". This column will be ignored.
+WARNING! Couldn't derive a BinaryBagOfWords dictionary for column "Diagnosi.MOTIVO_ANNULLA". This column will be ignored.
+Recursion level: 1(path: [[2, Calcio supplementazione]])
+Identifier value: NULL
+2 dataframes computed 
+Problem 0/2
+TRAIN
+Instances{467 instances; 322+1 attributes (classAttribute: PrincipiAttivi.NOME/Calcio carbonato)}
+TEST
+Instances{117 instances; 322+1 attributes (classAttribute: PrincipiAttivi.NOME/Calcio carbonato)}
+Trained model 'RaccomandazioniTerapeuticheUnitarie>TIPO:Calcio supplementazione=Calcio supplementazione__PrincipiAttivi:NOME:Calcio carbonato'.
+DBFit->test(Instances{117 instances; 322+1 attributes (classAttribute: PrincipiAttivi.NOME/Calcio carbonato)})
+Test accuracy: 0.5982905982906
+Train-time recursion stops here (recursionPath = [[2, Calcio supplementazione]], problem 0/2) : 'RaccomandazioniTerapeuticheUnitarie>TIPO:Calcio supplementazione=Calcio supplementazione__PrincipiAttivi:NOME:Calcio carbonato'. 
+Problem 1/2
+TRAIN
+Instances{467 instances; 322+1 attributes (classAttribute: PrincipiAttivi.NOME/Calcio citrato)}
+TEST
+Instances{117 instances; 322+1 attributes (classAttribute: PrincipiAttivi.NOME/Calcio citrato)}
+Trained model 'RaccomandazioniTerapeuticheUnitarie>TIPO:Calcio supplementazione=Calcio supplementazione__PrincipiAttivi:NOME:Calcio citrato'.
+DBFit->test(Instances{117 instances; 322+1 attributes (classAttribute: PrincipiAttivi.NOME/Calcio citrato)})
+Test accuracy: 0.5982905982906
+Train-time recursion stops here (recursionPath = [[2, Calcio supplementazione]], problem 1/2) : 'RaccomandazioniTerapeuticheUnitarie>TIPO:Calcio supplementazione=Calcio supplementazione__PrincipiAttivi:NOME:Calcio citrato'. 
+Problem 3/6
+TRAIN
+Instances{1083 instances; 322+1 attributes (classAttribute: RaccomandazioniTerapeuticheUnitarie.TIPO/Indagini approfondimento)}
+TEST
+Instances{271 instances; 322+1 attributes (classAttribute: RaccomandazioniTerapeuticheUnitarie.TIPO/Indagini approfondimento)}
+Trained model '__RaccomandazioniTerapeuticheUnitarie:TIPO:Indagini approfondimento'.
+DBFit->test(Instances{271 instances; 322+1 attributes (classAttribute: RaccomandazioniTerapeuticheUnitarie.TIPO/Indagini approfondimento)})
+Test accuracy: 0.74907749077491
+Branching at depth 0 on attribute "RaccomandazioniTerapeuticheUnitarie.TIPO/Indagini approfondimento" (3/6))  with domain [NO_Indagini approfondimento, Indagini approfondimento]. 
+Recursion on classValue NO_Indagini approfondimento for attribute "RaccomandazioniTerapeuticheUnitarie.TIPO/Indagini approfondimento". 
+DBFit->updateModel([[3, NO_Indagini approfondimento]])
+DBFit->readData(NULL, [[3, NO_Indagini approfondimento]])
+WARNING! Couldn't apply ForceCategoricalBinary treatment to column PrincipiAttivi.NOME. No data instance found.
+WARNING! Couldn't derive a BinaryBagOfWords dictionary for column "Anamnesi.MOTIVO_ANNULLA". This column will be ignored.
+WARNING! Couldn't derive a BinaryBagOfWords dictionary for column "Anamnesi.TERAPIA_OSTEOPROTETTIVA_SPECIFICA". This column will be ignored.
+WARNING! Couldn't derive a BinaryBagOfWords dictionary for column "Diagnosi.MOTIVO_ANNULLA". This column will be ignored.
+Recursion level: 1(path: [[3, NO_Indagini approfondimento]])
+Identifier value: NULL
+WARNING! Couldn't derive output attributes for output column PrincipiAttivi.NOME!
+Train-time recursion stops here due to lack of data (recursionPath = [[3, NO_Indagini approfondimento]]). 
+Recursion on classValue Indagini approfondimento for attribute "RaccomandazioniTerapeuticheUnitarie.TIPO/Indagini approfondimento". 
+DBFit->updateModel([[3, Indagini approfondimento]])
+DBFit->readData(NULL, [[3, Indagini approfondimento]])
+WARNING! Couldn't apply ForceCategoricalBinary treatment to column PrincipiAttivi.NOME. No data instance found.
+WARNING! Couldn't derive a BinaryBagOfWords dictionary for column "Anamnesi.MOTIVO_ANNULLA". This column will be ignored.
+WARNING! Couldn't derive a BinaryBagOfWords dictionary for column "Anamnesi.TERAPIA_OSTEOPROTETTIVA_SPECIFICA". This column will be ignored.
+WARNING! Couldn't derive a BinaryBagOfWords dictionary for column "Diagnosi.MOTIVO_ANNULLA". This column will be ignored.
+Recursion level: 1(path: [[3, Indagini approfondimento]])
+Identifier value: NULL
+WARNING! Couldn't derive output attributes for output column PrincipiAttivi.NOME!
+Train-time recursion stops here due to lack of data (recursionPath = [[3, Indagini approfondimento]]). 
+Problem 4/6
+TRAIN
+Instances{1083 instances; 322+1 attributes (classAttribute: RaccomandazioniTerapeuticheUnitarie.TIPO/Vitamina D terapia)}
+TEST
+Instances{271 instances; 322+1 attributes (classAttribute: RaccomandazioniTerapeuticheUnitarie.TIPO/Vitamina D terapia)}
+Trained model '__RaccomandazioniTerapeuticheUnitarie:TIPO:Vitamina D terapia'.
+DBFit->test(Instances{271 instances; 322+1 attributes (classAttribute: RaccomandazioniTerapeuticheUnitarie.TIPO/Vitamina D terapia)})
+Test accuracy: 0.92619926199262
+Branching at depth 0 on attribute "RaccomandazioniTerapeuticheUnitarie.TIPO/Vitamina D terapia" (4/6))  with domain [NO_Vitamina D terapia, Vitamina D terapia]. 
+Recursion on classValue NO_Vitamina D terapia for attribute "RaccomandazioniTerapeuticheUnitarie.TIPO/Vitamina D terapia". 
+DBFit->updateModel([[4, NO_Vitamina D terapia]])
+DBFit->readData(NULL, [[4, NO_Vitamina D terapia]])
+WARNING! Couldn't apply ForceCategoricalBinary treatment to column PrincipiAttivi.NOME. No data instance found.
+WARNING! Couldn't derive a BinaryBagOfWords dictionary for column "Anamnesi.MOTIVO_ANNULLA". This column will be ignored.
+WARNING! Couldn't derive a BinaryBagOfWords dictionary for column "Anamnesi.TERAPIA_OSTEOPROTETTIVA_SPECIFICA". This column will be ignored.
+WARNING! Couldn't derive a BinaryBagOfWords dictionary for column "Diagnosi.MOTIVO_ANNULLA". This column will be ignored.
+Recursion level: 1(path: [[4, NO_Vitamina D terapia]])
+Identifier value: NULL
+WARNING! Couldn't derive output attributes for output column PrincipiAttivi.NOME!
+Train-time recursion stops here due to lack of data (recursionPath = [[4, NO_Vitamina D terapia]]). 
+Recursion on classValue Vitamina D terapia for attribute "RaccomandazioniTerapeuticheUnitarie.TIPO/Vitamina D terapia". 
+DBFit->updateModel([[4, Vitamina D terapia]])
+DBFit->readData(NULL, [[4, Vitamina D terapia]])
+WARNING! Couldn't derive a BinaryBagOfWords dictionary for column "Anamnesi.MOTIVO_ANNULLA". This column will be ignored.
+WARNING! Couldn't derive a BinaryBagOfWords dictionary for column "Anamnesi.TERAPIA_OSTEOPROTETTIVA_SPECIFICA". This column will be ignored.
+WARNING! Couldn't derive a BinaryBagOfWords dictionary for column "Diagnosi.MOTIVO_ANNULLA". This column will be ignored.
+Recursion level: 1(path: [[4, Vitamina D terapia]])
+Identifier value: NULL
+2 dataframes computed 
+Problem 0/2
+TRAIN
+Instances{45 instances; 322+1 attributes (classAttribute: PrincipiAttivi.NOME/Calcifediolo)}
+TEST
+Instances{12 instances; 322+1 attributes (classAttribute: PrincipiAttivi.NOME/Calcifediolo)}
+Trained model 'RaccomandazioniTerapeuticheUnitarie>TIPO:Vitamina D terapia=Vitamina D terapia__PrincipiAttivi:NOME:Calcifediolo'.
+DBFit->test(Instances{12 instances; 322+1 attributes (classAttribute: PrincipiAttivi.NOME/Calcifediolo)})
+Test accuracy: 0.91666666666667
+Train-time recursion stops here (recursionPath = [[4, Vitamina D terapia]], problem 0/2) : 'RaccomandazioniTerapeuticheUnitarie>TIPO:Vitamina D terapia=Vitamina D terapia__PrincipiAttivi:NOME:Calcifediolo'. 
+Problem 1/2
+TRAIN
+Instances{45 instances; 322+1 attributes (classAttribute: PrincipiAttivi.NOME/Colecalciferolo)}
+TEST
+Instances{12 instances; 322+1 attributes (classAttribute: PrincipiAttivi.NOME/Colecalciferolo)}
+Trained model 'RaccomandazioniTerapeuticheUnitarie>TIPO:Vitamina D terapia=Vitamina D terapia__PrincipiAttivi:NOME:Colecalciferolo'.
+DBFit->test(Instances{12 instances; 322+1 attributes (classAttribute: PrincipiAttivi.NOME/Colecalciferolo)})
+Test accuracy: 0.91666666666667
+Train-time recursion stops here (recursionPath = [[4, Vitamina D terapia]], problem 1/2) : 'RaccomandazioniTerapeuticheUnitarie>TIPO:Vitamina D terapia=Vitamina D terapia__PrincipiAttivi:NOME:Colecalciferolo'. 
+Problem 5/6
+TRAIN
+Instances{1083 instances; 322+1 attributes (classAttribute: RaccomandazioniTerapeuticheUnitarie.TIPO/Terapie ormonali)}
+TEST
+Instances{271 instances; 322+1 attributes (classAttribute: RaccomandazioniTerapeuticheUnitarie.TIPO/Terapie ormonali)}
+Trained model '__RaccomandazioniTerapeuticheUnitarie:TIPO:Terapie ormonali'.
+DBFit->test(Instances{271 instances; 322+1 attributes (classAttribute: RaccomandazioniTerapeuticheUnitarie.TIPO/Terapie ormonali)})
+Test accuracy: 0.9409594095941
+Branching at depth 0 on attribute "RaccomandazioniTerapeuticheUnitarie.TIPO/Terapie ormonali" (5/6))  with domain [NO_Terapie ormonali, Terapie ormonali]. 
+Recursion on classValue NO_Terapie ormonali for attribute "RaccomandazioniTerapeuticheUnitarie.TIPO/Terapie ormonali". 
+DBFit->updateModel([[5, NO_Terapie ormonali]])
+DBFit->readData(NULL, [[5, NO_Terapie ormonali]])
+WARNING! Couldn't apply ForceCategoricalBinary treatment to column PrincipiAttivi.NOME. No data instance found.
+WARNING! Couldn't derive a BinaryBagOfWords dictionary for column "Anamnesi.MOTIVO_ANNULLA". This column will be ignored.
+WARNING! Couldn't derive a BinaryBagOfWords dictionary for column "Anamnesi.TERAPIA_OSTEOPROTETTIVA_SPECIFICA". This column will be ignored.
+WARNING! Couldn't derive a BinaryBagOfWords dictionary for column "Diagnosi.MOTIVO_ANNULLA". This column will be ignored.
+Recursion level: 1(path: [[5, NO_Terapie ormonali]])
+Identifier value: NULL
+WARNING! Couldn't derive output attributes for output column PrincipiAttivi.NOME!
+Train-time recursion stops here due to lack of data (recursionPath = [[5, NO_Terapie ormonali]]). 
+Recursion on classValue Terapie ormonali for attribute "RaccomandazioniTerapeuticheUnitarie.TIPO/Terapie ormonali". 
+DBFit->updateModel([[5, Terapie ormonali]])
+DBFit->readData(NULL, [[5, Terapie ormonali]])
+WARNING! Couldn't derive a BinaryBagOfWords dictionary for column "Anamnesi.MOTIVO_ANNULLA". This column will be ignored.
+WARNING! Couldn't derive a BinaryBagOfWords dictionary for column "Anamnesi.TERAPIA_OSTEOPROTETTIVA_SPECIFICA". This column will be ignored.
+WARNING! Couldn't derive a BinaryBagOfWords dictionary for column "Diagnosi.MOTIVO_ANNULLA". This column will be ignored.
+Recursion level: 1(path: [[5, Terapie ormonali]])
+Identifier value: NULL
+4 dataframes computed 
+Problem 0/4
+TRAIN
+Instances{47 instances; 322+1 attributes (classAttribute: PrincipiAttivi.NOME/Estradiolo + Drospirenone)}
+TEST
+Instances{12 instances; 322+1 attributes (classAttribute: PrincipiAttivi.NOME/Estradiolo + Drospirenone)}
+Trained model 'RaccomandazioniTerapeuticheUnitarie>TIPO:Terapie ormonali=Terapie ormonali__PrincipiAttivi:NOME:Estradiolo + Drospirenone'.
+DBFit->test(Instances{12 instances; 322+1 attributes (classAttribute: PrincipiAttivi.NOME/Estradiolo + Drospirenone)})
+Test accuracy: 0.91666666666667
+Train-time recursion stops here (recursionPath = [[5, Terapie ormonali]], problem 0/4) : 'RaccomandazioniTerapeuticheUnitarie>TIPO:Terapie ormonali=Terapie ormonali__PrincipiAttivi:NOME:Estradiolo + Drospirenone'. 
+Problem 1/4
+TRAIN
+Instances{47 instances; 322+1 attributes (classAttribute: PrincipiAttivi.NOME/Estrogeni coniugati equini + Bazedoxifene)}
+TEST
+Instances{12 instances; 322+1 attributes (classAttribute: PrincipiAttivi.NOME/Estrogeni coniugati equini + Bazedoxifene)}
+Trained model 'RaccomandazioniTerapeuticheUnitarie>TIPO:Terapie ormonali=Terapie ormonali__PrincipiAttivi:NOME:Estrogeni coniugati equini + Bazedoxifene'.
+DBFit->test(Instances{12 instances; 322+1 attributes (classAttribute: PrincipiAttivi.NOME/Estrogeni coniugati equini + Bazedoxifene)})
+Test accuracy: 0.66666666666667
+Train-time recursion stops here (recursionPath = [[5, Terapie ormonali]], problem 1/4) : 'RaccomandazioniTerapeuticheUnitarie>TIPO:Terapie ormonali=Terapie ormonali__PrincipiAttivi:NOME:Estrogeni coniugati equini + Bazedoxifene'. 
+Problem 2/4
+TRAIN
+Instances{47 instances; 322+1 attributes (classAttribute: PrincipiAttivi.NOME/Tibolone)}
+TEST
+Instances{12 instances; 322+1 attributes (classAttribute: PrincipiAttivi.NOME/Tibolone)}
+Trained model 'RaccomandazioniTerapeuticheUnitarie>TIPO:Terapie ormonali=Terapie ormonali__PrincipiAttivi:NOME:Tibolone'.
+DBFit->test(Instances{12 instances; 322+1 attributes (classAttribute: PrincipiAttivi.NOME/Tibolone)})
+Test accuracy: 1
+Train-time recursion stops here (recursionPath = [[5, Terapie ormonali]], problem 2/4) : 'RaccomandazioniTerapeuticheUnitarie>TIPO:Terapie ormonali=Terapie ormonali__PrincipiAttivi:NOME:Tibolone'. 
+Problem 3/4
+TRAIN
+Instances{47 instances; 322+1 attributes (classAttribute: PrincipiAttivi.NOME/Terapia ormonale sostitutiva)}
+TEST
+Instances{12 instances; 322+1 attributes (classAttribute: PrincipiAttivi.NOME/Terapia ormonale sostitutiva)}
+Trained model 'RaccomandazioniTerapeuticheUnitarie>TIPO:Terapie ormonali=Terapie ormonali__PrincipiAttivi:NOME:Terapia ormonale sostitutiva'.
+DBFit->test(Instances{12 instances; 322+1 attributes (classAttribute: PrincipiAttivi.NOME/Terapia ormonale sostitutiva)})
+Test accuracy: 0.83333333333333
+Train-time recursion stops here (recursionPath = [[5, Terapie ormonali]], problem 3/4) : 'RaccomandazioniTerapeuticheUnitarie>TIPO:Terapie ormonali=Terapie ormonali__PrincipiAttivi:NOME:Terapia ormonale sostitutiva'. 
+updateModel took 619.46962404251 seconds to complete.
+AVAILABLE MODELS
+
+/var/www/html/piton/DBFit.php:1597:
+array (size=25)
+  0 => string '__RaccomandazioniTerapeuticheUnitarie:TIPO:Terapie osteoprotettive' (length=66)
+  1 => string 'RaccomandazioniTerapeuticheUnitarie>TIPO:Terapie osteoprotettive=Terapie osteoprotettive__PrincipiAttivi:NOME:Teriparatide' (length=122)
+  2 => string 'RaccomandazioniTerapeuticheUnitarie>TIPO:Terapie osteoprotettive=Terapie osteoprotettive__PrincipiAttivi:NOME:Risedronato' (length=121)
+  3 => string 'RaccomandazioniTerapeuticheUnitarie>TIPO:Terapie osteoprotettive=Terapie osteoprotettive__PrincipiAttivi:NOME:Clodronato' (length=120)
+  4 => string 'RaccomandazioniTerapeuticheUnitarie>TIPO:Terapie osteoprotettive=Terapie osteoprotettive__PrincipiAttivi:NOME:Denosumab' (length=119)
+  5 => string 'RaccomandazioniTerapeuticheUnitarie>TIPO:Terapie osteoprotettive=Terapie osteoprotettive__PrincipiAttivi:NOME:Alendronato' (length=121)
+  6 => string 'RaccomandazioniTerapeuticheUnitarie>TIPO:Terapie osteoprotettive=Terapie osteoprotettive__PrincipiAttivi:NOME:Zoledronato' (length=121)
+  7 => string 'RaccomandazioniTerapeuticheUnitarie>TIPO:Terapie osteoprotettive=Terapie osteoprotettive__PrincipiAttivi:NOME:Ibandronato' (length=121)
+  8 => string 'RaccomandazioniTerapeuticheUnitarie>TIPO:Terapie osteoprotettive=Terapie osteoprotettive__PrincipiAttivi:NOME:Bazedoxifene' (length=122)
+  9 => string 'RaccomandazioniTerapeuticheUnitarie>TIPO:Terapie osteoprotettive=Terapie osteoprotettive__PrincipiAttivi:NOME:Raloxifene' (length=120)
+  10 => string '__RaccomandazioniTerapeuticheUnitarie:TIPO:Vitamina D Supplementazione' (length=70)
+  11 => string 'RaccomandazioniTerapeuticheUnitarie>TIPO:Vitamina D Supplementazione=Vitamina D Supplementazione__PrincipiAttivi:NOME:Colecalciferolo' (length=133)
+  12 => string 'RaccomandazioniTerapeuticheUnitarie>TIPO:Vitamina D Supplementazione=Vitamina D Supplementazione__PrincipiAttivi:NOME:Calcifediolo' (length=130)
+  13 => string '__RaccomandazioniTerapeuticheUnitarie:TIPO:Calcio supplementazione' (length=66)
+  14 => string 'RaccomandazioniTerapeuticheUnitarie>TIPO:Calcio supplementazione=Calcio supplementazione__PrincipiAttivi:NOME:Calcio carbonato' (length=126)
+  15 => string 'RaccomandazioniTerapeuticheUnitarie>TIPO:Calcio supplementazione=Calcio supplementazione__PrincipiAttivi:NOME:Calcio citrato' (length=124)
+  16 => string '__RaccomandazioniTerapeuticheUnitarie:TIPO:Indagini approfondimento' (length=67)
+  17 => string '__RaccomandazioniTerapeuticheUnitarie:TIPO:Vitamina D terapia' (length=61)
+  18 => string 'RaccomandazioniTerapeuticheUnitarie>TIPO:Vitamina D terapia=Vitamina D terapia__PrincipiAttivi:NOME:Calcifediolo' (length=112)
+  19 => string 'RaccomandazioniTerapeuticheUnitarie>TIPO:Vitamina D terapia=Vitamina D terapia__PrincipiAttivi:NOME:Colecalciferolo' (length=115)
+  20 => string '__RaccomandazioniTerapeuticheUnitarie:TIPO:Terapie ormonali' (length=59)
+  21 => string 'RaccomandazioniTerapeuticheUnitarie>TIPO:Terapie ormonali=Terapie ormonali__PrincipiAttivi:NOME:Estradiolo + Drospirenone' (length=121)
+  22 => string 'RaccomandazioniTerapeuticheUnitarie>TIPO:Terapie ormonali=Terapie ormonali__PrincipiAttivi:NOME:Estrogeni coniugati equini + Bazedoxifene' (length=137)
+  23 => string 'RaccomandazioniTerapeuticheUnitarie>TIPO:Terapie ormonali=Terapie ormonali__PrincipiAttivi:NOME:Tibolone' (length=104)
+  24 => string 'RaccomandazioniTerapeuticheUnitarie>TIPO:Terapie ormonali=Terapie ormonali__PrincipiAttivi:NOME:Terapia ormonale sostitutiva' (length=124)
+
+DBFit->predictByIdentifier(1, [])
+DBFit->readData(1, [])
+Recursion level: 0(path: [])
+Identifier value: 1
+6 dataframes computed 
+Problem 0/6
+Using model '__RaccomandazioniTerapeuticheUnitarie:TIPO:Terapie osteoprotettive' for prediction.
+predictedVal: "Terapie osteoprotettive"
+DBFit->predictByIdentifier(1, [[0, Terapie osteoprotettive]])
+DBFit->readData(1, [[0, Terapie osteoprotettive]])
+Recursion level: 1(path: [[0, Terapie osteoprotettive]])
+Identifier value: 1
+9 dataframes computed 
+Problem 0/9
+Using model 'RaccomandazioniTerapeuticheUnitarie>TIPO:Terapie osteoprotettive=Terapie osteoprotettive__PrincipiAttivi:NOME:Teriparatide' for prediction.
+predictedVal: "NO_Teriparatide"
+DBFit->predictByIdentifier(1, [[0, Terapie osteoprotettive], [0, NO_Teriparatide]])
+Prediction-time recursion stops here due to reached bottom (recursionPath = [[0, Terapie osteoprotettive], [0, NO_Teriparatide]]:
+Problem 1/9
+Using model 'RaccomandazioniTerapeuticheUnitarie>TIPO:Terapie osteoprotettive=Terapie osteoprotettive__PrincipiAttivi:NOME:Risedronato' for prediction.
+predictedVal: "NO_Risedronato"
+DBFit->predictByIdentifier(1, [[0, Terapie osteoprotettive], [1, NO_Risedronato]])
+Prediction-time recursion stops here due to reached bottom (recursionPath = [[0, Terapie osteoprotettive], [1, NO_Risedronato]]:
+Problem 2/9
+Using model 'RaccomandazioniTerapeuticheUnitarie>TIPO:Terapie osteoprotettive=Terapie osteoprotettive__PrincipiAttivi:NOME:Clodronato' for prediction.
+predictedVal: "NO_Clodronato"
+DBFit->predictByIdentifier(1, [[0, Terapie osteoprotettive], [2, NO_Clodronato]])
+Prediction-time recursion stops here due to reached bottom (recursionPath = [[0, Terapie osteoprotettive], [2, NO_Clodronato]]:
+Problem 3/9
+Using model 'RaccomandazioniTerapeuticheUnitarie>TIPO:Terapie osteoprotettive=Terapie osteoprotettive__PrincipiAttivi:NOME:Denosumab' for prediction.
+predictedVal: "NO_Denosumab"
+DBFit->predictByIdentifier(1, [[0, Terapie osteoprotettive], [3, NO_Denosumab]])
+Prediction-time recursion stops here due to reached bottom (recursionPath = [[0, Terapie osteoprotettive], [3, NO_Denosumab]]:
+Problem 4/9
+Using model 'RaccomandazioniTerapeuticheUnitarie>TIPO:Terapie osteoprotettive=Terapie osteoprotettive__PrincipiAttivi:NOME:Alendronato' for prediction.
+predictedVal: "NO_Alendronato"
+DBFit->predictByIdentifier(1, [[0, Terapie osteoprotettive], [4, NO_Alendronato]])
+Prediction-time recursion stops here due to reached bottom (recursionPath = [[0, Terapie osteoprotettive], [4, NO_Alendronato]]:
+Problem 5/9
+Using model 'RaccomandazioniTerapeuticheUnitarie>TIPO:Terapie osteoprotettive=Terapie osteoprotettive__PrincipiAttivi:NOME:Zoledronato' for prediction.
+predictedVal: "NO_Zoledronato"
+DBFit->predictByIdentifier(1, [[0, Terapie osteoprotettive], [5, NO_Zoledronato]])
+Prediction-time recursion stops here due to reached bottom (recursionPath = [[0, Terapie osteoprotettive], [5, NO_Zoledronato]]:
+Problem 6/9
+Using model 'RaccomandazioniTerapeuticheUnitarie>TIPO:Terapie osteoprotettive=Terapie osteoprotettive__PrincipiAttivi:NOME:Ibandronato' for prediction.
+predictedVal: "NO_Ibandronato"
+DBFit->predictByIdentifier(1, [[0, Terapie osteoprotettive], [6, NO_Ibandronato]])
+Prediction-time recursion stops here due to reached bottom (recursionPath = [[0, Terapie osteoprotettive], [6, NO_Ibandronato]]:
+Problem 7/9
+Using model 'RaccomandazioniTerapeuticheUnitarie>TIPO:Terapie osteoprotettive=Terapie osteoprotettive__PrincipiAttivi:NOME:Bazedoxifene' for prediction.
+predictedVal: "NO_Bazedoxifene"
+DBFit->predictByIdentifier(1, [[0, Terapie osteoprotettive], [7, NO_Bazedoxifene]])
+Prediction-time recursion stops here due to reached bottom (recursionPath = [[0, Terapie osteoprotettive], [7, NO_Bazedoxifene]]:
+Problem 8/9
+Using model 'RaccomandazioniTerapeuticheUnitarie>TIPO:Terapie osteoprotettive=Terapie osteoprotettive__PrincipiAttivi:NOME:Raloxifene' for prediction.
+predictedVal: "NO_Raloxifene"
+DBFit->predictByIdentifier(1, [[0, Terapie osteoprotettive], [8, NO_Raloxifene]])
+Prediction-time recursion stops here due to reached bottom (recursionPath = [[0, Terapie osteoprotettive], [8, NO_Raloxifene]]:
+Problem 1/6
+Using model '__RaccomandazioniTerapeuticheUnitarie:TIPO:Vitamina D Supplementazione' for prediction.
+predictedVal: "Vitamina D Supplementazione"
+DBFit->predictByIdentifier(1, [[1, Vitamina D Supplementazione]])
+DBFit->readData(1, [[1, Vitamina D Supplementazione]])
+Recursion level: 1(path: [[1, Vitamina D Supplementazione]])
+Identifier value: 1
+2 dataframes computed 
+Problem 0/2
+Using model 'RaccomandazioniTerapeuticheUnitarie>TIPO:Vitamina D Supplementazione=Vitamina D Supplementazione__PrincipiAttivi:NOME:Colecalciferolo' for prediction.
+predictedVal: "Colecalciferolo"
+DBFit->predictByIdentifier(1, [[1, Vitamina D Supplementazione], [0, Colecalciferolo]])
+Prediction-time recursion stops here due to reached bottom (recursionPath = [[1, Vitamina D Supplementazione], [0, Colecalciferolo]]:
+Problem 1/2
+Using model 'RaccomandazioniTerapeuticheUnitarie>TIPO:Vitamina D Supplementazione=Vitamina D Supplementazione__PrincipiAttivi:NOME:Calcifediolo' for prediction.
+predictedVal: "NO_Calcifediolo"
+DBFit->predictByIdentifier(1, [[1, Vitamina D Supplementazione], [1, NO_Calcifediolo]])
+Prediction-time recursion stops here due to reached bottom (recursionPath = [[1, Vitamina D Supplementazione], [1, NO_Calcifediolo]]:
+Problem 2/6
+Using model '__RaccomandazioniTerapeuticheUnitarie:TIPO:Calcio supplementazione' for prediction.
+predictedVal: "Calcio supplementazione"
+DBFit->predictByIdentifier(1, [[2, Calcio supplementazione]])
+DBFit->readData(1, [[2, Calcio supplementazione]])
+Recursion level: 1(path: [[2, Calcio supplementazione]])
+Identifier value: 1
+2 dataframes computed 
+Problem 0/2
+Using model 'RaccomandazioniTerapeuticheUnitarie>TIPO:Calcio supplementazione=Calcio supplementazione__PrincipiAttivi:NOME:Calcio carbonato' for prediction.
+predictedVal: "Calcio carbonato"
+DBFit->predictByIdentifier(1, [[2, Calcio supplementazione], [0, Calcio carbonato]])
+Prediction-time recursion stops here due to reached bottom (recursionPath = [[2, Calcio supplementazione], [0, Calcio carbonato]]:
+Problem 1/2
+Using model 'RaccomandazioniTerapeuticheUnitarie>TIPO:Calcio supplementazione=Calcio supplementazione__PrincipiAttivi:NOME:Calcio citrato' for prediction.
+predictedVal: "NO_Calcio citrato"
+DBFit->predictByIdentifier(1, [[2, Calcio supplementazione], [1, NO_Calcio citrato]])
+Prediction-time recursion stops here due to reached bottom (recursionPath = [[2, Calcio supplementazione], [1, NO_Calcio citrato]]:
+Problem 3/6
+Using model '__RaccomandazioniTerapeuticheUnitarie:TIPO:Indagini approfondimento' for prediction.
+predictedVal: "Indagini approfondimento"
+DBFit->predictByIdentifier(1, [[3, Indagini approfondimento]])
+Prediction-time recursion stops here due to lack of a model (recursionPath = [[3, Indagini approfondimento]]:
+Problem 4/6
+Using model '__RaccomandazioniTerapeuticheUnitarie:TIPO:Vitamina D terapia' for prediction.
+predictedVal: "NO_Vitamina D terapia"
+DBFit->predictByIdentifier(1, [[4, NO_Vitamina D terapia]])
+Prediction-time recursion stops here due to lack of a model (recursionPath = [[4, NO_Vitamina D terapia]]:
+Problem 5/6
+Using model '__RaccomandazioniTerapeuticheUnitarie:TIPO:Terapie ormonali' for prediction.
+predictedVal: "NO_Terapie ormonali"
+DBFit->predictByIdentifier(1, [[5, NO_Terapie ormonali]])
+Prediction-time recursion stops here due to lack of a model (recursionPath = [[5, NO_Terapie ormonali]]:
+Predictions: 
+[0]: [[RaccomandazioniTerapeuticheUnitarie.TIPO/Terapie osteoprotettive, Terapie osteoprotettive], [[[PrincipiAttivi.NOME/Teriparatide, NO_Teriparatide], []], [[PrincipiAttivi.NOME/Risedronato, NO_Risedronato], []], [[PrincipiAttivi.NOME/Clodronato, NO_Clodronato], []], [[PrincipiAttivi.NOME/Denosumab, NO_Denosumab], []], [[PrincipiAttivi.NOME/Alendronato, NO_Alendronato], []], [[PrincipiAttivi.NOME/Zoledronato, NO_Zoledronato], []], [[PrincipiAttivi.NOME/Ibandronato, NO_Ibandronato], []], [[PrincipiAttivi.NOME/Bazedoxifene, NO_Bazedoxifene], []], [[PrincipiAttivi.NOME/Raloxifene, NO_Raloxifene], []]]]
+[1]: [[RaccomandazioniTerapeuticheUnitarie.TIPO/Vitamina D Supplementazione, Vitamina D Supplementazione], [[[PrincipiAttivi.NOME/Colecalciferolo, Colecalciferolo], []], [[PrincipiAttivi.NOME/Calcifediolo, NO_Calcifediolo], []]]]
+[2]: [[RaccomandazioniTerapeuticheUnitarie.TIPO/Calcio supplementazione, Calcio supplementazione], [[[PrincipiAttivi.NOME/Calcio carbonato, Calcio carbonato], []], [[PrincipiAttivi.NOME/Calcio citrato, NO_Calcio citrato], []]]]
+[3]: [[RaccomandazioniTerapeuticheUnitarie.TIPO/Indagini approfondimento, Indagini approfondimento], []]
+[4]: [[RaccomandazioniTerapeuticheUnitarie.TIPO/Vitamina D terapia, NO_Vitamina D terapia], []]
+[5]: [[RaccomandazioniTerapeuticheUnitarie.TIPO/Terapie ormonali, NO_Terapie ormonali], []]
+
+predictByIdentifier took 0.16494393348694 seconds to complete.
+DBFit->predictByIdentifier(9, [])
+DBFit->readData(9, [])
+Recursion level: 0(path: [])
+Identifier value: 9
+6 dataframes computed 
+Problem 0/6
+Using model '__RaccomandazioniTerapeuticheUnitarie:TIPO:Terapie osteoprotettive' for prediction.
+predictedVal: "Terapie osteoprotettive"
+DBFit->predictByIdentifier(9, [[0, Terapie osteoprotettive]])
+DBFit->readData(9, [[0, Terapie osteoprotettive]])
+Recursion level: 1(path: [[0, Terapie osteoprotettive]])
+Identifier value: 9
+9 dataframes computed 
+Problem 0/9
+Using model 'RaccomandazioniTerapeuticheUnitarie>TIPO:Terapie osteoprotettive=Terapie osteoprotettive__PrincipiAttivi:NOME:Teriparatide' for prediction.
+predictedVal: "NO_Teriparatide"
+DBFit->predictByIdentifier(9, [[0, Terapie osteoprotettive], [0, NO_Teriparatide]])
+Prediction-time recursion stops here due to reached bottom (recursionPath = [[0, Terapie osteoprotettive], [0, NO_Teriparatide]]:
+Problem 1/9
+Using model 'RaccomandazioniTerapeuticheUnitarie>TIPO:Terapie osteoprotettive=Terapie osteoprotettive__PrincipiAttivi:NOME:Risedronato' for prediction.
+predictedVal: "NO_Risedronato"
+DBFit->predictByIdentifier(9, [[0, Terapie osteoprotettive], [1, NO_Risedronato]])
+Prediction-time recursion stops here due to reached bottom (recursionPath = [[0, Terapie osteoprotettive], [1, NO_Risedronato]]:
+Problem 2/9
+Using model 'RaccomandazioniTerapeuticheUnitarie>TIPO:Terapie osteoprotettive=Terapie osteoprotettive__PrincipiAttivi:NOME:Clodronato' for prediction.
+predictedVal: "NO_Clodronato"
+DBFit->predictByIdentifier(9, [[0, Terapie osteoprotettive], [2, NO_Clodronato]])
+Prediction-time recursion stops here due to reached bottom (recursionPath = [[0, Terapie osteoprotettive], [2, NO_Clodronato]]:
+Problem 3/9
+Using model 'RaccomandazioniTerapeuticheUnitarie>TIPO:Terapie osteoprotettive=Terapie osteoprotettive__PrincipiAttivi:NOME:Denosumab' for prediction.
+predictedVal: "NO_Denosumab"
+DBFit->predictByIdentifier(9, [[0, Terapie osteoprotettive], [3, NO_Denosumab]])
+Prediction-time recursion stops here due to reached bottom (recursionPath = [[0, Terapie osteoprotettive], [3, NO_Denosumab]]:
+Problem 4/9
+Using model 'RaccomandazioniTerapeuticheUnitarie>TIPO:Terapie osteoprotettive=Terapie osteoprotettive__PrincipiAttivi:NOME:Alendronato' for prediction.
+predictedVal: "NO_Alendronato"
+DBFit->predictByIdentifier(9, [[0, Terapie osteoprotettive], [4, NO_Alendronato]])
+Prediction-time recursion stops here due to reached bottom (recursionPath = [[0, Terapie osteoprotettive], [4, NO_Alendronato]]:
+Problem 5/9
+Using model 'RaccomandazioniTerapeuticheUnitarie>TIPO:Terapie osteoprotettive=Terapie osteoprotettive__PrincipiAttivi:NOME:Zoledronato' for prediction.
+predictedVal: "NO_Zoledronato"
+DBFit->predictByIdentifier(9, [[0, Terapie osteoprotettive], [5, NO_Zoledronato]])
+Prediction-time recursion stops here due to reached bottom (recursionPath = [[0, Terapie osteoprotettive], [5, NO_Zoledronato]]:
+Problem 6/9
+Using model 'RaccomandazioniTerapeuticheUnitarie>TIPO:Terapie osteoprotettive=Terapie osteoprotettive__PrincipiAttivi:NOME:Ibandronato' for prediction.
+predictedVal: "NO_Ibandronato"
+DBFit->predictByIdentifier(9, [[0, Terapie osteoprotettive], [6, NO_Ibandronato]])
+Prediction-time recursion stops here due to reached bottom (recursionPath = [[0, Terapie osteoprotettive], [6, NO_Ibandronato]]:
+Problem 7/9
+Using model 'RaccomandazioniTerapeuticheUnitarie>TIPO:Terapie osteoprotettive=Terapie osteoprotettive__PrincipiAttivi:NOME:Bazedoxifene' for prediction.
+predictedVal: "NO_Bazedoxifene"
+DBFit->predictByIdentifier(9, [[0, Terapie osteoprotettive], [7, NO_Bazedoxifene]])
+Prediction-time recursion stops here due to reached bottom (recursionPath = [[0, Terapie osteoprotettive], [7, NO_Bazedoxifene]]:
+Problem 8/9
+Using model 'RaccomandazioniTerapeuticheUnitarie>TIPO:Terapie osteoprotettive=Terapie osteoprotettive__PrincipiAttivi:NOME:Raloxifene' for prediction.
+predictedVal: "NO_Raloxifene"
+DBFit->predictByIdentifier(9, [[0, Terapie osteoprotettive], [8, NO_Raloxifene]])
+Prediction-time recursion stops here due to reached bottom (recursionPath = [[0, Terapie osteoprotettive], [8, NO_Raloxifene]]:
+Problem 1/6
+Using model '__RaccomandazioniTerapeuticheUnitarie:TIPO:Vitamina D Supplementazione' for prediction.
+predictedVal: "Vitamina D Supplementazione"
+DBFit->predictByIdentifier(9, [[1, Vitamina D Supplementazione]])
+DBFit->readData(9, [[1, Vitamina D Supplementazione]])
+Recursion level: 1(path: [[1, Vitamina D Supplementazione]])
+Identifier value: 9
+2 dataframes computed 
+Problem 0/2
+Using model 'RaccomandazioniTerapeuticheUnitarie>TIPO:Vitamina D Supplementazione=Vitamina D Supplementazione__PrincipiAttivi:NOME:Colecalciferolo' for prediction.
+predictedVal: "Colecalciferolo"
+DBFit->predictByIdentifier(9, [[1, Vitamina D Supplementazione], [0, Colecalciferolo]])
+Prediction-time recursion stops here due to reached bottom (recursionPath = [[1, Vitamina D Supplementazione], [0, Colecalciferolo]]:
+Problem 1/2
+Using model 'RaccomandazioniTerapeuticheUnitarie>TIPO:Vitamina D Supplementazione=Vitamina D Supplementazione__PrincipiAttivi:NOME:Calcifediolo' for prediction.
+predictedVal: "NO_Calcifediolo"
+DBFit->predictByIdentifier(9, [[1, Vitamina D Supplementazione], [1, NO_Calcifediolo]])
+Prediction-time recursion stops here due to reached bottom (recursionPath = [[1, Vitamina D Supplementazione], [1, NO_Calcifediolo]]:
+Problem 2/6
+Using model '__RaccomandazioniTerapeuticheUnitarie:TIPO:Calcio supplementazione' for prediction.
+predictedVal: "NO_Calcio supplementazione"
+DBFit->predictByIdentifier(9, [[2, NO_Calcio supplementazione]])
+Prediction-time recursion stops here due to lack of a model (recursionPath = [[2, NO_Calcio supplementazione]]:
+Problem 3/6
+Using model '__RaccomandazioniTerapeuticheUnitarie:TIPO:Indagini approfondimento' for prediction.
+predictedVal: "NO_Indagini approfondimento"
+DBFit->predictByIdentifier(9, [[3, NO_Indagini approfondimento]])
+Prediction-time recursion stops here due to lack of a model (recursionPath = [[3, NO_Indagini approfondimento]]:
+Problem 4/6
+Using model '__RaccomandazioniTerapeuticheUnitarie:TIPO:Vitamina D terapia' for prediction.
+predictedVal: "NO_Vitamina D terapia"
+DBFit->predictByIdentifier(9, [[4, NO_Vitamina D terapia]])
+Prediction-time recursion stops here due to lack of a model (recursionPath = [[4, NO_Vitamina D terapia]]:
+Problem 5/6
+Using model '__RaccomandazioniTerapeuticheUnitarie:TIPO:Terapie ormonali' for prediction.
+predictedVal: "NO_Terapie ormonali"
+DBFit->predictByIdentifier(9, [[5, NO_Terapie ormonali]])
+Prediction-time recursion stops here due to lack of a model (recursionPath = [[5, NO_Terapie ormonali]]:
+Predictions: 
+[0]: [[RaccomandazioniTerapeuticheUnitarie.TIPO/Terapie osteoprotettive, Terapie osteoprotettive], [[[PrincipiAttivi.NOME/Teriparatide, NO_Teriparatide], []], [[PrincipiAttivi.NOME/Risedronato, NO_Risedronato], []], [[PrincipiAttivi.NOME/Clodronato, NO_Clodronato], []], [[PrincipiAttivi.NOME/Denosumab, NO_Denosumab], []], [[PrincipiAttivi.NOME/Alendronato, NO_Alendronato], []], [[PrincipiAttivi.NOME/Zoledronato, NO_Zoledronato], []], [[PrincipiAttivi.NOME/Ibandronato, NO_Ibandronato], []], [[PrincipiAttivi.NOME/Bazedoxifene, NO_Bazedoxifene], []], [[PrincipiAttivi.NOME/Raloxifene, NO_Raloxifene], []]]]
+[1]: [[RaccomandazioniTerapeuticheUnitarie.TIPO/Vitamina D Supplementazione, Vitamina D Supplementazione], [[[PrincipiAttivi.NOME/Colecalciferolo, Colecalciferolo], []], [[PrincipiAttivi.NOME/Calcifediolo, NO_Calcifediolo], []]]]
+[2]: [[RaccomandazioniTerapeuticheUnitarie.TIPO/Calcio supplementazione, NO_Calcio supplementazione], []]
+[3]: [[RaccomandazioniTerapeuticheUnitarie.TIPO/Indagini approfondimento, NO_Indagini approfondimento], []]
+[4]: [[RaccomandazioniTerapeuticheUnitarie.TIPO/Vitamina D terapia, NO_Vitamina D terapia], []]
+[5]: [[RaccomandazioniTerapeuticheUnitarie.TIPO/Terapie ormonali, NO_Terapie ormonali], []]
+
+DBFit->predictByIdentifier(3, [])
+DBFit->readData(3, [])
+Recursion level: 0(path: [])
+Identifier value: 3
+6 dataframes computed 
+Problem 0/6
+Using model '__RaccomandazioniTerapeuticheUnitarie:TIPO:Terapie osteoprotettive' for prediction.
+predictedVal: "NO_Terapie osteoprotettive"
+DBFit->predictByIdentifier(3, [[0, NO_Terapie osteoprotettive]])
+Prediction-time recursion stops here due to lack of a model (recursionPath = [[0, NO_Terapie osteoprotettive]]:
+Problem 1/6
+Using model '__RaccomandazioniTerapeuticheUnitarie:TIPO:Vitamina D Supplementazione' for prediction.
+predictedVal: "Vitamina D Supplementazione"
+DBFit->predictByIdentifier(3, [[1, Vitamina D Supplementazione]])
+DBFit->readData(3, [[1, Vitamina D Supplementazione]])
+Recursion level: 1(path: [[1, Vitamina D Supplementazione]])
+Identifier value: 3
+2 dataframes computed 
+Problem 0/2
+Using model 'RaccomandazioniTerapeuticheUnitarie>TIPO:Vitamina D Supplementazione=Vitamina D Supplementazione__PrincipiAttivi:NOME:Colecalciferolo' for prediction.
+predictedVal: "Colecalciferolo"
+DBFit->predictByIdentifier(3, [[1, Vitamina D Supplementazione], [0, Colecalciferolo]])
+Prediction-time recursion stops here due to reached bottom (recursionPath = [[1, Vitamina D Supplementazione], [0, Colecalciferolo]]:
+Problem 1/2
+Using model 'RaccomandazioniTerapeuticheUnitarie>TIPO:Vitamina D Supplementazione=Vitamina D Supplementazione__PrincipiAttivi:NOME:Calcifediolo' for prediction.
+predictedVal: "NO_Calcifediolo"
+DBFit->predictByIdentifier(3, [[1, Vitamina D Supplementazione], [1, NO_Calcifediolo]])
+Prediction-time recursion stops here due to reached bottom (recursionPath = [[1, Vitamina D Supplementazione], [1, NO_Calcifediolo]]:
+Problem 2/6
+Using model '__RaccomandazioniTerapeuticheUnitarie:TIPO:Calcio supplementazione' for prediction.
+predictedVal: "Calcio supplementazione"
+DBFit->predictByIdentifier(3, [[2, Calcio supplementazione]])
+DBFit->readData(3, [[2, Calcio supplementazione]])
+Recursion level: 1(path: [[2, Calcio supplementazione]])
+Identifier value: 3
+2 dataframes computed 
+Problem 0/2
+Using model 'RaccomandazioniTerapeuticheUnitarie>TIPO:Calcio supplementazione=Calcio supplementazione__PrincipiAttivi:NOME:Calcio carbonato' for prediction.
+predictedVal: "Calcio carbonato"
+DBFit->predictByIdentifier(3, [[2, Calcio supplementazione], [0, Calcio carbonato]])
+Prediction-time recursion stops here due to reached bottom (recursionPath = [[2, Calcio supplementazione], [0, Calcio carbonato]]:
+Problem 1/2
+Using model 'RaccomandazioniTerapeuticheUnitarie>TIPO:Calcio supplementazione=Calcio supplementazione__PrincipiAttivi:NOME:Calcio citrato' for prediction.
+predictedVal: "NO_Calcio citrato"
+DBFit->predictByIdentifier(3, [[2, Calcio supplementazione], [1, NO_Calcio citrato]])
+Prediction-time recursion stops here due to reached bottom (recursionPath = [[2, Calcio supplementazione], [1, NO_Calcio citrato]]:
+Problem 3/6
+Using model '__RaccomandazioniTerapeuticheUnitarie:TIPO:Indagini approfondimento' for prediction.
+predictedVal: "Indagini approfondimento"
+DBFit->predictByIdentifier(3, [[3, Indagini approfondimento]])
+Prediction-time recursion stops here due to lack of a model (recursionPath = [[3, Indagini approfondimento]]:
+Problem 4/6
+Using model '__RaccomandazioniTerapeuticheUnitarie:TIPO:Vitamina D terapia' for prediction.
+predictedVal: "NO_Vitamina D terapia"
+DBFit->predictByIdentifier(3, [[4, NO_Vitamina D terapia]])
+Prediction-time recursion stops here due to lack of a model (recursionPath = [[4, NO_Vitamina D terapia]]:
+Problem 5/6
+Using model '__RaccomandazioniTerapeuticheUnitarie:TIPO:Terapie ormonali' for prediction.
+predictedVal: "NO_Terapie ormonali"
+DBFit->predictByIdentifier(3, [[5, NO_Terapie ormonali]])
+Prediction-time recursion stops here due to lack of a model (recursionPath = [[5, NO_Terapie ormonali]]:
+Predictions: 
+[0]: [[RaccomandazioniTerapeuticheUnitarie.TIPO/Terapie osteoprotettive, NO_Terapie osteoprotettive], []]
+[1]: [[RaccomandazioniTerapeuticheUnitarie.TIPO/Vitamina D Supplementazione, Vitamina D Supplementazione], [[[PrincipiAttivi.NOME/Colecalciferolo, Colecalciferolo], []], [[PrincipiAttivi.NOME/Calcifediolo, NO_Calcifediolo], []]]]
+[2]: [[RaccomandazioniTerapeuticheUnitarie.TIPO/Calcio supplementazione, Calcio supplementazione], [[[PrincipiAttivi.NOME/Calcio carbonato, Calcio carbonato], []], [[PrincipiAttivi.NOME/Calcio citrato, NO_Calcio citrato], []]]]
+[3]: [[RaccomandazioniTerapeuticheUnitarie.TIPO/Indagini approfondimento, Indagini approfondimento], []]
+[4]: [[RaccomandazioniTerapeuticheUnitarie.TIPO/Vitamina D terapia, NO_Vitamina D terapia], []]
+[5]: [[RaccomandazioniTerapeuticheUnitarie.TIPO/Terapie ormonali, NO_Terapie ormonali], []]
+

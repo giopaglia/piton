@@ -35,11 +35,11 @@ class DBFit {
   private $inputTables;
 
   /*
-    Input columns. (array of column-terms, one for each column)
+    Input columns. (array of inputColumn-terms, one for each column)
 
     *
     
-    For each column, the name must be specified, and it makes up sufficient information. As such, a term can simply be the name of the column (e.g "Age").
+    For each input column, the name must be specified, and it makes up sufficient information. As such, a term can simply be the name of the input column (e.g "Age").
     When dealing with more than one MySQL table, it is mandatory that each column name references the table it belongs using the dot notation, as in "patient.Age".
     Additional parameters can be supplied for managing the column pre-processing.
     The generic form for a column-term is [columnName, treatment=NULL, attrName=columnName].
@@ -65,7 +65,7 @@ class DBFit {
        for instance, ["BirthDate", "YearsSince", "Age"] creates an "Age" attribute
        by processing a "BirthDate" sql column.
   */
-  private $columns;
+  private $inputColumns;
   
   /* Columns that are to be treated as output.
       (array of outputColumn-terms, one for each column)
@@ -77,7 +77,7 @@ class DBFit {
     One can then take this a step further and, for each of the M models, independently train K models, where K is the number of output classes of the attribute, using data that is only relevant to that given output class and model. Generally, this hierarchical training and prediction structur takes the form of a tree with depth O (number of "nested" outputColumns).
     Having said this, the outputColumns array specifies one column per each depth of the recursion tree.
 
-    outputColumn-terms are very similar to column-terms (see documentation for $this->columns a few lines above), with a few major differences:
+    outputColumn-terms are very similar to inputColumn-terms (see documentation for $this->inputColumns a few lines above), with a few major differences:
     - The default treatment is "ForceCategorical": note, in fact, that output columns must generate categorical attributes (this module only supports classification and not regression). Also consider using "ForceCategoricalBinary", which breaks a nominal class attribute into k disjoint binary attributes.
     - Each output column can be derived from join operations (thus it can also belong to inputTables that are not in $this->inputTables).
     Additional join criteria can be specified using table-terms format (see documentation for $this->inputTables a few lines above).
@@ -178,8 +178,8 @@ class DBFit {
       die_error("DBFit requires a mysqli object, but got object of type "
         . get_class($db) . ".");
     $this->db = $db;
-    $this->inputTables = [];
-    $this->columns = [];
+    $this->setInputTables([]);
+    $this->setInputColumns([]);
     $this->setOutputColumns([]);
     $this->setIdentifierColumnName(NULL);
     $this->whereClauses = NULL;
@@ -196,8 +196,8 @@ class DBFit {
     echo "DBFit->readData(" . toString($idVal) . ", " . toString($recursionPath) . ")" . PHP_EOL;
 
     /* Checks */
-    if (!count($this->columns)) {
-      die_error("Must specify the concerning input columns, through ->setColumns() or ->addColumn().");
+    if (!count($this->inputColumns)) {
+      die_error("Must specify the concerning input columns, through ->setInputColumns() or ->addInputColumn().");
     }
     if (!count($this->outputColumns)) {
       die_error("Must specify at least an output column, through ->setOutputColumns() or ->addOutputColumn().");
@@ -213,25 +213,17 @@ class DBFit {
 
     /* Refresh all attributes except for those at the previous levels, in order to profit from attributes that are more specific.
      */
-    /*
-      TODO figure out what's the best place where to assign column attributes. Question: Should I recompute the attributes when I recurse? I think so, because I might profit from attributes that are more specific. But I need to fix the outputAttributes at the previous levels. Thus, I recompute the remaining outputLevels, as well as the input attributes. On the other end, why do I need to refresh the lower-level outputColumns? At prediction time, I don't have values for those!
-     */
-    // for ($i_col = $recursionLevel; $i_col < count($this->outputColumns); $i_col++) {
-    //   // var_dump($this->outputColumns[$i_col]);
-    //   $this->assignColumnAttributes($this->outputColumns[$i_col], NULL, $recursionPath);
-    //   // var_dump($this->outputColumns[$i_col]);
-    // }
     // var_dump($this->outputColumns[$recursionLevel]);
     if ($idVal === NULL) {
       $this->assignColumnAttributes($this->outputColumns[$recursionLevel], $recursionPath);
-      foreach ($this->getColumns(false) as &$column) {
+      foreach ($this->getInputColumns(false) as &$column) {
         $this->assignColumnAttributes($column, $recursionPath);
       }
     }
     
     // var_dump($this->outputColumns[$recursionLevel]);
     // var_dump($this->outputColumns);
-    // var_dump($this->columns);
+    // var_dump($this->inputColumns);
 
     /* Select redundant columns by examining the SQL constaints,
         to be ignored when creating the dataframe */
@@ -280,12 +272,12 @@ class DBFit {
     /* Derive the input columns & output columns needed for the dataframes at this recursion level */
     // TODO figure out whether I should be using the previous outputColumns values,
     //  but I think they would hold the same value, and $recursionPath contains everything needed. I think they should be discarted. If so, then no need to include them in $columns and $colsNeeded.
-    //  TODO the difference between columns and cols needed is just potentially the presence of the identifiercolumn. It'd be super simpler if we're sure that that column is not in $this->columns
+    //  TODO the difference between columns and cols needed is just potentially the presence of the identifiercolumn. It'd be super simpler if we're sure that that column is not in $this->inputColumns
     // $columns = array_slice($this->outputColumns, 0, $recursionLevel+1);
     // $thisOutputAttr = $columns[$recursionLevel];
     // array_splice($columns, $recursionLevel, 1);
     // array_unshift($columns, $thisOutputAttr);
-    // $columns = array_merge($columns, $this->getColumns(false))
+    // $columns = array_merge($columns, $this->getInputColumns(false))
       
     // var_dump($inputColumns);
 
@@ -312,7 +304,7 @@ class DBFit {
       }
 
       /* Obtain input attributes */
-      $inputColumns = $this->getColumns(false);
+      $inputColumns = $this->getInputColumns(false);
       $inputAttributes = [];
       foreach ($inputColumns as &$column) {
         if (in_array($this->getColumnName($column), $columnsToIgnore)) {
@@ -379,7 +371,7 @@ class DBFit {
         }
       }
 
-      // echo "this->columns: " . PHP_EOL; var_dump($this->columns);
+      // echo "this->columns: " . PHP_EOL; var_dump($this->inputColumns);
       // echo "attributes: " . PHP_EOL; var_dump($attributes);
       // echo "final_attributes: " . PHP_EOL; var_dump($final_attributes);
       
@@ -589,13 +581,13 @@ class DBFit {
   }
 
   /* TODO explain */
-  function getColumns($IncludeIdCol = false) {
+  function getInputColumns($IncludeIdCol = false) {
     $cols = [];
-    foreach ($this->columns as &$col) {
+    foreach ($this->inputColumns as &$col) {
       $cols[] = &$col;
     }
     if ($IncludeIdCol && $this->identifierColumnName !== NULL) {
-      if (!in_array($this->identifierColumnName, $this->getColumnNames(false))) {
+      if (!in_array($this->identifierColumnName, $this->getInputColumnNames(false))) {
         $cols[] = $this->readColumn($this->identifierColumnName);
       }
     }
@@ -603,8 +595,8 @@ class DBFit {
   }
 
   /* TODO explain */
-  function getColumnNames($IncludeIdCol = false) {
-    $cols = array_map([$this, "getColumnName"], $this->columns);
+  function getInputColumnNames($IncludeIdCol = false) {
+    $cols = array_map([$this, "getColumnName"], $this->inputColumns);
     if ($IncludeIdCol && $this->identifierColumnName !== NULL) {
       if (!in_array($this->identifierColumnName, $cols)) {
         $cols[] = $this->identifierColumnName;
@@ -633,7 +625,7 @@ class DBFit {
   function SQLSelectColumns(array $columns, $idVal = NULL, array $recursionPath = [],
     array $outputColumn = NULL, bool $silent = !DEBUGMODE) : object {
     // if ($colNames === NULL) { ...columns
-    //   $colNames = $this->getColumnNames(true);
+    //   $colNames = $this->getInputColumnNames(true);
     // }
     // listify($colNames);
     $cols_str = [];
@@ -1078,7 +1070,7 @@ class DBFit {
     return $new_tab;
   }
   
-  function setColumns($columns) : self
+  function setInputColumns($columns) : self
   {
     if ($columns === "*") {
       /* Obtain column names from database */
@@ -1090,25 +1082,25 @@ class DBFit {
       foreach ($res as $raw_col) {
         $colsNames[] = $raw_col["TABLE_NAME"].".".$raw_col["COLUMN_NAME"];
       }
-      return $this->setColumns($colsNames);
+      return $this->setInputColumns($colsNames);
     } else {
       listify($columns);
-      $this->columns = [];
+      $this->inputColumns = [];
       foreach ($columns as $col) {
-        $this->addColumn($col);
+        $this->addInputColumn($col);
       }
     }
     return $this;
   }
 
-  function addColumn($col) : self
+  function addInputColumn($col) : self
   {
     if (!count($this->inputTables)) {
       die_error("Must specify the concerning inputTables before the columns, through ->setInputTables() or ->addInputTable().");
     }
 
-    if (!is_array($this->columns)) {
-      die_error("Can't addColumn at this time! Use ->setColumns() instead.");
+    if (!is_array($this->inputColumns)) {
+      die_error("Can't addInputColumn at this time! Use ->setInputColumns() instead.");
     }
 
     $new_col = $this->readColumn($col);
@@ -1118,7 +1110,7 @@ class DBFit {
     $this->assignColumnMySQLType($new_col);
     // $this->assignColumnAttributes($new_col);
 
-    $this->columns[] = &$new_col;
+    $this->inputColumns[] = &$new_col;
 
     return $this;
   }
@@ -1176,7 +1168,7 @@ class DBFit {
 
   function addOutputColumn($col) : self
   {
-    if (!count($this->columns)) {
+    if (!count($this->inputColumns)) {
       die_error("You must set the columns in use before the output columns.");
     }
 
@@ -1236,14 +1228,14 @@ class DBFit {
         . "') cannot be used as identifier.");
     }
 
-    for ($i_col = count($this->columns)-1; $i_col >= 0; $i_col--) {
-      $col = $this->columns[$i_col];
+    for ($i_col = count($this->inputColumns)-1; $i_col >= 0; $i_col--) {
+      $col = $this->inputColumns[$i_col];
       if ($new_col["name"] == $this->getColumnName($col)) {
         warn("Found output column '" . $new_col["name"] . "' in input columns. Removing...");
-        array_splice($this->columns, $i_col, 1);
+        array_splice($this->inputColumns, $i_col, 1);
         // die_error("Output column '" . $new_col["name"] .
         //   "' cannot also belong to inputColumns."
-        //   // . get_var_dump($this->getColumnNames(true))
+        //   // . get_var_dump($this->getInputColumnNames(true))
         //   );
       }
     }

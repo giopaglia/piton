@@ -65,7 +65,7 @@ function testMed3() {
 
   $db_fit->setIdentifierColumnName("Referti.ID");
   $db_fit->setDefaultOption("textTreatment", ["BinaryBagOfWords", 10]);
-  $db_fit->setColumns([
+  $db_fit->setInputColumns([
 "Anamnesi.DATA_SALVA",
 "Anamnesi.DATA_ANNULLA",
 "Anamnesi.MOTIVO_ANNULLA",
@@ -217,7 +217,7 @@ function testMed3() {
 "Referti.STATO",
 ]);
   // $db_fit->setAllColumnsExcept("RaccomandazioniTerapeuticheUnitarie.ID");
-  $db_fit->setLimit(10);
+  // $db_fit->setLimit(10);
   $db_fit->setLimit(100);
   $db_fit->setWhereClauses("Pazienti.SESSO = 'F'");
   $db_fit->setOutputColumns([
@@ -265,8 +265,8 @@ function testMed2() {
   ]);
   $db_fit->setIdentifierColumnName("RaccomandazioniTerapeuticheUnitarie.ID");
   $db_fit->setDefaultOption("textTreatment", ["BinaryBagOfWords", 10]);
-  $db_fit->setColumns("*");
-  $db_fit->setColumns([
+  $db_fit->setInputColumns("*");
+  $db_fit->setInputColumns([
     "RaccomandazioniTerapeutiche.DATA_ANNULLA",
     "RaccomandazioniTerapeutiche.MOTIVO_ANNULLA",
     "RaccomandazioniTerapeutiche.STATO",
@@ -326,7 +326,7 @@ function testMed() {
   ]);
   $db_fit->setIdentifierColumnName("Referti.ID");
   $db_fit->setDefaultOption("textTreatment", ["BinaryBagOfWords", 10]);
-  $db_fit->setColumns([
+  $db_fit->setInputColumns([
 "Anamnesi.DATA_SALVA",
 "Anamnesi.DATA_ANNULLA",
 "Anamnesi.MOTIVO_ANNULLA",
@@ -509,7 +509,7 @@ function testSPAM() {
   $db_fit->setIdentifierColumnName("ID");
   $db_fit->setTrainingMode([.8, .2]);
   $db_fit->setInputTables($table_names);
-  $db_fit->setColumns($columns);
+  $db_fit->setInputColumns($columns);
   $db_fit->setOutputColumnName($output_column_name);
   // $db_fit->setModelType($model_type);
   $db_fit->setLearningMethod($learning_method);
@@ -530,7 +530,7 @@ function testSilly() {
   $db_fit = new DBFit($db);
   $db_fit->setTrainingMode("FullTraining");
   $db_fit->setInputTables($table_names);
-  $db_fit->setColumns($columns);
+  $db_fit->setInputColumns($columns);
   $db_fit->setWhereClauses($whereClauses);
   $db_fit->setOutputColumnName($output_column_name);
   // $db_fit->setModelType($model_type);
@@ -555,7 +555,7 @@ function testWinery() {
   // $db_fit->setTrainingMode("FullTraining");
   $db_fit->setTrainingMode([.8, .2]);
   $db_fit->setInputTables($table_names);
-  $db_fit->setColumns($columns);
+  $db_fit->setInputColumns($columns);
   $db_fit->setWhereClauses($whereClauses);
   $db_fit->setLimit(100);
   $db_fit->setOutputColumnName($output_column_name);
@@ -590,7 +590,7 @@ function testSillyWithJoin() {
   $db_fit = new DBFit($db);
   $db_fit->setTrainingMode([.8, .2]);
   $db_fit->setInputTables($table_names);
-  $db_fit->setColumns($columns);
+  $db_fit->setInputColumns($columns);
   $db_fit->setWhereClauses($whereClauses);
   $db_fit->setOutputColumnName($output_column_name);
   // $db_fit->setModelType($model_type);
@@ -613,7 +613,7 @@ function testCovid() {
   $db_fit = new DBFit($db);
   // $db_fit->setModelType($model_type);
   $db_fit->setInputTables($table_names);
-  $db_fit->setColumns($columns);
+  $db_fit->setInputColumns($columns);
   $db_fit->setWhereClauses($whereClauses);
   $db_fit->setOutputColumnName($output_column_name);
   $db_fit->setLimit(1000);
