@@ -501,20 +501,18 @@ class Instances {
   }
   function toString(bool $short = false) : string {
     $out_str = "";
+    $atts_str = [];
+    foreach ($this->getAttributes() as $att) {
+      // $atts_str[] = substr($att->toString(), 0, 7);
+      $atts_str[] = $att->toString();
+    }
     if ($short) {
-      $atts_str = [];
-      foreach ($this->getAttributes() as $att) {
-        // $atts_str[] = substr($att->toString(), 0, 7);
-        $atts_str[] = $att->toString();
-      }
-      $out_str .= "Data{{$this->numInstances()} instances; {$this->numAttributes()} attributes [" . join(",", $atts_str) . "]}";
+      $out_str .= "Instances{{$this->numInstances()} instances; "
+        . ($this->numAttributes()-1) . "+1 attributes (classAttribute: " . $this->getClassAttribute() . ")}";
     } else {
-      $atts_str = [];
-      foreach ($this->getAttributes() as $att) {
-        $atts_str[] = $att->toString();
-      }
       $out_str .= "\n";
-      $out_str .= "Data{{$this->numInstances()} instances; {$this->numAttributes()} attributes [" . join(",", $atts_str) . "]}";
+      $out_str .= "Instances{{$this->numInstances()} instances; "
+        . ($this->numAttributes()-1) . "+1 attributes [" . join(",", $atts_str) . "]}";
       $out_str .= "\n";
       $out_str .= str_repeat("======|=", $this->numAttributes()+1) . "|\n";
       $out_str .= "";

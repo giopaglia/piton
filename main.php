@@ -55,7 +55,7 @@ function testMed3() {
   $db_fit = new DBFit($db);
   $db_fit->setTrainingMode([.8, .2]);
 
-  $db_fit->setTables([
+  $db_fit->setInputTables([
     "Anamnesi",
     ["Referti", "Anamnesi.ID_REFERTO = Referti.ID"], 
     ["Diagnosi", "Diagnosi.ID_REFERTO = Referti.ID"], 
@@ -253,7 +253,7 @@ function testMed2() {
   $db_fit = new DBFit($db);
   $db_fit->setTrainingMode([.8, .2]);
 
-  $db_fit->setTables([
+  $db_fit->setInputTables([
     "Anamnesi",
     ["Referti", "Anamnesi.ID_REFERTO = Referti.ID"], 
     ["Diagnosi", "Diagnosi.ID_REFERTO = Referti.ID"], 
@@ -316,7 +316,7 @@ function testMed() {
   //    and Anamnesi.DATA_SALVA = ScanAnalysis.DATA_SALVA
     
    */
-  $db_fit->setTables([
+  $db_fit->setInputTables([
     "Anamnesi",
     ["Referti", "Anamnesi.ID_REFERTO = Referti.ID"], 
     ["Diagnosi", "Diagnosi.ID_REFERTO = Referti.ID"], 
@@ -508,7 +508,7 @@ function testSPAM() {
   $db_fit = new DBFit($db);
   $db_fit->setIdentifierColumnName("ID");
   $db_fit->setTrainingMode([.8, .2]);
-  $db_fit->setTables($table_names);
+  $db_fit->setInputTables($table_names);
   $db_fit->setColumns($columns);
   $db_fit->setOutputColumnName($output_column_name);
   // $db_fit->setModelType($model_type);
@@ -529,7 +529,7 @@ function testSilly() {
 
   $db_fit = new DBFit($db);
   $db_fit->setTrainingMode("FullTraining");
-  $db_fit->setTables($table_names);
+  $db_fit->setInputTables($table_names);
   $db_fit->setColumns($columns);
   $db_fit->setWhereClauses($whereClauses);
   $db_fit->setOutputColumnName($output_column_name);
@@ -554,7 +554,7 @@ function testWinery() {
   $db_fit = new DBFit($db);
   // $db_fit->setTrainingMode("FullTraining");
   $db_fit->setTrainingMode([.8, .2]);
-  $db_fit->setTables($table_names);
+  $db_fit->setInputTables($table_names);
   $db_fit->setColumns($columns);
   $db_fit->setWhereClauses($whereClauses);
   $db_fit->setLimit(100);
@@ -589,7 +589,7 @@ function testSillyWithJoin() {
 
   $db_fit = new DBFit($db);
   $db_fit->setTrainingMode([.8, .2]);
-  $db_fit->setTables($table_names);
+  $db_fit->setInputTables($table_names);
   $db_fit->setColumns($columns);
   $db_fit->setWhereClauses($whereClauses);
   $db_fit->setOutputColumnName($output_column_name);
@@ -612,7 +612,7 @@ function testCovid() {
 
   $db_fit = new DBFit($db);
   // $db_fit->setModelType($model_type);
-  $db_fit->setTables($table_names);
+  $db_fit->setInputTables($table_names);
   $db_fit->setColumns($columns);
   $db_fit->setWhereClauses($whereClauses);
   $db_fit->setOutputColumnName($output_column_name);

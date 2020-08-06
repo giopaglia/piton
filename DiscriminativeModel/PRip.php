@@ -378,8 +378,8 @@ class PRip extends Learner {
           $finalRule = NULL;
 
           if ($this->debug) {
-            echo "\nRule #" . $i_ruleToOpt . "| isResidual?"
-              . $isResidual . "| data size: " . $newData->getSumOfWeights() . PHP_EOL;
+            echo "\nRule #" . $i_ruleToOpt . " | isResidual:"
+              . intval($isResidual) . " | data size: " . $newData->getSumOfWeights() . PHP_EOL;
           }
 
           if ($isResidual) {

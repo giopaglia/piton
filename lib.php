@@ -2,8 +2,8 @@
 
 define("PACKAGE_NAME", "DBFit");
 define("MODELS_FOLDER", "models");
-// define("DEBUGMODE", false);
-define("DEBUGMODE", 1);
+define("DEBUGMODE", false);
+// define("DEBUGMODE", 1);
 
 /* Library of generic utils */
 
@@ -32,9 +32,11 @@ function mysql_list($arr, $map_function = "mysql_backtick_str") { return join(",
 function mysql_quote_str($str) { return "'$str'"; }
 function mysql_backtick_str($str) { return "`$str`"; }
 
-function &mysql_select(object &$db, string $sql) : object {
+function &mysql_select(object &$db, string $sql, bool $silent = false) : object {
 
-  echo "SQL:" . PHP_EOL . $sql . PHP_EOL;
+  if (!$silent) {
+    echo "SQL:" . PHP_EOL . $sql . PHP_EOL;
+  }
   $stmt = $db->prepare($sql);
   if (!$stmt)
     die_error("Incorrect SQL query:" . PHP_EOL . $sql);
