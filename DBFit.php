@@ -668,7 +668,7 @@ class DBFit {
       $whereClauses = array_merge($whereClauses, $this->whereClauses);
     }
     if ($idVal !== NULL) {
-      if($this->identifierColumnName !== NULL) {
+      if($this->identifierColumnName === NULL) {
         die_error("An identifier column name must be set. Use ->setIdentifierColumnName()");
       }
       $whereClauses[] = $this->identifierColumnName . " = $idVal";
