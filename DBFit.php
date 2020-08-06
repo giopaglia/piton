@@ -190,7 +190,8 @@ class DBFit {
     $this->trainingMode = NULL;
   }
 
-  /** Read data & pre-process it */
+  /** Given the path to a recursion node, read data from database, pre-process it,
+       build instance objects. At each node, there is an output column which might generate different attributes, so there are k different problems, and this function computes k sets of instances, with same input attributes/values and different output ones. */
   private function readData($idVal = NULL, array $recursionPath = []) : array {
 
     echo "DBFit->readData(" . toString($idVal) . ", " . toString($recursionPath) . ")" . PHP_EOL;
@@ -210,16 +211,6 @@ class DBFit {
     $outputColumnName = $this->getOutputColumnNames()[$recursionLevel];
 
     // var_dump($this->outputColumns);
-
-    /* Refresh all attributes except for those at the previous levels, in order to profit from attributes that are more specific.
-     */
-    // var_dump($this->outputColumns[$recursionLevel]);
-    if ($idVal === NULL) {
-      $this->assignColumnAttributes($this->outputColumns[$recursionLevel], $recursionPath);
-      foreach ($this->getInputColumns(false) as &$column) {
-        $this->assignColumnAttributes($column, $recursionPath);
-      }
-    }
     
     // var_dump($this->outputColumns[$recursionLevel]);
     // var_dump($this->outputColumns);
@@ -269,33 +260,25 @@ class DBFit {
 
     // echo "columnsToIgnore  "; var_dump($columnsToIgnore);
 
-    /* Derive the input columns & output columns needed for the dataframes at this recursion level */
-    // TODO figure out whether I should be using the previous outputColumns values,
-    //  but I think they would hold the same value, and $recursionPath contains everything needed. I think they should be discarted. If so, then no need to include them in $columns and $colsNeeded.
-    //  TODO the difference between columns and cols needed is just potentially the presence of the identifiercolumn. It'd be super simpler if we're sure that that column is not in $this->inputColumns
-    // $columns = array_slice($this->outputColumns, 0, $recursionLevel+1);
-    // $thisOutputAttr = $columns[$recursionLevel];
-    // array_splice($columns, $recursionLevel, 1);
-    // array_unshift($columns, $thisOutputAttr);
-    // $columns = array_merge($columns, $this->getInputColumns(false))
-      
-    // var_dump($inputColumns);
-
     echo "Recursion level: " . $recursionLevel . "(path: "
     . toString($recursionPath) . ")" . PHP_EOL;
     echo "Identifier value: " . toString($idVal) . PHP_EOL;
 
-    /* Obtain output attribute */
-    $outputColumn = $this->outputColumns[$recursionLevel];
+    /* Recompute and obtain output attributes in order to profit from attributes that are more specific to the current recursionPath. */
+    $outputColumn = &$this->outputColumns[$recursionLevel];
+    if ($idVal === NULL) {
+      $this->assignColumnAttributes($outputColumn, $recursionPath);
+    }
     $outputAttributes = $this->getColumnAttributes($outputColumn, $recursionPath);
 
     $dataframes = [];
     
-    /* Check that some data is found */
+    /* Check that some data is found and the output attributes were correctly computed */
     if(!is_array($outputAttributes)) {
       warn("Couldn't derive output attributes for output column {$this->getColumnName($outputColumn)}!");
     }
     else {
+      /* Check that the output attributes are discrete (i.e nominal) */
       foreach ($outputAttributes as $i_attr => $outputAttribute) {
         if(!($outputAttribute instanceof DiscreteAttribute)) {
           die_error("All output attributes must be categorical! '"
@@ -303,52 +286,49 @@ class DBFit {
         }
       }
 
-      /* Obtain input attributes */
-      $inputColumns = $this->getInputColumns(false);
+      /* Recompute and obtain input attributes in order to profit from attributes that are more specific to the current recursionPath. */
+      if ($idVal === NULL) {
+        foreach ($this->inputColumns as &$column) {
+          $this->assignColumnAttributes($column, $recursionPath);
+        }
+      }
+
       $inputAttributes = [];
-      foreach ($inputColumns as &$column) {
+      foreach ($this->inputColumns as &$column) {
         if (in_array($this->getColumnName($column), $columnsToIgnore)) {
           $attribute = NULL;
         }
         else {
-          $attribute = $this->getColumnAttributes($column);
+          $attribute = $this->getColumnAttributes($column, $recursionPath);
         }
         $inputAttributes[] = $attribute;
       }
 
-      // echo "Reading " . count($inputColumns) . " inputColumns..." . PHP_EOL;
-
       $attributes = array_merge([$outputAttributes], $inputAttributes);
-      $columns = array_merge([$outputColumn], $inputColumns);
+      $columns = array_merge([$outputColumn], $this->inputColumns);
 
       /* Finally obtain data */
-      $res = $this->SQLSelectColumns($inputColumns, $idVal, $recursionPath, $outputColumn);
+      $res = $this->SQLSelectColumns($this->inputColumns, $idVal, $recursionPath, $outputColumn);
       $data = $this->readRawData($res, $attributes, $columns);
-
-      // echo count($data) . " rows retrieved" . PHP_EOL;
-      // echo get_var_dump($data);
       
-      // TODO document from here
       /* Deflate attribute and data arrays (breaking the symmetry with columns) */
       
       $final_data = [];
-
       foreach ($data as $attr_vals) {
         $row = [];
         foreach ($attr_vals as $i_col => $attr_val) {
-          $attribute = $attributes[$i_col];
-          if ($attribute === NULL) {
-            // Ignore attribute/value
+          if ($attributes[$i_col] === NULL) {
+            // Ignore column
             continue;
           }
           else if (is_array($attr_val)) {
+            // Unpack values
             foreach ($attr_val as $v) {
               $row[] = $v;
             }
           }
           else {
-            die_error("Something's off. Invalid attr_val = " . get_var_dump($attr_val));
-            // $row[] = $attr_val;
+            die_error("Something's off. Invalid attr_val = " . get_var_dump($attr_val) . get_var_dump($attributes[$i_col]));
           }
         }
         $final_data[] = $row;
@@ -357,10 +337,11 @@ class DBFit {
       $final_attributes = [];
       foreach ($attributes as $attribute) {
         if ($attribute === NULL) {
-          // Ignore attribute/value
+          // Ignore column
           continue;
         }
         else if (is_array($attribute)) {
+          // Unpack attributes
           foreach ($attribute as $attr) {
             $final_attributes[] = $attr;
           }
@@ -370,38 +351,30 @@ class DBFit {
            . get_var_dump($attribute));
         }
       }
-
-      // echo "this->columns: " . PHP_EOL; var_dump($this->inputColumns);
-      // echo "attributes: " . PHP_EOL; var_dump($attributes);
-      // echo "final_attributes: " . PHP_EOL; var_dump($final_attributes);
       
-      // var_dump($final_data);
-      
-      /* Unpacking: generate many dataframes, each with a single output attribute (one per each of the output attributes fore this column) */
+      /* Generate many dataframes, each with a single output attribute (one per each of the output attributes fore this column) */
       $numOutputAttributes = count($outputAttributes);
-      // echo "Output attributes: ";
-      // var_dump($outputAttributes);
+      // echo "Output attributes: "; var_dump($outputAttributes);
       foreach ($outputAttributes as $i_attr => $outputAttribute) {
         // echo "Problem $i_attr/" . $numOutputAttributes . PHP_EOL;
 
         /* Build instances for this output attribute */
         $outputAttr = clone $final_attributes[$i_attr];
+        $inputAttrs = array_map("clone_object", array_slice($final_attributes, $numOutputAttributes));
         $outputVals = array_column($final_data, $i_attr);
-        $attrs = array_merge([$outputAttr], array_slice($final_attributes, $numOutputAttributes));
+        $attrs = array_merge([$outputAttr], $inputAttrs);
         $data = [];
         foreach ($final_data as $i => $row) {
           $data[] = array_merge([$outputVals[$i]], array_slice($row, $numOutputAttributes));
         }
-        // var_dump($attrs);
-        // var_dump($data);
+
         $dataframe = new Instances($attrs, $data);
-        
-        // echo $dataframe->toString(false);
         
         if (DEBUGMODE && $idVal === NULL) {
           $dataframe->save_ARFF("instances");
+          // echo $dataframe->toString(false);
         }
-        
+
         $dataframes[] = $dataframe;
       }
 
