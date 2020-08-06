@@ -79,14 +79,19 @@ class DBFit {
 
     outputColumn-terms are very similar to column-terms (see documentation for $this->columns a few lines above), with a few major differences:
     - The default treatment is "ForceCategorical": note, in fact, that output columns must generate categorical attributes (this module only supports classification and not regression). Also consider using "ForceCategoricalBinary", which breaks a nominal class attribute into k disjoint binary attributes.
-    - From the second outputColumn onwards, one can introduce a new column derived by join operations (thus introducing tables that are not in $this->tables).
-    Additional join criteria can be specified via table-terms format (see documentation for $this->tables a few lines above) using the format [columnName, tables, treatment="ForceCategorical", TODO attrName=columnName].
-    Note that additional join criteria for the first outputColumn are not allowed, and should instead be specified into $this->tables; format expected for the first outputColumn is similar to column-terms: [columnName, treatment="ForceCategorical", attrName=columnName],
+    - Each output column can be derived from join operations (thus it can also belong to tables that are not in $this->tables).
+    Additional join criteria can be specified using table-terms format (see documentation for $this->tables a few lines above).
+    The format for an outputColumn is thus [columnName, tables=[], treatment="ForceCategorical", TODO attrName=columnName], where tables is an array of table-terms.
 
     As such, the following is a valid outputColumns array:
     [
       // first outputColumn
-      ["report.Status", "ForceCategoricalBinary"],
+      ["report.Status",
+        [
+          ["RaccomandazioniTerapeuticheUnitarie", ["RaccomandazioniTerapeuticheUnitarie.ID_RACCOMANDAZIONE_TERAPEUTICA = RaccomandazioniTerapeutiche.ID"]]
+        ],
+        "ForceCategoricalBinary"
+      ],
       // second outputColumn
       ["PrincipiAttivi.NOME",
         [
@@ -188,7 +193,7 @@ class DBFit {
   /** Read data & pre-process it */
   private function readData($idVal = NULL, array $recursionPath = []) : array {
 
-    echo "DBFit->readData($idVal, " . toString($recursionPath) . ")" . PHP_EOL;
+    echo "DBFit->readData(" . toString($idVal) . ", " . toString($recursionPath) . ")" . PHP_EOL;
 
     /* Checks */
     if (!count($this->columns)) {
@@ -216,13 +221,15 @@ class DBFit {
     //   $this->assignColumnAttributes($this->outputColumns[$i_col], NULL, $recursionPath);
     //   // var_dump($this->outputColumns[$i_col]);
     // }
-    var_dump($this->outputColumns[$recursionLevel]);
-    $this->assignColumnAttributes($this->outputColumns[$recursionLevel], NULL, $recursionPath);
-    foreach ($this->getColumns(false) as &$column) {
-      $this->assignColumnAttributes($column, NULL, $recursionPath);
+    // var_dump($this->outputColumns[$recursionLevel]);
+    if ($idVal === NULL) {
+      $this->assignColumnAttributes($this->outputColumns[$recursionLevel], $recursionPath);
+      foreach ($this->getColumns(false) as &$column) {
+        $this->assignColumnAttributes($column, $recursionPath);
+      }
     }
     
-    var_dump($this->outputColumns[$recursionLevel]);
+    // var_dump($this->outputColumns[$recursionLevel]);
     // var_dump($this->outputColumns);
     // var_dump($this->columns);
 
@@ -278,46 +285,52 @@ class DBFit {
     // $thisOutputAttr = $columns[$recursionLevel];
     // array_splice($columns, $recursionLevel, 1);
     // array_unshift($columns, $thisOutputAttr);
-    // $columns = array_merge($columns, $this->getColumns(false));
-    $columns = array_merge([$this->outputColumns[$recursionLevel]], $this->getColumns(false));
-
-    // var_dump($columns);
+    // $columns = array_merge($columns, $this->getColumns(false))
+      
+    // var_dump($inputColumns);
 
     echo "Recursion level: " . $recursionLevel . PHP_EOL;
-    echo "Reading " . count($columns) . " columns..." . PHP_EOL;
     echo "Recursion path: " . toString($recursionPath) . PHP_EOL;
     echo "Identifier value: " . toString($idVal) . PHP_EOL;
 
-    /* Obtain the attributes for each dataframe column */
-    $attributes = [];
-
-    foreach ($columns as &$column) {
-      if (in_array($this->getColumnName($column), $columnsToIgnore)) {
-        $attribute = NULL;
-      }
-      else {
-        $attribute = $this->getColumnAttributes($column);
-      }
-      $attributes[] = $attribute;
-    }
+    /* Obtain output attribute */
+    $outputColumn = $this->outputColumns[$recursionLevel];
+    $outputAttributes = $this->getColumnAttributes($outputColumn, $recursionPath);
 
     $dataframes = [];
     
     /* Check that some data is found */
-    if(!is_array($attributes[0])) {
-      warn("Couldn't derive output attributes for output column {$this->getColumnName($columns[0])}!");
+    if(!is_array($outputAttributes)) {
+      warn("Couldn't derive output attributes for output column {$this->getColumnName($outputColumn)}!");
     }
     else {
-      foreach ($attributes[0] as $i_attr => $outputAttribute) {
+      foreach ($outputAttributes as $i_attr => $outputAttribute) {
         if(!($outputAttribute instanceof DiscreteAttribute)) {
           die_error("All output attributes must be categorical! '"
-            . $outputAttribute->getName() . "' ($i_attr-th of output column {$this->getColumnName($columns[0])}) is not.");
+            . $outputAttribute->getName() . "' ($i_attr-th of output column {$this->getColumnName($outputColumn)}) is not.");
         }
       }
 
+      /* Obtain input attributes */
+      $inputColumns = $this->getColumns(false);
+      $inputAttributes = [];
+      foreach ($inputColumns as &$column) {
+        if (in_array($this->getColumnName($column), $columnsToIgnore)) {
+          $attribute = NULL;
+        }
+        else {
+          $attribute = $this->getColumnAttributes($column);
+        }
+        $inputAttributes[] = $attribute;
+      }
+
+      echo "Reading " . count($inputColumns) . " inputColumns..." . PHP_EOL;
+
+      $attributes = array_merge([$outputAttributes], $inputAttributes);
+      $columns = array_merge([$outputColumn], $inputColumns);
+
       /* Finally obtain data */
-      $sql = $this->getSQLSelectQuery($columns, $idVal, $recursionPath);
-      $res = mysql_select($this->db, $sql);
+      $res = $this->SQLSelectColumns($inputColumns, $idVal, $recursionPath, $outputColumn);
       $data = $this->readRawData($res, $attributes, $columns);
 
       // echo count($data) . " rows retrieved" . PHP_EOL;
@@ -373,10 +386,10 @@ class DBFit {
       // var_dump($final_data);
       
       /* Unpacking: generate many dataframes, each with a single output attribute (one per each of the output attributes fore this column) */
-      $numOutputAttributes = count($attributes[0]);
+      $numOutputAttributes = count($outputAttributes);
       // echo "Output attributes: ";
-      // var_dump($attributes[0]);
-      foreach ($attributes[0] as $i_attr => $outputAttribute) {
+      // var_dump($outputAttributes);
+      foreach ($outputAttributes as $i_attr => $outputAttribute) {
         // echo "Problem $i_attr/" . $numOutputAttributes . PHP_EOL;
 
         /* Build instances for this output attribute */
@@ -617,16 +630,29 @@ class DBFit {
   }
 
   /* TODO explain */
-  function getSQLSelectQuery(array $columns, $idVal = NULL, array $recursionPath = []) : string {
+  function SQLSelectColumns(array $columns, $idVal = NULL, array $recursionPath = [],
+    array $outputColumn = NULL) : object {
     // if ($colNames === NULL) { ...columns
     //   $colNames = $this->getColumnNames(true);
     // }
     // listify($colNames);
     $cols_str = [];
+
+    if ($outputColumn != NULL) {
+      $name = $this->getColumnName($outputColumn);
+      if ($idVal !== NULL) {
+        $cols_str[] = "NULL AS " . $this->getColNickname($name);
+      }
+      else {
+        $cols_str[] = $name . " AS " . $this->getColNickname($name);
+      }
+    }
+
     foreach ($columns as $col) {
       $name = $this->getColumnName($col);
       $cols_str[] = $name . " AS " . $this->getColNickname($name);
     }
+
     /* Add identifier column */
     $name = $this->identifierColumnName;
     $cols_str[] = $name . " AS " . $this->getColNickname($name);
@@ -634,13 +660,18 @@ class DBFit {
     $sql = "SELECT " . mysql_list($cols_str, "noop") . " FROM";
     
     /* Join all input tables AND the output tables needed, depending on the recursion depth */
+    $tables = $this->tables;
+    if ($idVal === NULL) {
+      $tables = array_merge($tables, $this->getColumnTables($this->outputColumns[count($recursionPath)]));
+    }
     // for ($recursionLevel = 0; $recursionLevel < count($recursionPath)+1; $recursionLevel++) {
+    // }
     
     /* Join all the tables needed */
-    $tables = $this->tables;
-    foreach ($columns as $col) {
-      $tables = array_merge($tables, $this->getColumnTables($col));
-    }
+    // $tables = $this->tables;
+    // foreach ($columns as $col) {
+    //   $tables = array_merge($tables, $this->getColumnTables($col));
+    // }
     
     // echo "tables" . PHP_EOL . get_var_dump($tables);
 
@@ -651,9 +682,9 @@ class DBFit {
       }
       else {
         $sql .= $this->getTableJoinType($table) . " " . $this->getTableName($table);
-        $crit = $this->getTableJoinClauses($table);
-        if (count($crit)) {
-          $sql .= " ON " . join(" AND ", $crit);
+        $clauses = $this->getTableJoinClauses($table);
+        if (count($clauses)) {
+          $sql .= " ON " . join(" AND ", $clauses);
         }
       }
     }
@@ -674,7 +705,8 @@ class DBFit {
 
     }
 
-    return $sql;
+    $res = mysql_select($this->db, $sql);
+    return $res;
   }
 
   private function getSQLConstraints($idVal, array $recursionPath) : array {
@@ -712,7 +744,7 @@ class DBFit {
 
 
   /* Create attribute(s) for a column */
-  function assignColumnAttributes(array &$column, $idVal = NULL, array $recursionPath = [])
+  function assignColumnAttributes(array &$column, array $recursionPath = [])
   {
     $attrName = $this->getColumnAttrName($column);
 
@@ -722,8 +754,7 @@ class DBFit {
         
         /* Find classes */
         $classes = [];
-        $sql = $this->getSQLSelectQuery([$column], $idVal, $recursionPath);
-        $res = mysql_select($this->db, $sql);
+        $res = $this->SQLSelectColumns([$column], NULL, $recursionPath);
 
         foreach ($res as $raw_row) {
           $class = $raw_row[$this->getColNickname($this->getColumnName($column))];
@@ -784,8 +815,7 @@ class DBFit {
 
               /* Find $k most frequent words */
               $word_counts = [];
-              $sql = $this->getSQLSelectQuery([$column], $idVal, $recursionPath);
-              $res = mysql_select($this->db, $sql);
+              $res = $this->SQLSelectColumns([$column], NULL, $recursionPath);
               
               if (!isset($this->stop_words)) {
                 // TODO italian
@@ -858,10 +888,14 @@ class DBFit {
       die_error("Something's off. Attributes set for a column (here '"
         . $this->getColumnName($column) . "') can't be empty: " . get_var_dump($attributes) . PHP_EOL . get_var_dump($column) . PHP_EOL);
     }
-    
-    $column["attributes"] = $attributes;
+    $column["attributes"][$this->getPathRepr($recursionPath)] = $attributes;
     // var_dump($column);
   }
+
+  function getPathRepr(array $recursionPath) : string {
+    return array_list($recursionPath, ";");
+  }
+
   // TODO use Nlptools
   function text2words($text) {
     if ($text === NULL) {
@@ -953,9 +987,9 @@ class DBFit {
     return $col["mysql_type"];
   }
 
-  function getColumnAttributes(array &$col) {
+  function getColumnAttributes(array &$col, array $recursionPath = []) {
     // var_dump($col);
-    return $col["attributes"];
+    return isset($col["attributes"][$this->getPathRepr($recursionPath)]) ? $col["attributes"][$this->getPathRepr($recursionPath)] : NULL;
   }
 
   function getColumnTables(array &$col) {
@@ -1051,7 +1085,7 @@ class DBFit {
       $sql = "SELECT * FROM `information_schema`.`columns` WHERE `table_name` IN "
             . mysql_set(array_map([$this, "getTableName"], $this->tables)) . " ";
       $res = mysql_select($this->db, $sql);
-      
+
       $colsNames = [];
       foreach ($res as $raw_col) {
         $colsNames[] = $raw_col["TABLE_NAME"].".".$raw_col["COLUMN_NAME"];
@@ -1153,11 +1187,10 @@ class DBFit {
     $new_col = [];
     $new_col["name"] = NULL;
     $new_col["treatment"] = "ForceCategorical";
+    $new_col["attributes"] = [];
     $new_col["tables"] = [];
     $new_col["attrName"] = NULL;
     $new_col["mysql_type"] = NULL;
-
-    $i_col = count($this->outputColumns);
 
     if (is_string($col)) {
       $new_col["name"] = $col;
@@ -1167,27 +1200,27 @@ class DBFit {
           . ". The name must be a string.");
       }
       $new_col["name"] = $col[0];
+      
+      if (isset($col[1])) {
+        $these_tables = array_map([$this, "readTable"], $col[1]);
+        // tables also include all of the tables of the previous output layers? Can't think of a use-case, though
+        $prev_tables = [];
+        foreach ($this->outputColumns as $outputCol) {
+          $prev_tables = array_merge($prev_tables, $this->getColumnTables($outputCol));
+        }
+        $new_col["tables"] = array_merge($prev_tables, $these_tables);
 
-      if ($i_col == 0) {
-        if (isset($col[1])) {
-          $new_col["treatment"] = $col[1];
-        }
+        // $new_col["tables"] = $these_tables;
       }
-      else {
-        if (isset($col[1])) {
-          $new_col["tables"] = array_map([$this, "readTable"], $col[1]);
-          // TODO maybe tables should also include all of the tables of the previous output layers? Can't think of a use-case, though
+      if (isset($col[2])) {
+        $new_col["treatment"] = $col[2];
+      }
+      if (isset($col[3])) {
+        if(!is_string($col[3])) {
+          die_error("Malformed target attribute name for column: " . toString($col[3])
+            . ". The target name must be a string.");
         }
-        if (isset($col[2])) {
-          $new_col["treatment"] = $col[2];
-        }
-        if (isset($col[3])) {
-          if(!is_string($col[3])) {
-            die_error("Malformed target attribute name for column: " . toString($col[3])
-              . ". The target name must be a string.");
-          }
-          $new_col["attrName"] = $col[3];
-        }
+        $new_col["attrName"] = $col[3];
       }
     } else {
       die_error("Malformed output column term: " . toString($col));
@@ -1241,8 +1274,7 @@ class DBFit {
   function assignColumnMySQLType(array &$column)
   {
     /* Obtain column type */
-    $tables = $this->tables;
-    $tables = array_merge($tables, $this->getColumnTables($column));
+    $tables = array_merge($this->tables, $this->getColumnTables($column));
 
     // var_dump($tables);
 
@@ -1310,7 +1342,7 @@ class DBFit {
       return;
     }
 
-    $outputAttributes = $this->getColumnAttributes($this->outputColumns[$recursionLevel]);
+    $outputAttributes = $this->getColumnAttributes($this->outputColumns[$recursionLevel], $recursionPath);
     
     // TODO figure out, note: since the four root problems are independent, we use  splits that can be different (due to randomization)
     foreach ($dataframes as $i_prob => $data) {
@@ -1354,8 +1386,8 @@ class DBFit {
       
       /* Recursive step: for each output class value, recurse and train the subtree */
       if ($recursionLevel+1 == count($this->outputColumns)) {
-        echo "Prediction-time recursion stops here (recursionPath = " . toString($recursionPath)
-           . ", problem $i_prob/" . count($dataframes) . "). " . PHP_EOL;
+        echo "Train-time recursion stops here (recursionPath = " . toString($recursionPath)
+           . ", problem $i_prob/" . count($dataframes) . ") : '$model_name'. " . PHP_EOL;
       }
       else {
         // echo "outputAttributes";
@@ -1385,20 +1417,30 @@ class DBFit {
     }
 
     $recursionLevel = count($recursionPath);
-    $outputAttributes = $this->getColumnAttributes($this->outputColumns[$recursionLevel]);
+    $outputAttributes = $this->getColumnAttributes($this->outputColumns[$recursionLevel], $recursionPath);
 
     /* If no model was trained for the current node, stop the recursion */
-    $atLeastOneModel = false;
-    foreach ($outputAttributes as $i_prob => $outputAttribute) {
-      $model_name = $this->getModelName($recursionPath, $i_prob);
-      if((isset($this->models[$model_name]))) {
-        $atLeastOneModel = true;
+    if ($outputAttributes !== NULL) {
+      $atLeastOneModel = false;
+      foreach ($outputAttributes as $i_prob => $outputAttribute) {
+        $model_name = $this->getModelName($recursionPath, $i_prob);
+        if((isset($this->models[$model_name]))) {
+          $atLeastOneModel = true;
+        }
+      }
+      if (!$atLeastOneModel) {
+        echo "Prediction-time recursion stops here due to lack of models (recursionPath = " . toString($recursionPath) . ":" . PHP_EOL;
+
+        foreach ($outputAttributes as $i_prob => $outputAttribute) {
+          $model_name = $this->getModelName($recursionPath, $i_prob);
+          echo "$model_name" . PHP_EOL;
+        }
+        return [[]];
       }
     }
-    if (!$atLeastOneModel) {
-      echo "Prediction-time recursion stops here due to lack of models (recursionPath = " . toString($recursionPath)
-         . "). " . PHP_EOL;
-      return [];
+    else {
+      echo "Prediction-time recursion stops here due to lack of a model (recursionPath = " . toString($recursionPath) . ":" . PHP_EOL;
+      return [[]];
     }
     
     $predictions = [];
@@ -1412,7 +1454,7 @@ class DBFit {
       if ($recursionLevel == 0) {
         die_error("Couldn't compute output attribute (at root level prediction-time).");
       }
-      return [];
+      return [[]];
     }
 
     foreach ($dataframes as $i_prob => $data) {
@@ -1450,7 +1492,7 @@ class DBFit {
       echo "predictedVal: \"$predictedVal\"" . PHP_EOL;
 
       if ($recursionLevel+1 == count($this->outputColumns)) {
-        echo "Test-time recursion stops here (recursionPath = " . toString($recursionPath)
+        echo "Prediction-time recursion stops here (recursionPath = " . toString($recursionPath)
            . ", problem $i_prob/" . count($dataframes) . "). " . PHP_EOL;
         $predictions[] = [$predictedVal];
       }
@@ -1473,7 +1515,7 @@ class DBFit {
     $name_chunks = [];
     foreach ($recursionPath as $recursionLevel => $node) {
       $name_chunks[] =
-        str_replace(".", ">", $this->getColumnAttributes($this->outputColumns[$recursionLevel])[$node[0]]->getName())
+        str_replace(".", ">", $this->getColumnAttributes($this->outputColumns[$recursionLevel], array_slice($recursionPath, 0, $recursionLevel))[$node[0]]->getName())
         . "=" . $node[1];
     }
     $path_name = join("-", $name_chunks);
@@ -1483,7 +1525,7 @@ class DBFit {
     // var_dump($outAttrs[count($recursionPath)]);
     $recursionLevel = count($recursionPath);
     $currentLevelStr = str_replace(".", ":",
-           $this->getColumnAttributes($this->outputColumns[$recursionLevel])[$i_prob]->getName());
+           $this->getColumnAttributes($this->outputColumns[$recursionLevel], $recursionPath)[$i_prob]->getName());
     return str_replace("/", ":", $path_name . "__" . $currentLevelStr);
 
   }

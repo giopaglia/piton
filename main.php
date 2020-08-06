@@ -60,7 +60,6 @@ function testMed3() {
     ["Referti", "Anamnesi.ID_REFERTO = Referti.ID"], 
     ["Diagnosi", "Diagnosi.ID_REFERTO = Referti.ID"], 
     ["RaccomandazioniTerapeutiche", ["RaccomandazioniTerapeutiche.ID_REFERTO = Referti.ID"], "INNER JOIN"], 
-    ["RaccomandazioniTerapeuticheUnitarie", "RaccomandazioniTerapeuticheUnitarie.ID_RACCOMANDAZIONE_TERAPEUTICA = RaccomandazioniTerapeutiche.ID"], 
     ["Pazienti", "Pazienti.ID = Referti.ID_PAZIENTE"]
   ]);
 
@@ -223,6 +222,9 @@ function testMed3() {
   $db_fit->setWhereClauses("Pazienti.SESSO = 'F'");
   $db_fit->setOutputColumns([
     ["RaccomandazioniTerapeuticheUnitarie.TIPO",
+      [
+        ["RaccomandazioniTerapeuticheUnitarie", ["RaccomandazioniTerapeuticheUnitarie.ID_RACCOMANDAZIONE_TERAPEUTICA = RaccomandazioniTerapeutiche.ID"]]
+      ],
       "ForceCategoricalBinary"],
     ["PrincipiAttivi.NOME",
       [
@@ -238,11 +240,11 @@ function testMed3() {
   $lr->setNumOptimizations(3);
   $db_fit->setLearner($lr);
   $db_fit->test_all_capabilities();
-  $db_fit->predictByIdentifier(15);
-  $db_fit->predictByIdentifier(1);
-  $db_fit->predictByIdentifier(2);
+  // $db_fit->predictByIdentifier(15);
+  // $db_fit->predictByIdentifier(1);
+  // $db_fit->predictByIdentifier(2);
+  $db_fit->predictByIdentifier(9);
   $db_fit->predictByIdentifier(3);
-  // $db_fit->predictByIdentifier(10);
 }
 
 function testMed2() {
