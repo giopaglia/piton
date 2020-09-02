@@ -392,6 +392,8 @@ class DBFit {
       The identifier column is used to determine which rows to merge.
    */
   function &readRawData(object &$res, array &$attributes, array &$columns) : array {
+    var_dump($attributes);
+    var_dump($columns);
 
     $data = [];
 
@@ -528,16 +530,22 @@ class DBFit {
           $attr_vals_orig = &$data[$idVal];
 
           /* Check differences between rows */
-          foreach (zip($attr_vals_orig, $attr_vals) as $i_col => $z) {
+          foreach (zip($attr_vals_orig, $attr_vals, $columns) as $i_col => $z) {
+            $column = $columns[$i_col];
             if ($z[0] === $z[1]) {
               continue;
             }
             /* Only merging output values is allowed */
             if ($i_col !== 0) {
-              die_error("Found more than one row with same identifier value: '{$this->identifierColumnName}' = " . toString($idVal)
-                . ", but merging on column " . $this->getColumnName($columns[$i_col])
-                . " ($i_col) failed (it's not an output column). "
-                . get_var_dump($z[0]) . get_var_dump($z[1])
+              die_error("Found more than one row with same identifier ({$this->identifierColumnName} = " . toString($idVal)
+                . ") but merging on column $i_col-th (" . $this->getColumnName($column)
+                . " failed (it's not an output column). " . PHP_EOL
+                . "First value: " . get_var_dump($z[0]) . PHP_EOL
+                . "Second value: " . get_var_dump($z[1]) . PHP_EOL
+                . "Column mysql type: " . get_var_dump($this->getColumnMySQLType($column)) . PHP_EOL
+                . "Column treatment: " . get_var_dump($this->getColumnTreatment($column)) . PHP_EOL
+                . "Column attr type: " . get_var_dump($this->getColumnAttrType($column)) . PHP_EOL
+                // . "Column name: " . get_var_dump($this->getColumnName($column)) . PHP_EOL
                 // . get_var_dump($attr_vals_orig) . get_var_dump($attr_vals)
                 . "Suggestion: explicitly ask to ignore this column."
               );
@@ -551,7 +559,7 @@ class DBFit {
                 }
                 else {
                   die_error("Found more than one row with same identifier value: '{$this->identifierColumnName}' = " . toString($idVal)
-                  . ", but I don't know how to merge values for column " . $this->getColumnName($columns[$i_col])
+                  . ", but I don't know how to merge values for column " . $this->getColumnName($column)
                   . " ($i_col) of type '{$attribute[$a]->getType()}'. "
                   . "Suggestion: specify ForceBinary/ForceCategoricalBinary treatment for this column (this will break categorical attributes into k binary attributes, easily mergeable via OR operation)."
                   // . get_var_dump($z[0]) . get_var_dump($z[1])

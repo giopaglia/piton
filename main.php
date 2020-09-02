@@ -60,167 +60,61 @@ function testMed3() {
     ["Referti", "Anamnesi.ID_REFERTO = Referti.ID"], 
     ["Diagnosi", "Diagnosi.ID_REFERTO = Referti.ID"], 
     ["RaccomandazioniTerapeutiche", ["RaccomandazioniTerapeutiche.ID_REFERTO = Referti.ID"], "INNER JOIN"], 
-    ["Pazienti", "Pazienti.ID = Referti.ID_PAZIENTE"]
+    ["Pazienti", "Pazienti.ID = Referti.ID_PAZIENTE"],
+    ["Densitometrie", "Densitometrie.ID_REFERTO = Referti.ID"]
   ]);
+
 
   $db_fit->setIdentifierColumnName("Referti.ID");
   $db_fit->setDefaultOption("textTreatment", ["BinaryBagOfWords", 10]);
   $db_fit->setDefaultOption("textLanguage", "it");
   $db_fit->setInputColumns([
-"Anamnesi.DATA_SALVA",
-"Anamnesi.DATA_ANNULLA",
-"Anamnesi.MOTIVO_ANNULLA",
-"Anamnesi.INVIATA_DA",
-"Anamnesi.INVIATA_DA_GINECOLOGO",
-"Anamnesi.INVIATA_DA_ALTRO_SPECIALISTA",
-"Anamnesi.STATO_MENOPAUSALE",
-"Anamnesi.ULTIMA_MESTRUAZIONE",
-"Anamnesi.ETA_MENOPAUSA",
-"Anamnesi.TERAPIA_STATO",
-"Anamnesi.TERAPIA_ANNI_SOSPENSIONE",
-"Anamnesi.TERAPIA_OSTEOPROTETTIVA_ORMONALE",
-"Anamnesi.TERAPIA_OSTEOPROTETTIVA_ORMONALE_LISTA",
-"Anamnesi.TERAPIA_OSTEOPROTETTIVA_SPECIFICA",
-"Anamnesi.TERAPIA_OSTEOPROTETTIVA_SPECIFICA_LISTA",
-"Anamnesi.VITAMINA_D_TERAPIA_OSTEOPROTETTIVA",
-"Anamnesi.VITAMINA_D_TERAPIA_OSTEOPROTETTIVA_LISTA",
-"Anamnesi.TERAPIA_ALTRO_CHECKBOX",
-"Anamnesi.TERAPIA_ALTRO",
-"Anamnesi.TERAPIA_COMPLIANCE",
-"Anamnesi.PESO",
-"Anamnesi.ALTEZZA",
-"Anamnesi.BMI",
-"Anamnesi.FRATTURA_VERTEBRE_CHECKBOX",
-"Anamnesi.FRATTURA_VERTEBRE",
-"Anamnesi.FRATTURA_FEMORE",
-"Anamnesi.FRATTURA_SITI_DIVERSI",
-"Anamnesi.FRATTURA_SITI_DIVERSI_ALTRO",
-"Anamnesi.FRATTURA_FAMILIARITA",
-"Anamnesi.ABUSO_FUMO_CHECKBOX",
-"Anamnesi.ABUSO_FUMO",
-"Anamnesi.USO_CORTISONE_CHECKBOX",
-"Anamnesi.USO_CORTISONE",
-"Anamnesi.MALATTIE_ATTUALI_CHECKBOX",
-"Anamnesi.MALATTIE_ATTUALI_ARTRITE_REUM",
-"Anamnesi.MALATTIE_ATTUALI_ARTRITE_PSOR",
-"Anamnesi.MALATTIE_ATTUALI_LUPUS",
-"Anamnesi.MALATTIE_ATTUALI_SCLERODERMIA",
-"Anamnesi.MALATTIE_ATTUALI_ALTRE_CONNETTIVITI",
-"Anamnesi.CAUSE_OSTEOPOROSI_SECONDARIA_CHECKBOX",
-"Anamnesi.CAUSE_OSTEOPOROSI_SECONDARIA",
-"Anamnesi.ALCOL_CHECKBOX",
-"Anamnesi.ALCOL",
-"Anamnesi.PATOLOGIE_UTERINE_CHECKBOX",
-"Anamnesi.PATOLOGIE_UTERINE_DIAGNOSI",
-"Anamnesi.NEOPLASIA_CHECKBOX",
-"Anamnesi.NEOPLASIA_MAMMARIA_DATA",
-"Anamnesi.NEOPLASIA_MAMMARIA_TERAPIA",
-"Anamnesi.SINTOMI_VASOMOTORI",
-"Anamnesi.SINTOMI_DISTROFICI",
-"Anamnesi.DISLIPIDEMIA_CHECKBOX",
-"Anamnesi.DISLIPIDEMIA_TERAPIA",
-"Anamnesi.IPERTENSIONE",
-"Anamnesi.RISCHIO_TEV",
-"Anamnesi.PATOLOGIA_CARDIACA",
-"Anamnesi.PATOLOGIA_VASCOLARE",
-"Anamnesi.INSUFFICIENZA_RENALE",
-"Anamnesi.PATOLOGIA_RESPIRATORIA",
-"Anamnesi.PATOLOGIA_CAVO_ORALE_CHECKBOX",
-"Anamnesi.PATOLOGIA_CAVO_ORALE",
-"Anamnesi.PATOLOGIA_EPATICA",
-"Anamnesi.PAROLOGIA_ESOFAGEA",
-"Anamnesi.GASTRO_DUODENITE",
-"Anamnesi.GASTRO_RESEZIONE",
-"Anamnesi.RESEZIONE_INTESTINALE",
-"Anamnesi.MICI",
-"Anamnesi.VITAMINA_D_CHECKBOX",
-"Anamnesi.VITAMINA_D",
-"Anamnesi.ALTRE_PATOLOGIE_CHECKBOX",
-"Anamnesi.ALTRE_PATOLOGIE",
-"Anamnesi.ALLERGIE_CHECKBOX",
-"Anamnesi.ALLERGIE",
-"Anamnesi.INTOLLERANZE_CHECKBOX",
-"Anamnesi.INTOLLERANZE",
-"Anamnesi.DENSITOMETRIA_PRECEDENTE_CHECKBOX",
-"Anamnesi.DENSITOMETRIA_PRECEDENTE_DATA",
-"Anamnesi.DENSITOMETRIA_PRECEDENTE_INTERNA",
-"Anamnesi.MORFOMETRIA_PRECEDENTE_CHECKBOX",
-"Anamnesi.MORFOMETRIA_PRECEDENTE_DATA",
-"Anamnesi.MORFOMETRIA_PRECEDENTE_INTERNA",
-"Anamnesi.BODY_SCAN_PRECEDENTE_CHECKBOX",
-"Anamnesi.BODY_SCAN_PRECEDENTE_DATA",
-"Anamnesi.BODY_SCAN_PRECEDENTE_INTERNA",
-"Anamnesi.VERTEBRE_VALUTATE_L1",
-"Anamnesi.VERTEBRE_VALUTATE_L2",
-"Anamnesi.VERTEBRE_VALUTATE_L3",
-"Anamnesi.VERTEBRE_VALUTATE_L4",
-"Anamnesi.COLONNA_APPLICABILE",
-"Anamnesi.COLONNA_T_SCORE",
-"Anamnesi.COLONNA_Z_SCORE",
-"Anamnesi.FEMORE_LATO",
-"Anamnesi.FEMORE_APPLICABILE",
-"Anamnesi.FEMORE_T_SCORE",
-"Anamnesi.FEMORE_Z_SCORE",
-"Diagnosi.STATO",
-"Diagnosi.DATA_SALVA",
-"Diagnosi.DATA_ANNULLA",
-"Diagnosi.MOTIVO_ANNULLA",
-"Diagnosi.SITUAZIONE_COLONNA_CHECKBOX",
-"Diagnosi.SITUAZIONE_COLONNA",
-"Diagnosi.SITUAZIONE_FEMORE_SN_CHECKBOX",
-"Diagnosi.SITUAZIONE_FEMORE_SN",
-"Diagnosi.SITUAZIONE_FEMORE_DX_CHECKBOX",
-"Diagnosi.SITUAZIONE_FEMORE_DX",
-"Diagnosi.OSTEOPOROSI_GRAVE",
-"Diagnosi.VERTEBRE_NON_ANALIZZATE_CHECKBOX",
-"Diagnosi.VERTEBRE_NON_ANALIZZATE_L1",
-"Diagnosi.VERTEBRE_NON_ANALIZZATE_L2",
-"Diagnosi.VERTEBRE_NON_ANALIZZATE_L3",
-"Diagnosi.VERTEBRE_NON_ANALIZZATE_L4",
-"Diagnosi.COLONNA_NON_ANALIZZABILE",
-"Diagnosi.COLONNA_VALORI_SUPERIORI",
-"Diagnosi.FEMORE_NON_ANALIZZABILE",
-"Diagnosi.FRAX_APPLICABILE",
-"Diagnosi.FRAX_PERCENTUALE",
-"Diagnosi.FRAX_FRATTURE_MAGGIORI",
-"Diagnosi.FRAX_COLLO_FEMORE_PERCENTUALE",
-"Diagnosi.FRAX_COLLO_FEMORE",
-"Diagnosi.DEFRA_APPLICABILE",
-"Diagnosi.DEFRA_PERCENTUALE_01",
-"Diagnosi.DEFRA_PERCENTUALE_50",
-"Diagnosi.DEFRA",
-"Diagnosi.FRAX_AGGIUSTATO_APPLICABILE",
-"Diagnosi.FRAX_AGGIUSTATO_PERCENTUALE",
-"Diagnosi.FRAX_FRATTURE_MAGGIORI_AGGIUSTATO_VALORE",
-"Diagnosi.FRAX_COLLO_FEMORE_AGGIUSTATO_PERCENTUALE",
-"Diagnosi.FRAX_COLLO_FEMORE_AGGIUSTATO_VALORE",
-"Diagnosi.TBS_COLONNA_APPLICABILE",
-"Diagnosi.TBS_COLONNA_PERCENTUALE",
-"Diagnosi.TBS_COLONNA_VALORE",
-"Diagnosi.VALUTAZIONE_INTEGRATA",
-"Pazienti.PATIENT_KEY",
-"Pazienti.DATA_NASCITA",
-"Pazienti.SESSO",
-"Pazienti.ETNIA",
-"Pazienti.MEDICO_RIFERIMENTO",
-"Pazienti.COMMENTO",
-"RaccomandazioniTerapeutiche.DATA_ANNULLA",
-"RaccomandazioniTerapeutiche.MOTIVO_ANNULLA",
-"RaccomandazioniTerapeutiche.STATO",
-"RaccomandazioniTerapeutiche.DATA_SALVA",
-"RaccomandazioniTerapeutiche.ALTRO",
-"RaccomandazioniTerapeutiche.ALTRO_CHECKBOX",
-"RaccomandazioniTerapeutiche.SOSPENSIONE_TERAPIA_CHECKBOX",
-"RaccomandazioniTerapeutiche.SOSPENSIONE_TERAPIA_FARMACO",
-"RaccomandazioniTerapeutiche.SOSPENSIONE_TERAPIA_MESI",
-"Referti.DATA_ANNULLA",
-"Referti.MOTIVO_ANNULLA",
-"Referti.STATO",
+"Pazienti.SESSO"                   // gender
+, "Anamnesi.STATO_MENOPAUSALE"       // menopause state (if relevant)
+, "Anamnesi.ETA_MENOPAUSA"           // age at last menopause (if relevant)
+, "Anamnesi.BMI"                     // bmi
+// , checkbox+value("Anamnesi.FRATTURA_VERTEBRE_CHECKBOX" "Anamnesi.FRATTURA_VERTEBRE")                                 // fragility fractures in spine (one or more)
+, "Anamnesi.FRATTURA_FEMORE"                                 // fragility fractures in hip (one or more)
+, "Anamnesi.FRATTURA_SITI_DIVERSI"                                 // fragility fractures in other sites (one or more)
+, "Anamnesi.FRATTURA_FAMILIARITA"    // familiarity
+// , checkbox+value("Anamnesi.ABUSO_FUMO_CHECKBOX" "Anamnesi.ABUSO_FUMO")              // current smoker
+// , checkbox+value("Anamnesi.USO_CORTISONE_CHECKBOX" "Anamnesi.USO_CORTISONE")              // ? current corticosteoroid use
+// ? current illnesses
+, "Anamnesi.MALATTIE_ATTUALI_CHECKBOX"
+, "Anamnesi.MALATTIE_ATTUALI_ARTRITE_REUM"
+, "Anamnesi.MALATTIE_ATTUALI_ARTRITE_PSOR"
+, "Anamnesi.MALATTIE_ATTUALI_LUPUS"
+, "Anamnesi.MALATTIE_ATTUALI_SCLERODERMIA"
+, "Anamnesi.MALATTIE_ATTUALI_ALTRE_CONNETTIVITI"
+// ? secondary causes
+, "Anamnesi.CAUSE_OSTEOPOROSI_SECONDARIA_CHECKBOX"
+// , "Anamnesi.CAUSE_OSTEOPOROSI_SECONDARIA" text
+// ? previous/current hormonal therapy
+// ? previous/current osteoprotective therapy
+// ? previous/current vitamin D supplementation
+// ? clinical information (20 fields)
+, "Anamnesi.COLONNA_T_SCORE"            // previous DXA spine total T score
+, "Anamnesi.COLONNA_Z_SCORE"            // previous DXA spine total Z score
+, "Anamnesi.FEMORE_T_SCORE"             // previous DXA hip total T score
+, "Anamnesi.FEMORE_Z_SCORE"             // previous DXA hip total Z score
+, "Densitometrie.TOT_T_SCORE"            // current DXA spine total T score
+, "Densitometrie.TOT_Z_SCORE"            // current DXA spine total Z score
+, "Densitometrie.NECK_T_SCORE"           // current DXA hip total T score
+, "Densitometrie.NECK_Z_SCORE"           // current DXA hip total Z score
+, "Diagnosi.SITUAZIONE_COLONNA"          // ? spine (normal, osteopenic, osteoporotic)
+// , merge(Diagnosi.SITUAZIONE_FEMORE_SN,SITUAZIONE_FEMORE_DX)                                 // ? hip (normal, osteopenic, osteoporotic)
+
+// ? FRAX
+// , checkbox+value("Diagnosi.FRAX_PERCENTUALE" "Diagnosi.FRAX_FRATTURE_MAGGIORI" true)
+// , checkbox+value("Diagnosi.FRAX_COLLO_FEMORE_PERCENTUALE" "Diagnosi.FRAX_COLLO_FEMORE" true)
+
+// ? DeFRA
+// , map(["Diagnosi.DEFRA" => true, "Diagnosi.DEFRA_PERCENTUALE_01" => 0, "Diagnosi.DEFRA_PERCENTUALE_50" => 50])
 ]);
   // $db_fit->setAllColumnsExcept("RaccomandazioniTerapeuticheUnitarie.ID");
   // $db_fit->setLimit(10);
-  $db_fit->setLimit(100);
-  $db_fit->setWhereClauses("Pazienti.SESSO = 'F'");
+  $db_fit->setLimit(10);
+  $db_fit->setWhereClauses(["Pazienti.SESSO = 'F'", "RaccomandazioniTerapeuticheUnitarie.TIPO !=  'Indagini approfondimento'"]);
   $db_fit->setDefaultOption("dateTreatment", "DaysSince");
   $db_fit->setOutputColumns([
     ["RaccomandazioniTerapeuticheUnitarie.TIPO",

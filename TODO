@@ -1,0 +1,19 @@
+- test con piu' livelli (e.g quantita')
+- salva dbfit su tabella come dicevamo
+- NLPTools http://php-nlp-tools.com/documentation/transformations.html http://php-nlp-tools.com/documentation/tokenizers.html
+
+// TODO figure out, note: since the four root problems are independent, we use  splits that can be different (due to randomization)
+
+- solve the prediction on one-column-more-attributes.
+		then maybe hardcode in the sql that a given column must have that value, at prediction time?
+
+- ForceCategoricalSubset
+- ForceSubset
+
+
+
+TODO: at prediction time just interrogate the database once and then use that same row for every level
+
+- TODO don't recurse when the outcome is false... NO_thing is not entirely safe
+// TODO bow possibility to specify the langage for each column
+// TODO stemming in italiano
