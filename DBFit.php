@@ -104,7 +104,7 @@ class DBFit {
   */
   private $outputColumns;
 
-  /*
+  /* TODO update
     SQL WHERE clauses for the concerning inputTables (array of strings, or single string)
     For example:
     - "patient.Age > 30"
@@ -413,7 +413,11 @@ class DBFit {
         else {
           /* At this point, a value for a column is an array of values for the column's attributes */
           $attr_val = [];
+          // var_dump($i_col);
+          // var_dump($raw_row);
+          // var_dump($this->getColumnTreatmentType($column));
           $raw_val = $raw_row[$this->getColNickname($this->getColumnName($column))];
+          // var_dump($raw_val);
 
           if ($raw_val === NULL) {
             // Empty column -> empty vals for all the column's attributes
@@ -470,8 +474,10 @@ class DBFit {
                       $val = $attribute->getKey($raw_val);
                     }
                     else {
-                      die_error("Something's off. Couldn't find element \"" . toString($raw_val) . "\" in domain of attribute {$attribute->getName()}. ");
+                      die_error("Something's off. Couldn't find element in domain of attribute {$attribute->getName()}: " . get_var_dump($raw_val));
                     }
+                    // echo "adomain";
+                    // var_dump($attribute->getDomain());
                   }
                 }
                 /* Dates & Datetime values */
@@ -506,6 +512,8 @@ class DBFit {
                         break;
                     };
                   }
+                } else {
+                  $val = $raw_val;
                 }
                 $attr_val = [$val];
                 break;
@@ -514,6 +522,7 @@ class DBFit {
         }
         $attr_vals[] = $attr_val;
       } // foreach ($columns as $i_col => $column)
+      unset($column);
 
       /* Append row */
       if ($this->identifierColumnName === NULL) {
@@ -674,7 +683,13 @@ class DBFit {
   private function getSQLWhereClauses($idVal, array $recursionPath) : array {
     $whereClauses = [];
     if ($this->whereClauses !== NULL && count($this->whereClauses)) {
-      $whereClauses = array_merge($whereClauses, $this->whereClauses);
+      $whereClauses = array_merge($whereClauses, $this->whereClauses[0]);
+      // foreach ($this->whereClauses as $recursionLevel => $whereClausesSet) {
+      //   $whereClauses = array_merge($whereClauses, $whereClausesSet);
+      //   if ($recursionLevel >= count($recursionPath) + ($idVal !== NULL ? 0 : 1)) {
+      //     break;
+      //   }
+      // }
     }
     if ($idVal !== NULL) {
       if ($this->identifierColumnName === NULL) {
@@ -682,7 +697,8 @@ class DBFit {
       }
       $whereClauses[] = $this->identifierColumnName . " = $idVal";
     }
-    if ($idVal === NULL) {
+    else {
+      $whereClauses = array_merge($whereClauses, $this->whereClauses[1]);
       $outAttrs = $this->getOutputColumnNames();
       foreach ($recursionPath as $recursionLevel => $node) {
         // $this->getOutputColumnAttributes()[$recursionLevel][$node[0]]->getName();
@@ -971,6 +987,15 @@ class DBFit {
       identified by the identifier column */
   function predictByIdentifier(string $idVal, array $recursionPath = []) : array {
     echo "DBFit->predictByIdentifier($idVal, " . toString($recursionPath) . ")" . PHP_EOL;
+
+    // var_dump("aoeu");
+    // // var_dump($this->inputColumns);
+    // foreach($this->inputColumns as $column) 
+    //   var_dump($this->getColumnAttributes($column));
+    //   var_dump($this->getColNickname($this->getColumnName($column)));
+    //   $raw_val = $raw_row[$this->getColNickname($this->getColumnName($column))];
+    //   var_dump($raw_val);
+    // }
 
     /* Check */
     if ($this->identifierColumnName === NULL) {
@@ -1642,11 +1667,14 @@ class DBFit {
 
   function setWhereClauses($whereClauses) : self
   {
-    listify($whereClauses);
-    foreach ($whereClauses as $jc) {
-      if (!is_string($jc)) {
-        die_error("Non-string value encountered in whereClauses: "
-        . "\"$jc\": ");
+    // TODO explain new hierachical structure
+    // listify($whereClauses);
+    foreach ($whereClauses as $whereClausesSet) {
+      foreach ($whereClausesSet as $jc) {
+        if (!is_string($jc)) {
+          die_error("Non-string value encountered in whereClauses: "
+          . "\"$jc\": ");
+        }
       }
     }
     $this->whereClauses = $whereClauses;
