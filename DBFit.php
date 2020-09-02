@@ -719,7 +719,7 @@ class DBFit {
     $attrName = $this->getColumnAttrName($column);
 
     switch(true) {
-      /* Forcing a set of binary categorical attributes */
+      /* Forcing a set of binary categorical attributes, one per each class */
       case $this->getColumnTreatmentType($column) == "ForceCategoricalBinary":
         
         /* Find unique values */
@@ -916,6 +916,7 @@ class DBFit {
       
       /* Train */
       $model_name = $this->getModelName($recursionPath, $i_prob);
+      $model_id = $this->getModelName($recursionPath, $i_prob, true);
       $model = $this->learner->initModel();
 
       $model->fit($trainData, $this->learner);
@@ -932,8 +933,8 @@ class DBFit {
       $model->save(join_paths(MODELS_FOLDER, $model_name));
       // $model->save(join_paths(MODELS_FOLDER, date("Y-m-d_H:i:s") . $model_name));
 
-      // TODO $model->saveToDB($this->db, $model_name, $testData);
-      // TODO $model->dumpToDB($this->db, $model_name);
+      $model->saveToDB($this->db, $model_id, $testData);
+      $model->dumpToDB($this->db, $model_id);
         // . "_" . join("", array_map([$this, "getColumnName"], ...).);
 
       $this->models[$model_name] = clone $model;
@@ -1542,13 +1543,17 @@ class DBFit {
   
 
   /* TODO explain */
-  function getModelName(array $recursionPath, int $i_prob) : string {
+  function getModelName(array $recursionPath, int $i_prob, $short = false) : string {
 
     $name_chunks = [];
     foreach ($recursionPath as $recursionLevel => $node) {
-      $name_chunks[] =
-        str_replace(".", ">", $this->getColumnAttributes($this->outputColumns[$recursionLevel], array_slice($recursionPath, 0, $recursionLevel))[$node[0]]->getName())
-        . "=" . $node[1];
+      if (!$short) {
+        $name_chunks[] = str_replace(".", ">", $this->getColumnAttributes($this->outputColumns[$recursionLevel], array_slice($recursionPath, 0, $recursionLevel))[$node[0]]->getName())
+          . "=" . $node[1];
+      }
+      else {
+        $name_chunks[] = $node[0] . "=" . $node[1] . ",";
+      }
     }
     $path_name = join("-", $name_chunks);
     // var_dump($outAttrs);
@@ -1556,9 +1561,15 @@ class DBFit {
     // var_dump(count($recursionPath));
     // var_dump($outAttrs[count($recursionPath)]);
     $recursionLevel = count($recursionPath);
-    $currentLevelStr = str_replace(".", ":",
-           $this->getColumnAttributes($this->outputColumns[$recursionLevel], $recursionPath)[$i_prob]->getName());
-    return str_replace("/", ":", $path_name . "__" . $currentLevelStr);
+    if (!$short) {
+      $currentLevelStr = str_replace(".", ":",
+             $this->getColumnAttributes($this->outputColumns[$recursionLevel], $recursionPath)[$i_prob]->getName());
+      $out = str_replace("/", ":", $path_name . "__" . $currentLevelStr);
+    }
+    else {
+      $out = $path_name . "__" . $i_prob;
+    }
+    return $out;
 
   }
   /* Use the model for predicting on a set of instances */
@@ -1667,8 +1678,8 @@ class DBFit {
 
   function setWhereClauses($whereClauses) : self
   {
-    // TODO explain new hierachical structure
-    // listify($whereClauses);
+    // TODO explain new hierachical structure, and make this more elastic
+    listify($whereClauses);
     foreach ($whereClauses as $whereClausesSet) {
       foreach ($whereClausesSet as $jc) {
         if (!is_string($jc)) {

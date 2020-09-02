@@ -87,11 +87,11 @@ function testMed3() {
 , "Anamnesi.MALATTIE_ATTUALI_SCLERODERMIA"
 , "Anamnesi.MALATTIE_ATTUALI_ALTRE_CONNETTIVITI"
 // ? secondary causes
-, "Anamnesi.CAUSE_OSTEOPOROSI_SECONDARIA_CHECKBOX"
-// , "Anamnesi.CAUSE_OSTEOPOROSI_SECONDARIA" text
-// ? previous/current hormonal therapy
-// ? previous/current osteoprotective therapy
-// ? previous/current vitamin D supplementation
+, "Anamnesi.CAUSE_OSTEOPOROSI_SECONDARIA_CHECKBOX" //(ForceSet?)
+// , "Anamnesi.CAUSE_OSTEOPOROSI_SECONDARIA" text (ForceSet?)
+// ?  ForceSet previous/current hormonal therapy
+// ?  ForceSet previous/current osteoprotective therapy
+// ?  ForceSet previous/current vitamin D supplementation
 // ? clinical information (20 fields)
 , "Anamnesi.COLONNA_T_SCORE"            // previous DXA spine total T score
 , "Anamnesi.COLONNA_Z_SCORE"            // previous DXA spine total Z score
