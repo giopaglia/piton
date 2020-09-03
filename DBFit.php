@@ -924,7 +924,7 @@ class DBFit {
       echo "Trained model '$model_name'." . PHP_EOL;
 
       /* Test */
-      $this->test($model, $testData);
+      $model->test($testData);
 
       echo $model . PHP_EOL;
 
@@ -933,7 +933,7 @@ class DBFit {
       $model->save(join_paths(MODELS_FOLDER, $model_name));
       // $model->save(join_paths(MODELS_FOLDER, date("Y-m-d_H:i:s") . $model_name));
 
-      $model->saveToDB($this->db, $model_id, $testData);
+      $model->saveToDB($this->db, $model_name, $model_id, $testData);
       $model->dumpToDB($this->db, $model_id);
         // . "_" . join("", array_map([$this, "getColumnName"], ...).);
 
@@ -1564,10 +1564,10 @@ class DBFit {
     if (!$short) {
       $currentLevelStr = str_replace(".", ":",
              $this->getColumnAttributes($this->outputColumns[$recursionLevel], $recursionPath)[$i_prob]->getName());
-      $out = str_replace("/", ":", $path_name . "__" . $currentLevelStr);
+      $out = str_replace("/", ":", $path_name . "_" . $currentLevelStr);
     }
     else {
-      $out = $path_name . "__" . $i_prob;
+      $out = $path_name . $i_prob;
     }
     return $out;
 
@@ -1585,43 +1585,6 @@ class DBFit {
 
     die_error("TODO check if predict still works");
     return $model->predict($inputData);
-  }
-
-  // Test a model
-  function test(DiscriminativeModel $model, Instances $testData) {
-    echo "DBFit->test(" . $testData->toString(true) . ")" . PHP_EOL;
-
-    $ground_truths = [];
-    $classAttr = $testData->getClassAttribute();
-
-    for ($x = 0; $x < $testData->numInstances(); $x++) {
-      $ground_truths[] = $classAttr->reprVal($testData->inst_classValue($x));
-    }
-
-    // $testData->dropOutputAttr();
-    $predictions = $model->predict($testData);
-    
-    // echo "\$ground_truths : " . get_var_dump($ground_truths) . PHP_EOL;
-    // echo "\$predictions : " . get_var_dump($predictions) . PHP_EOL;
-    $negatives = 0;
-    $positives = 0;
-    if (DEBUGMODE > 1) {
-      foreach ($ground_truths as $i => $val) {
-        echo "[" . $val . "," . $predictions[$i] . "]";
-      }
-    }
-    if (DEBUGMODE > 1) echo "\n";
-    foreach ($ground_truths as $i => $val) {
-      if ($ground_truths[$i] != $predictions[$i]) {
-        $negatives++;
-      } else {
-        $positives++;
-      }
-    }
-    echo "Test accuracy: " . ($positives/($positives+$negatives));
-    echo "\n";
-    
-    // TODO compute confusion matrix, etc. using $predictions $ground_truths
   }
 
   /* DEBUG-ONLY - TODO remove */
