@@ -502,9 +502,9 @@ class Instances {
   function toString(bool $short = false) : string {
     $out_str = "";
     $atts_str = [];
-    foreach ($this->getAttributes() as $att) {
+    foreach ($this->getAttributes() as $i => $att) {
       // $atts_str[] = substr($att->toString(), 0, 7);
-      $atts_str[] = $att->toString();
+      $atts_str[] = "[$i]:" . $att->toString();
     }
     if ($short) {
       $out_str .= "Instances{{$this->numInstances()} instances; "
@@ -512,15 +512,17 @@ class Instances {
     } else {
       $out_str .= "\n";
       $out_str .= "Instances{{$this->numInstances()} instances; "
-        . ($this->numAttributes()-1) . "+1 attributes [" . join(",", $atts_str) . "]}";
+        . ($this->numAttributes()-1) . "+1 attributes [" . join(";", $atts_str) . "]}";
       $out_str .= "\n";
       $out_str .= str_repeat("======|=", $this->numAttributes()+1) . "|\n";
       $out_str .= "";
-      foreach ($this->getAttributes() as $att) {
-        $out_str .= substr($att->toString(), 0, 7) . "\t";
+      foreach ($this->getAttributes() as $i => $att) {
+        // $out_str .= substr($att->toString(), 0, 7) . "\t";
+        $out_str .= str_pad("[$i]", 7, " ", STR_PAD_BOTH) . "\t";
       }
       $out_str .= "weight";
       $out_str .= "\n";
+      // TODO reuse inst_toString
       $out_str .= str_repeat("======|=", $this->numAttributes()+1) . "|\n";
       foreach ($this->data as $i => $inst) {
         foreach ($this->getInstance($i) as $val) {

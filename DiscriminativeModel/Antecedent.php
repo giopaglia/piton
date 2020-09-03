@@ -413,6 +413,12 @@ class ContinuousAntecedent extends _Antecedent {
   function covers(Instances &$data, int $i) : bool {
     $isCover = true;
     $val = $this->inst_valueOfAttr($data, $i);
+    // echo "covers" . PHP_EOL;
+    // echo "[$i]" . $data->inst_toString($i) . PHP_EOL;
+    // echo "VAL " . toString($val) . PHP_EOL;
+    // echo "sign " . toString($this->value) . PHP_EOL;
+    // echo "splitPoint " . toString($this->splitPoint) . PHP_EOL;
+    // echo "this " . $this->toString(true) . PHP_EOL;
     if ($val !== NULL) {
       if ($this->value == 0) { // First bag
         if ($val > $this->splitPoint) {
@@ -424,6 +430,10 @@ class ContinuousAntecedent extends _Antecedent {
     } else {
       $isCover = false;
     }
+    // echo "[$i]" . $data->inst_toString($i) . PHP_EOL; "antd doesn't cover: " . $this->toString()
+    //       . "[$i]" . $data->inst_toString($i) . PHP_EOL;
+        
+    
     return $isCover;
   }
 
@@ -433,14 +443,14 @@ class ContinuousAntecedent extends _Antecedent {
   function toString(bool $short = false) : string {
     if ($short) {
       return "{$this->attribute->getName()}" . (($this->value == 0) ? " <= " : " >= ") .
+        $this->splitPoint
         // number_format($this->splitPoint, 6)
-        number_format($this->splitPoint)
         ;
     }
     else {
       return "ContinuousAntecedent: ({$this->attribute->getName()}" . (($this->value == 0) ? " <= " : " >= ") .
+        $this->splitPoint
         // number_format($this->splitPoint, 6)
-        number_format($this->splitPoint)
         . ") (maxInfoGain={$this->maxInfoGain}, accuRate={$this->accuRate}, cover={$this->cover}, accu={$this->accu})";
     }
   }
@@ -450,8 +460,8 @@ class ContinuousAntecedent extends _Antecedent {
    */
   function serialize() : string {
     return "{$this->attribute->getName()}" . (($this->value == 0) ? " <= " : " >= ") .
+      $this->splitPoint
       // number_format($this->splitPoint, 6)
-      number_format($this->splitPoint)
       ;
   }
 

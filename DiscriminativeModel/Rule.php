@@ -70,15 +70,12 @@ class RipperRule extends _Rule {
    *         this rule
    */
   function covers(Instances &$data, int $i) : bool {
-    $covers = true;
-
     foreach ($this->antecedents as $antd) {
       if (!$antd->covers($data, $i)) {
-        $covers = false;
-        break;
+        return false;
       }
     }
-    return $covers;
+    return true;
   }
 
   function coversAll(Instances &$data) : bool {
@@ -122,14 +119,18 @@ class RipperRule extends _Rule {
     $tot       = $data->numInstances();
     $totWeight = $data->getSumOfWeights();
     
+    // if (DEBUGMODE > -1) echo "\$totWeight    : $totWeight    " . PHP_EOL;
+    // if (DEBUGMODE > -1) echo "\$tot    : $tot    " . PHP_EOL;
     // $covered = 0;
     $coveredWeight = 0;
     // $tp = 0;
     $tpWeight = 0;
     $totConsWeight = 0;
 
+    // echo $this->toString() . PHP_EOL;
     for ($i = 0; $i < $tot; $i++) {
-      if ($this->covers($data, $i)) {
+      if ($this->covers($data,  $i)) {
+        // echo "covered: [$i] " . $data->inst_toString($i) . PHP_EOL;
         // Covered by antecedents
         // $covered += 1;
         $coveredWeight += $data->inst_weight($i);

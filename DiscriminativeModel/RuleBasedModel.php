@@ -64,7 +64,6 @@ abstract class DiscriminativeModel {
 
     $sql = "INSERT INTO `{$tableName}_dump` VALUES (?)";
 
-    echo "SQL: $sql" . PHP_EOL;
     $stmt = $db->prepare($sql);
     $dump = serialize($this);
     // echo $dump;
@@ -239,15 +238,23 @@ class RuleBasedModel extends DiscriminativeModel {
     $classAttr = $testData->getClassAttribute();
 
     $domain = $classAttr->getDomain();
-    if ( count($domain) != 2) {
-      $measures = [];
-      foreach ($domain as $classId => $className) {
-        $measures[$classId] = $this->computeMeasures($ground_truths, $predictions, $classId);
+    // For the binary case, one measure for YES class is enough
+    if (count($domain) == 2) {
+      // TODO:
+      //  since algorithms like prip can alter the order of the domain,
+      //  the class chosen here may not be the one expected. Right now I look for the one not starting with "NO_", but this is not correct. Please fix this.
+      // echo "domain " . get_var_dump($domain);
+      if (startsWith($domain[0], "NO_"))
+        $domain = [1 => $domain[1]];
+      elseif (startsWith($domain[1], "NO_"))
+        $domain = [0 => $domain[0]];
+      else {
+        $domain = [0 => $domain[0]];
       }
     }
-    else {
-      // For the binary case, one measure for YES class is enough
-      $measures = [$this->computeMeasures($ground_truths, $predictions, 1)];
+    $measures = [];
+    foreach ($domain as $classId => $className) {
+      $measures[$classId] = $this->computeMeasures($ground_truths, $predictions, $classId);
     }
     return $measures;
   }
@@ -286,17 +293,17 @@ class RuleBasedModel extends DiscriminativeModel {
     $PPV = safe_div($TP, ($TP+$FP));
     $NPV = safe_div($TN, ($TN+$FN));
     
-    // if (DEBUGMODE) echo "\$positives    : $positives    " . PHP_EOL;
-    // if (DEBUGMODE) echo "\$negatives    : $negatives " . PHP_EOL;
-    // if (DEBUGMODE) echo "\$TP           : $TP " . PHP_EOL;
-    // if (DEBUGMODE) echo "\$TN           : $TN " . PHP_EOL;
-    // if (DEBUGMODE) echo "\$FP           : $FP " . PHP_EOL;
-    // if (DEBUGMODE) echo "\$FN           : $FN " . PHP_EOL;
-    // if (DEBUGMODE) echo "\$accuracy     : $accuracy " . PHP_EOL;
-    // if (DEBUGMODE) echo "\$sensitivity  : $sensitivity " . PHP_EOL;
-    // if (DEBUGMODE) echo "\$specificity  : $specificity " . PHP_EOL;
-    // if (DEBUGMODE) echo "\$PPV          : $PPV " . PHP_EOL;
-    // if (DEBUGMODE) echo "\$NPV          : $NPV " . PHP_EOL;
+    // if (DEBUGMODE > -1) echo "\$positives    : $positives    " . PHP_EOL;
+    // if (DEBUGMODE > -1) echo "\$negatives    : $negatives " . PHP_EOL;
+    // if (DEBUGMODE > -1) echo "\$TP           : $TP " . PHP_EOL;
+    // if (DEBUGMODE > -1) echo "\$TN           : $TN " . PHP_EOL;
+    // if (DEBUGMODE > -1) echo "\$FP           : $FP " . PHP_EOL;
+    // if (DEBUGMODE > -1) echo "\$FN           : $FN " . PHP_EOL;
+    // if (DEBUGMODE > -1) echo "\$accuracy     : $accuracy " . PHP_EOL;
+    // if (DEBUGMODE > -1) echo "\$sensitivity  : $sensitivity " . PHP_EOL;
+    // if (DEBUGMODE > -1) echo "\$specificity  : $specificity " . PHP_EOL;
+    // if (DEBUGMODE > -1) echo "\$PPV          : $PPV " . PHP_EOL;
+    // if (DEBUGMODE > -1) echo "\$NPV          : $NPV " . PHP_EOL;
 
     return [
       $positives, $negatives,
@@ -306,7 +313,7 @@ class RuleBasedModel extends DiscriminativeModel {
   }
 
   /* Save model to database */
-  function saveToDB(object &$db, string $modelName, string $tableName, ?Instances &$testData = NULL) {
+  function saveToDB(object &$db, string $modelName, string $tableName, ?Instances &$testData = NULL, ?Instances &$trainData = NULL) {
     //if (DEBUGMODE > 2) 
       echo "RuleBasedModel->saveToDB($tableName)" . PHP_EOL;
     
@@ -318,7 +325,6 @@ class RuleBasedModel extends DiscriminativeModel {
     $tableName = self::$prefix . $tableName;
 
     $sql = "DROP TABLE IF EXISTS `$tableName`";
-
     $stmt = $db->prepare($sql);
     if (!$stmt)
       die_error("Incorrect SQL query: $sql");
@@ -330,7 +336,6 @@ class RuleBasedModel extends DiscriminativeModel {
     $sql .= " (ID INT AUTO_INCREMENT PRIMARY KEY, class VARCHAR(256) NOT NULL, rule TEXT NOT NULL, support FLOAT DEFAULT NULL, confidence FLOAT DEFAULT NULL, lift FLOAT DEFAULT NULL, conviction FLOAT DEFAULT NULL)";
     // $sql .= "(class VARCHAR(256) PRIMARY KEY, regola TEXT)"; TODO why primary
 
-    echo "SQL: $sql" . PHP_EOL;
     $stmt = $db->prepare($sql);
     if (!$stmt)
       die_error("Incorrect SQL query: $sql");
@@ -338,9 +343,17 @@ class RuleBasedModel extends DiscriminativeModel {
       die_error("Query failed: $sql");
     $stmt->close();
 
+    if (DEBUGMODE > -1) {
+      echo "MODEL '$modelName' (table '$tableName'): " . PHP_EOL;
+      if ($testData !== NULL)
+        echo "  LOCAL EVALUATION:" . PHP_EOL;
+    }
+
     $arr_vals = [];
     foreach ($this->rules as $rule) {
-      echo $rule->toString($this->getClassAttribute()) . PHP_EOL;
+      if (DEBUGMODE > -1)
+        echo "    " . $rule->toString($this->getClassAttribute()) . PHP_EOL;
+
       $antds = [];
       foreach ($rule->getAntecedents() as $antd) {
         $antds[] = $antd->serialize();
@@ -350,9 +363,17 @@ class RuleBasedModel extends DiscriminativeModel {
             . "\", \"" . join(" AND ", $antds) . "\"";
 
       if ($testData !== NULL) {
-
         $measures = $rule->computeMeasures($testData);
         $str .= "," . join(",", array_map("mysql_number", $measures));
+
+        if (DEBUGMODE > -1) {
+          list($support, $confidence, $lift, $conviction) = $measures;
+          echo "      support      : $support\n";
+          echo "      confidence   : $confidence\n";
+          echo "      lift         : $lift\n";
+          echo "      conviction   : $conviction\n";
+        }
+
       }
       $arr_vals[] = $str;
     }
@@ -365,7 +386,7 @@ class RuleBasedModel extends DiscriminativeModel {
     }
     $sql .= " VALUES (" . join("), (", $arr_vals) . ")";
     
-    echo "SQL: $sql" . PHP_EOL;
+    // echo "SQL: $sql" . PHP_EOL;
     $stmt = $db->prepare($sql);
     if (!$stmt)
       die_error("Incorrect SQL query: $sql");
@@ -377,8 +398,20 @@ class RuleBasedModel extends DiscriminativeModel {
     //   echo $attribute->toString(false) . PHP_EOL;
     // }
 
+    // TODO remove?
+    // $sql = "DROP TABLE IF EXISTS `" . self::$indexTableName . "`";
+    // $stmt = $db->prepare($sql);
+    // if (!$stmt)
+    //   die_error("Incorrect SQL query: $sql");
+    // if (!$stmt->execute())
+    //   die_error("Query failed: $sql");
+    // $stmt->close();
+
+
     $sql = "CREATE TABLE IF NOT EXISTS `" . self::$indexTableName . "`";
     $sql .= " (ID INT AUTO_INCREMENT PRIMARY KEY, date DATETIME NOT NULL, modelName TEXT NOT NULL, tableName TEXT NOT NULL, classId INT NOT NULL, className TEXT NOT NULL";
+    $sql .= ", trainN FLOAT DEFAULT NULL";
+    $sql .= ", testN FLOAT DEFAULT NULL";
     $sql .= ", positives FLOAT DEFAULT NULL";
     $sql .= ", negatives FLOAT DEFAULT NULL";
     $sql .= ", TP FLOAT DEFAULT NULL";
@@ -400,20 +433,27 @@ class RuleBasedModel extends DiscriminativeModel {
     $stmt->close();
 
     // $globalIndicatorsStr = "";
-    // $globalIndicatorsStr .= "positives    : $positives\n";
-    // $globalIndicatorsStr .= "negatives    : $negatives\n";
-    // $globalIndicatorsStr .= "TP           : $TP\n";
-    // $globalIndicatorsStr .= "TN           : $TN\n";
-    // $globalIndicatorsStr .= "FP           : $FP\n";
-    // $globalIndicatorsStr .= "FN           : $FN\n";
-    // $globalIndicatorsStr .= "accuracy     : $accuracy\n";
-    // $globalIndicatorsStr .= "sensitivity  : $sensitivity\n";
-    // $globalIndicatorsStr .= "specificity  : $specificity\n";
-    // $globalIndicatorsStr .= "PPV          : $PPV\n";
-    // $globalIndicatorsStr .= "NPV          : $NPV\n";
+    // $globalIndicatorsStr .= 
+    // $globalIndicatorsStr .= 
+    // $globalIndicatorsStr .= 
+    // $globalIndicatorsStr .= 
+    // $globalIndicatorsStr .= 
+    // $globalIndicatorsStr .= 
+    // $globalIndicatorsStr .= 
+    // $globalIndicatorsStr .= 
+    // $globalIndicatorsStr .= 
+    // $globalIndicatorsStr .= 
+    // $globalIndicatorsStr .= 
+    // 
 
     $sql = "INSERT INTO `" . self::$indexTableName . "`";
     $sql .= " (date, modelName, tableName, classId, className";
+    if ($trainData !== NULL) {
+      $sql .= ", trainN";
+    }
+    if ($testData !== NULL) {
+      $sql .= ", testN";
+    }
     if ($testData !== NULL) {
       $sql .= ", positives, negatives, TP, TN, FP, FN, accuracy, sensitivity, specificity, PPV, NPV";
     }
@@ -424,17 +464,55 @@ class RuleBasedModel extends DiscriminativeModel {
       $measures = $this->test($testData);
     }
     $classAttr = $this->getClassAttribute();
+    
+    if (DEBUGMODE > -1)
+      if ($testData !== NULL)
+        echo "  GLOBAL EVALUATION:" . PHP_EOL;
+    
     foreach ($classAttr->getDomain() as $classId => $className) {
-      $valueSql = "'" . date('Y-m-d H:i:s') . "', '$modelName', '$tableName', $classId, '$className'";
-
       if ($testData !== NULL) {
-        $valueSql .= ", " . join(", ", array_map("mysql_number", $measures[$classId]));
+        if (isset($measures[$classId])) {
+          $valueSql = "'" . date('Y-m-d H:i:s') . "', '$modelName', '$tableName', $classId, '$className'";
+          if ($trainData !== NULL) {
+            $valueSql .= ", " . strval($trainData->numInstances());
+          }
+          if ($testData !== NULL) {
+            $valueSql .= ", " . strval($testData->numInstances());
+          }
+          $valueSql .= ", " . join(", ", array_map("mysql_number", $measures[$classId])); 
+          $valuesSql[] = $valueSql;
+          if (DEBUGMODE > -1) {
+            echo "    '$className', ($classId): " . PHP_EOL;
+            if ($trainData !== NULL)
+              echo "    trainN: {$trainData->numInstances()}" . PHP_EOL;
+            if ($testData !== NULL)
+              echo "    testN: {$testData->numInstances()}" . PHP_EOL;
+            list($positives, $negatives,
+              $TP, $TN, $FP, $FN,
+              $accuracy,
+              $sensitivity, $specificity, $PPV, $NPV) = $measures[$classId];
+            echo "      positives    : $positives\n";
+            echo "      negatives    : $negatives\n";
+            echo "      TP           : $TP\n";
+            echo "      TN           : $TN\n";
+            echo "      FP           : $FP\n";
+            echo "      FN           : $FN\n";
+            echo "      accuracy     : $accuracy\n";
+            echo "      sensitivity  : $sensitivity\n";
+            echo "      specificity  : $specificity\n";
+            echo "      PPV          : $PPV\n";
+            echo "      NPV          : $NPV\n";
+          }
+        }
       }
-      $valuesSql[] = $valueSql;
+      else {
+        $valueSql = "'" . date('Y-m-d H:i:s') . "', '$modelName', '$tableName', $classId, '$className'";
+        $valuesSql[] = $valueSql;
+      }
     }
     $sql .= join("), (", $valuesSql) . ")";
 
-    echo "SQL: $sql" . PHP_EOL;
+    // echo "SQL: $sql" . PHP_EOL;
     $stmt = $db->prepare($sql);
     if (!$stmt)
       die_error("Incorrect SQL query: $sql");
@@ -507,14 +585,20 @@ class RuleBasedModel extends DiscriminativeModel {
 
   /* Print a textual representation of the rule */
   function __toString () : string {
-    $out_str = "";
-    $out_str .= "RuleBasedModel with rules & attributes: " . PHP_EOL;
+    $out_str = "    ";
+    $out_str .= "RuleBasedModel with rules & attributes: " . PHP_EOL . "    ";
     foreach ($this->getRules() as $x => $rule) {
-      $out_str .= $x . ": " . $rule->toString() . PHP_EOL;
+      $out_str .= "R" . $x . ": " . $rule->toString() . PHP_EOL . "    ";
     }
-    foreach ($this->getAttributes() as $x => $attr) {
-      $out_str .= $x . ": " . $attr->toString() . PHP_EOL;
-    }
+    // foreach ($this->getAttributes() as $x => $attr) {
+    //   $out_str .= $x . ": " . $attr->toString() . PHP_EOL . "    ";
+    // }
+    $attrs = $this->getAttributes();
+    $x = 0;               $out_str .= "A" . $x . ": " . $attrs[$x]->toString(false) . PHP_EOL . "    ";
+    $x = 1;               $out_str .= "A" . $x . ": " . $attrs[$x]->toString() . PHP_EOL . "    ";
+    $x = 2;               $out_str .= "A" . $x . ": " . $attrs[$x]->toString() . PHP_EOL . "    ";
+                          $out_str .= "..." . PHP_EOL . "    ";
+    $x = count($attrs)-1; $out_str .= "A" . $x . ": " . $attrs[$x]->toString() . PHP_EOL . "    ";
     return $out_str;
   }
 }

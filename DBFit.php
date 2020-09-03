@@ -196,7 +196,8 @@ class DBFit {
        build instance objects. At each node, there is an output column which might generate different attributes, so there are k different problems, and this function computes k sets of instances, with same input attributes/values and different output ones. */
   private function readData($idVal = NULL, array $recursionPath = []) : array {
 
-    echo "DBFit->readData(" . toString($idVal) . ", " . toString($recursionPath) . ")" . PHP_EOL;
+    $recursionLevel = count($recursionPath);
+    echo "DBFit->readData(ID: " . toString($idVal) . ", LEVEL $recursionLevel (path " . toString($recursionPath) . "))" . PHP_EOL;
 
     /* Checks */
     if (!count($this->inputColumns)) {
@@ -209,7 +210,6 @@ class DBFit {
       die_error("Must specify the concerning input tables, through ->setInputTables() or ->addInputTable().");
     }
     
-    $recursionLevel = count($recursionPath);
     $outputColumnName = $this->getOutputColumnNames()[$recursionLevel];
 
     // var_dump($this->outputColumns);
@@ -262,9 +262,9 @@ class DBFit {
 
     // echo "columnsToIgnore  "; var_dump($columnsToIgnore);
 
-    echo "Recursion level: " . $recursionLevel . "(path: "
-    . toString($recursionPath) . ")" . PHP_EOL;
-    echo "Identifier value: " . toString($idVal) . PHP_EOL;
+    // echo "Recursion level: " . $recursionLevel . " (path: "
+    // . toString($recursionPath) . ")" . PHP_EOL;
+    // echo "Identifier value: " . toString($idVal) . PHP_EOL;
 
     /* Recompute and obtain output attributes in order to profit from attributes that are more specific to the current recursionPath. */
     $outputColumn = &$this->outputColumns[$recursionLevel];
@@ -392,8 +392,8 @@ class DBFit {
       The identifier column is used to determine which rows to merge.
    */
   function &readRawData(object &$res, array &$attributes, array &$columns) : array {
-    var_dump($attributes);
-    var_dump($columns);
+    // var_dump($attributes);
+    // var_dump($columns);
 
     $data = [];
 
@@ -911,8 +911,8 @@ class DBFit {
       /* Obtain and train, test set */
       list($trainData, $testData) = $this->getDataSplit($data);
       
-      echo "TRAIN" . PHP_EOL . $trainData->toString(true) . PHP_EOL;
-      echo "TEST" . PHP_EOL . $testData->toString(true) . PHP_EOL;
+      echo "TRAIN" . PHP_EOL . $trainData->toString(DEBUGMODE < 0) . PHP_EOL;
+      echo "TEST" . PHP_EOL . $testData->toString(DEBUGMODE < 0) . PHP_EOL;
       
       /* Train */
       $model_name = $this->getModelName($recursionPath, $i_prob);
@@ -933,7 +933,7 @@ class DBFit {
       $model->save(join_paths(MODELS_FOLDER, $model_name));
       // $model->save(join_paths(MODELS_FOLDER, date("Y-m-d_H:i:s") . $model_name));
 
-      $model->saveToDB($this->db, $model_name, $model_id, $testData);
+      $model->saveToDB($this->db, $model_name, $model_id, $testData, $trainData);
       $model->dumpToDB($this->db, $model_id);
         // . "_" . join("", array_map([$this, "getColumnName"], ...).);
 
