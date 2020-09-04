@@ -10,6 +10,61 @@ Crea mappa di valori:
 	vitamina d terapia e supplementazione
 		distingui principioattivo+quantita'
 	CALCIO?
+
+TODO
+	SELECT * FROM `PrincipiAttivi` ORDER BY `PrincipiAttivi`.`ID` ASC
+
+	ID   	NOME	FORMATO	QUANTITA	
+	1	Calcio carbonato	NULL	600 mg	
+	2	Calcio carbonato	NULL	1000 mg	
+	3	Calcio citrato	NULL	500 mg	
+	4	Calcio citrato	NULL	1000 mg	
+	5	Tibolone	NULL	2.5 mg	
+	6	Risedronato	Compresse	75 mg	
+	7	Alendronato	Compresse	70 mg	
+	8	Alendronato	Compresse effervescenti	70 mg	
+	9	Ibandronato	Compresse	150 mg	
+	10	Risedronato	Compresse	35 mg	
+	11	Calcifediolo	Capsule molli	0.266 mg	
+	12	Calcifediolo	Gocce	NULL	
+	13	Colecalciferolo	Flacone	25000 UI	
+	14	Colecalciferolo	Flacone monodose	50000 UI	
+	15	Colecalciferolo	Flacone monodose	25000 UI	
+	16	Colecalciferolo	Gocce	10000 UI	
+	17	Estradiolo + Drospirenone	NULL	1 mg / 2 mg	
+	18	Estrogeni coniugati equini + Bazedoxifene	NULL	0.4 mg / 20 mg	
+	19	Terapia ormonale sostitutiva	NULL	NULL	
+	20	Raloxifene	Compresse	60 mg	
+	21	Bazedoxifene	Compresse	20 mg	
+	22	Teriparatide	Soluzione iniettabile sotto cute	20 mcg	
+	23	Denosumab	Soluzione iniettabile sotto cute	NULL	
+	24	Zoledronato	NULL	5 mg	
+	25	Clodronato	Fiale	200 mg	
+
+	SELECT DISTINCT CONCAT(PrincipiAttivi.NOME, ' ', COALESCE(PrincipiAttivi.QUANTITA,'')) AS PRINCIPIO FROM Anamnesi INNER JOIN Referti ON Anamnesi.ID_REFERTO = Referti.ID INNER JOIN Diagnosi ON Diagnosi.ID_REFERTO = Referti.ID INNER JOIN RaccomandazioniTerapeutiche ON RaccomandazioniTerapeutiche.ID_REFERTO = Referti.ID INNER JOIN Pazienti ON Pazienti.ID = Referti.ID_PAZIENTE INNER JOIN Densitometrie ON Densitometrie.ID_REFERTO = Referti.ID INNER JOIN RaccomandazioniTerapeuticheUnitarie ON RaccomandazioniTerapeuticheUnitarie.ID_RACCOMANDAZIONE_TERAPEUTICA = RaccomandazioniTerapeutiche.ID INNER JOIN ElementiTerapici ON ElementiTerapici.ID_RACCOMANDAZIONE_TERAPEUTICA_UNITARIA = RaccomandazioniTerapeuticheUnitarie.ID INNER JOIN PrincipiAttivi ON ElementiTerapici.ID_PRINCIPIO_ATTIVO = PrincipiAttivi.ID WHERE Referti.DATA_REFERTO BETWEEN '2018-07-18' AND '2020-08-31' AND RaccomandazioniTerapeuticheUnitarie.TIPO != 'Indagini approfondimento' 
+
+PRINCIPIO 	
+Teriparatide 20 mcg
+Colecalciferolo 10000 UI
+Calcio carbonato 600 mg
+Risedronato 75 mg
+Calcio citrato 500 mg
+Calcifediolo 0.266 mg
+Clodronato 200 mg
+Denosumab NULL
+Alendronato 70 mg
+Colecalciferolo 25000 UI
+Colecalciferolo 50000 UI
+Zoledronato 5 mg
+Ibandronato 150 mg
+Estradiolo + Drospirenone 1 mg / 2 mg
+Estrogeni coniugati equini + Bazedoxifene 0.4 mg /...
+Risedronato 35 mg
+Tibolone 2.5 mg
+Bazedoxifene 20 mg
+Terapia ormonale sostitutiva NULL
+Raloxifene 60 mg
+
 - assicurarsi che il numero di istanze sia giusto (stampa sqls)
 
 // TODO figure out, note: since the four root problems are independent, we use  splits that can be different (due to randomization)

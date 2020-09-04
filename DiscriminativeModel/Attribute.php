@@ -14,6 +14,9 @@ abstract class Attribute {
   /** The index of the attribute (useful when dealing with many attributes) */
   protected $index;
 
+  /** Metadata */
+  protected $metadata;
+
   function __construct(string $name, string $type) {
     $this->name  = $name;
     $this->type  = $type;
@@ -91,7 +94,7 @@ abstract class Attribute {
     return $this->type;
   }
 
-  function setType($type)
+  function setType(string $type)
   {
     $this->type = $type;
   }
@@ -106,6 +109,16 @@ abstract class Attribute {
   function setIndex(int $index)
   {
     $this->index = $index;
+  }
+
+  function getMetadata()
+  {
+    return $this->metadata;
+  }
+
+  function setMetadata($metadata)
+  {
+    $this->metadata = $metadata;
   }
 }
 

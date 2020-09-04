@@ -393,6 +393,8 @@ class DBFit {
    */
   function &readRawData(object &$res, array &$attributes, array &$columns) : array {
     // var_dump($attributes);
+    // var_dump("attributes");
+    // var_dump($attributes[1][0]);
     // var_dump($columns);
 
     $data = [];
@@ -428,13 +430,14 @@ class DBFit {
           else {
             /* Apply treatment */
             switch (true) {
-              /* ForceCategoricalBinary (multiple attributes & values) */
-              case $this->getColumnTreatmentType($column) == "ForceCategoricalBinary":
+              /* ForceSet (multiple attributes & values) */
+              case $this->getColumnTreatmentType($column) == "ForceSet":
 
-                /* Append k values, one for each of the classes */
-                $classes = $this->getColumnTreatmentArg($column, 0);
-                foreach ($classes as $class) {
-                  $val = intval($class == $raw_val);
+                /* TODO change explanation Append k values, one for each of the classes */
+                foreach ($attribute as $attr) {
+                  $classSet = $attr->getMetadata();
+                  // $val = intval($class == $raw_val);
+                  $val = intval(in_array($raw_val, $classSet));
                   $attr_val[] = $val;
                 }
                 break;
@@ -444,8 +447,8 @@ class DBFit {
 
                 /* Append k values, one for each word in the dictionary */
                 $lang = $this->defaultOptions["textLanguage"];
-                $dict = $this->getColumnTreatmentArg($column, 0);
-                foreach ($dict as $word) {
+                foreach ($attribute as $attr) {
+                  $word = $attr->getMetadata();
                   $val = intval(in_array($word, $this->text2words($raw_val, $lang)));
                   $attr_val[] = $val;
                 }
@@ -589,8 +592,13 @@ class DBFit {
   }
 
   /* Generates SQL SELECT queries and interrogates the database. */
-  function SQLSelectColumns(array $columns, $idVal = NULL, array $recursionPath = [],
-    array $outputColumn = NULL, bool $silent = !DEBUGMODE) : object {
+  private function SQLSelectColumns(
+      array $columns
+    , $idVal = NULL
+    , array $recursionPath = []
+    , array $outputColumn = NULL
+    , bool $silent = !DEBUGMODE
+    , bool $distinct = false) : object {
 
     /* Build SQL query string */
     $sql = "";
@@ -614,13 +622,13 @@ class DBFit {
     }
 
     /* Add identifier column */
-    if ($this->identifierColumnName !== NULL) {
+    if ($this->identifierColumnName !== NULL && !$distinct) {
       $name = $this->identifierColumnName;
       $cols_str[] = $name . " AS " . $this->getColNickname($name);
     }
 
-    $sql .= "SELECT " . mysql_list($cols_str, "noop");
-    
+    $sql .= "SELECT " . ($distinct ? "DISTINCT " : "") . mysql_list($cols_str, "noop");
+
     /* Join all input tables AND the output tables needed, depending on the recursion depth */
     $tables = $this->inputTables;
     if ($idVal === NULL) {
@@ -667,7 +675,12 @@ class DBFit {
       since PHP MySQL connections do not allow to access result fields
       using this notation. Therefore, each column is aliased to table_DOT_column */
   function getColNickname($colName) {
-    return str_replace(".", "_DOT_", $colName);
+    if (strstr($colName, '(') === false) {
+      return str_replace(".", "_DOT_", $colName);
+    }
+    else {
+      return "X" . md5($colName);
+    }
   }
 
   /* Helper */
@@ -718,31 +731,45 @@ class DBFit {
     /* Attribute base-name */
     $attrName = $this->getColumnAttrName($column);
 
+    // var_dump($column);
     switch(true) {
-      /* Forcing a set of binary categorical attributes, one per each class */
-      case $this->getColumnTreatmentType($column) == "ForceCategoricalBinary":
-        
+      /* Forcing a set of binary categorical attributes */
+      case $this->getColumnTreatmentType($column) == "ForceSet":
+        $depth = $this->getColumnTreatmentArg($column, 0);
+
         /* Find unique values */
         $classes = [];
-        $res = $this->SQLSelectColumns([$column], NULL, $recursionPath, NULL, true);
+        $res = $this->SQLSelectColumns([$column], NULL, $recursionPath, NULL, true, true);
         foreach ($res as $raw_row) {
-          $class = $raw_row[$this->getColNickname($this->getColumnName($column))];
-          $classes[$class] = 0;
+          $classes[] = $raw_row[$this->getColNickname($this->getColumnName($column))];
         }
-        $classes = array_keys($classes);
 
         if (!count($classes)) {
-          warn("Couldn't apply ForceCategoricalBinary treatment to column " . $this->getColumnName($column) . ". No data instance found.");
+          warn("Couldn't apply ForceSet (depth: $depth) " . $this->getColumnName($column) . ". No data instance found.");
           $attributes = NULL;
         }
         else {
-          $attributes = [];
-          
-          /* Create one attribute per different class */
-          foreach ($classes as $class) {
-            $attributes[] = new DiscreteAttribute($attrName . "/" . $class, "bool", ["NO_" . $class, $class]);
+          if ($depth == -1) {
+            $depth = count($classes)-1;
           }
-          $this->setColumnTreatmentArg($column, 0, $classes);
+
+          $powerClasses = powerSet($classes, false, $depth+1);
+          var_dump("powerClasses");
+          var_dump($powerClasses);
+          $attributes = [];
+
+          /* Create one attribute per set */
+          foreach ($powerClasses as $classSet) {
+            if ($depth != 0) {
+              $className = "{" . join(",", $classSet) . "}";
+            }
+            else {
+              $className = join(",", $classSet);
+            }
+            $a = new DiscreteAttribute($attrName . "/" . $className, "bool", ["NO_" . $className, $className]);
+            $a->setMetadata($classSet);
+            $attributes[] = $a;
+          }
         }
         break;
       /* Enum column */
@@ -772,10 +799,11 @@ class DBFit {
             $generateDictAttrs = function($dict) use ($attrName, &$column) {
               $attributes = [];
               foreach ($dict as $word) {
-                $attributes[] = new DiscreteAttribute("'$word' in $attrName",
-                  "word_presence", ["N", "Y"]);
+                $a = new DiscreteAttribute("'$word' in $attrName",
+                  "word_presence", ["N", "Y"], $word); 
+                $a->setMetadata($word);
+                $attributes[] = $a; 
               }
-              $this->setColumnTreatmentArg($column, 0, $dict);
               return $attributes;
             };
 
@@ -1016,9 +1044,6 @@ class DBFit {
     /* If no model was trained for the current node, stop the recursion */
     if ($outputAttributes === NULL) {
       echo "Prediction-time recursion stops here due to lack of a model (recursionPath = " . toString($recursionPath) . ":" . PHP_EOL;
-      var_dump($this->outputColumns[$recursionLevel]["attributes"]);
-      var_dump($this->getPathRepr($recursionPath));
-      var_dump($this->outputColumns[$recursionLevel]);
       return [];
     }
     else {
@@ -1213,14 +1238,24 @@ class DBFit {
     return $t;
   }
   function getColumnTreatmentArg(array &$col, int $j) {
+    $j = ($j < 0 ? $j : 1+$j);
     $tr = $this->getColumnTreatment($col);
-    return !is_array($tr) || !isset($tr[1+$j]) ? NULL : $tr[1+$j];
+    return !is_array($tr) || !isset($tr[$j]) ? NULL : $tr[$j];
   }
   function setColumnTreatment(array &$col, $val) {
+    if ($val !== NULL)
+      listify($val);
+    if ($val == ["ForceCategoricalBinary"]) {
+      $val = ["ForceSet", 0];
+    }
+    else if ($val == ["ForceSet"]) {
+      $val = ["ForceSet", -1];
+    }
     $col["treatment"] = $val;
   }
   function setColumnTreatmentArg(array &$col, int $j, $val) {
-    $this->getColumnTreatment($col)[1+$j] = $val;
+    $j = ($j < 0 ? $j : 1+$j);
+    $this->getColumnTreatment($col)[$j] = $val;
   }
   function getColumnAttrName(array &$col) {
     return $col["attrName"];
@@ -1380,7 +1415,7 @@ class DBFit {
   function readColumn($col) : array {
     $new_col = [];
     $new_col["name"] = NULL;
-    $new_col["treatment"] = NULL;
+    $this->setColumnTreatment($new_col, NULL);
     $new_col["tables"] = [];
     $new_col["attrName"] = NULL;
     $new_col["mysql_type"] = NULL;
@@ -1394,8 +1429,7 @@ class DBFit {
       }
       $new_col["name"] = $col[0];
       if (isset($col[1])) {
-        listify($col[1]);
-        $new_col["treatment"] = $col[1];
+        $this->setColumnTreatment($new_col, $col[1]);
       }
       if (isset($col[2])) {
         if (!is_string($col[2])) {
@@ -1440,7 +1474,7 @@ class DBFit {
 
     $new_col = [];
     $new_col["name"] = NULL;
-    $new_col["treatment"] = "ForceCategorical";
+    $this->setColumnTreatment($new_col, "ForceCategorical");
     $new_col["attributes"] = [];
     $new_col["tables"] = [];
     $new_col["attrName"] = NULL;
@@ -1465,7 +1499,7 @@ class DBFit {
         $new_col["tables"] = array_merge($prev_tables, $these_tables);
       }
       if (isset($col[2])) {
-        $new_col["treatment"] = $col[2];
+        $this->setColumnTreatment($new_col, $col[2]);
       }
       if (isset($col[3])) {
         if (!is_string($col[3])) {
@@ -1530,27 +1564,32 @@ class DBFit {
 
     // var_dump($tables);
 
-    $sql = "SELECT * FROM `information_schema`.`columns` WHERE `table_name` IN "
-          . mysql_set(array_map([$this, "getTableName"], $tables))
-          . " AND (COLUMN_NAME = '" . $this->getColumnName($column) . "'"
-          . " OR CONCAT(TABLE_NAME,'.',COLUMN_NAME) = '" . $this->getColumnName($column)
-           . "')";
-    $res = mysql_select($this->db, $sql, true);
-
     /* Find column */
-    $mysql_column = NULL;
-    foreach ($res as $col) {
-      if (in_array($column["name"],
-          [$col["TABLE_NAME"].".".$col["COLUMN_NAME"], $col["COLUMN_NAME"]])) {
-        $mysql_column = $col;
-        break;
+    $mysql_type = NULL;
+    if (startsWith($column["name"], "CONCAT")) {
+      $mysql_type = "varchar";
+    }
+    else {
+      $sql = "SELECT * FROM `information_schema`.`columns` WHERE `table_name` IN "
+            . mysql_set(array_map([$this, "getTableName"], $tables))
+            . " AND (COLUMN_NAME = '" . $this->getColumnName($column) . "'"
+            . " OR CONCAT(TABLE_NAME,'.',COLUMN_NAME) = '" . $this->getColumnName($column)
+             . "')";
+      $res = mysql_select($this->db, $sql, true);
+      foreach ($res as $col) {
+        if (in_array($column["name"],
+            [$col["TABLE_NAME"].".".$col["COLUMN_NAME"], $col["COLUMN_NAME"]])) {
+          $mysql_type = $col["COLUMN_TYPE"];
+          break;
+        }
       }
     }
-    if ($mysql_column === NULL) {
+
+    if ($mysql_type === NULL) {
       die_error("Couldn't retrieve information about column \""
         . $column["name"] . "\"");
     }
-    $column["mysql_type"] = $mysql_column["COLUMN_TYPE"];
+    $column["mysql_type"] = $mysql_type;
   }
   
 

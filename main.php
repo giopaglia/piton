@@ -112,8 +112,8 @@ function testMed3() {
 // , map(["Diagnosi.DEFRA" => true, "Diagnosi.DEFRA_PERCENTUALE_01" => 0, "Diagnosi.DEFRA_PERCENTUALE_50" => 50])
 ]);
   // $db_fit->setAllColumnsExcept("RaccomandazioniTerapeuticheUnitarie.ID");
-  // $db_fit->setLimit(10);
   $db_fit->setLimit(10);
+  // $db_fit->setLimit(10);
   // $db_fit->setLimit(100);
   $db_fit->setWhereClauses([
     [
@@ -134,12 +134,14 @@ function testMed3() {
         ["RaccomandazioniTerapeuticheUnitarie", ["RaccomandazioniTerapeuticheUnitarie.ID_RACCOMANDAZIONE_TERAPEUTICA = RaccomandazioniTerapeutiche.ID"]]
       ],
       "ForceCategoricalBinary"],
-    ["PrincipiAttivi.NOME",
+    // ["PrincipiAttivi.NOME",
+    ["CONCAT(PrincipiAttivi.NOME, ' ', COALESCE(PrincipiAttivi.QUANTITA,''))",
       [
         ["ElementiTerapici", ["ElementiTerapici.ID_RACCOMANDAZIONE_TERAPEUTICA_UNITARIA = RaccomandazioniTerapeuticheUnitarie.ID"]],
         ["PrincipiAttivi", "ElementiTerapici.ID_PRINCIPIO_ATTIVO = PrincipiAttivi.ID"]
       ],
-      "ForceCategoricalBinary"
+      "ForceCategoricalBinary",
+      "PrincipioAttivo"
     ]
   ]);
 

@@ -201,6 +201,49 @@ function zip() {
     return $zipped;
 }
 
+# Based onto: https://stackoverflow.com/a/27968556/5646732
+function powerSet(array $array, bool $includeEmpty = true, int $maxSize = -1) {
+  // add the empty set
+  $results = [];
+  if ($includeEmpty) {
+    $results[] = [];
+  }
+  
+  if ($maxSize == -1) {
+    $maxSize = count($array);
+  }
+  if ($maxSize < 0 || $maxSize > count($array)) {
+    die_error("powerSet(...): maxSize=$maxSize out of bounds [0," . count($array) . "]");
+  }
+  foreach ($array as $element) {
+    foreach ($results as $combination) {
+      $newElem = array_merge($combination,[$element]);
+      if (count($newElem) <= $maxSize) {
+        $results[] = $newElem;
+      }
+    }
+    if (!$includeEmpty) {
+      $newElem = [$element];
+      if (count($newElem) <= $maxSize) {
+        $results[] = $newElem;
+      }
+    }
+  }
+
+  return $results;
+}
+
+// print_r(powerSet([1,2,3,4]));
+// print_r(powerSet([1,2,3,4],false));
+// print_r(powerSet([1,2,3,4],false,0));
+// print_r(powerSet([1,2,3,4],true,0));
+// print_r(powerSet([1,2,3,4],false,1));
+// print_r(powerSet([1,2,3,4],true,1));
+// print_r(powerSet([1,2,3,4],false,-1));
+// print_r(powerSet([1,2,3,4],true,-1));
+// print_r(powerSet([1,2,3,4],false,0));
+// print_r(powerSet([1,2,3,4],true,0));
+
 
 # Files in directory
 function filesin($a, $full_path = false, $sortby=false)
