@@ -562,7 +562,7 @@ class RuleBasedModel extends DiscriminativeModel {
     return $this;
   }
 
-  function getClassAttribute() : _Attribute {
+  function getClassAttribute() : Attribute {
     // Note: assuming the class attribute is the first
     return $this->getAttributes()[0];
   }

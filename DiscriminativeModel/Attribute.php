@@ -3,7 +3,7 @@
 /**
  * Interface for continuous/discrete attributes
  */
-abstract class _Attribute {
+abstract class Attribute {
 
   /** The name of the attribute */
   protected $name;
@@ -38,7 +38,7 @@ abstract class _Attribute {
   , "real"     => "float"
   ];
 
-  static function createFromARFF(string $line) : _Attribute {
+  static function createFromARFF(string $line) : Attribute {
     if (DEBUGMODE > 2) echo "$line" . PHP_EOL;
     preg_match("/@attribute\s+(\S+)\s+(.*)/", $line, $matches);
     $name = $matches[1];
@@ -62,19 +62,19 @@ abstract class _Attribute {
   }
 
   // /** Whether two attributes are equal (completely interchangeable) */
-  // function isEqualTo(_Attribute $otherAttr) : bool {
+  // function isEqualTo(Attribute $otherAttr) : bool {
   //   return $this->isEquivalentTo();
   // }
 
   // * Whether there can be a bijective mapping between two attributes 
-  // function isEquivalentTo(_Attribute $otherAttr) : bool {
+  // function isEquivalentTo(Attribute $otherAttr) : bool {
   //   return get_class($this) == get_class($otherAttr)
   //       && $this->getName() == $otherAttr->getName()
   //       && $this->getType() == $otherAttr->getType();
   // }
 
   /** Whether there can be a mapping from one attribute to another */
-  abstract function isAtLeastAsExpressiveAs(_Attribute $otherAttr);
+  abstract function isAtLeastAsExpressiveAs(Attribute $otherAttr);
 
   function getName() : string
   {
@@ -112,7 +112,7 @@ abstract class _Attribute {
 /**
  * Discrete attribute
  */
-class DiscreteAttribute extends _Attribute {
+class DiscreteAttribute extends Attribute {
 
   function __construct(string $name, string $type, array $domain = []) {
     parent::__construct($name, $type);
@@ -123,13 +123,13 @@ class DiscreteAttribute extends _Attribute {
   private $domain;
 
   // /** Whether two attributes are equal (completely interchangeable) */
-  // function isEqualTo(_Attribute $otherAttr) : bool {
+  // function isEqualTo(Attribute $otherAttr) : bool {
   //   return $this->getDomain() == $otherAttr->getDomain()
   //      && parent::isEqualTo($otherAttr);
   // }
 
   // /** Whether there can be a mapping between two attributes */
-  // function isEquivalentTo(_Attribute $otherAttr) : bool {
+  // function isEquivalentTo(Attribute $otherAttr) : bool {
   //   if (DEBUGMODE > 2) echo get_arr_dump($this->getDomain());
   //   if (DEBUGMODE > 2) echo get_arr_dump($otherAttr->getDomain());
   //   if (DEBUGMODE > 2) echo array_equiv($this->getDomain(), $otherAttr->getDomain());
@@ -138,7 +138,7 @@ class DiscreteAttribute extends _Attribute {
   // }
 
   /** Whether there can be a mapping frmb one attribute to another */
-  function isAtLeastAsExpressiveAs(_Attribute $otherAttr) {
+  function isAtLeastAsExpressiveAs(Attribute $otherAttr) {
     return get_class($this) == get_class($otherAttr)
         && $this->getName() == $otherAttr->getName()
         && $this->getType() == $otherAttr->getType()
@@ -210,7 +210,7 @@ class DiscreteAttribute extends _Attribute {
 /**
  * Continuous attribute
  */
-class ContinuousAttribute extends _Attribute {
+class ContinuousAttribute extends Attribute {
 
   /** The type of the attribute (ARFF/Weka style)  */
   static $type2ARFFtype = [
@@ -230,7 +230,7 @@ class ContinuousAttribute extends _Attribute {
   // }
 
   /** Whether there can be a mapping frmb one attribute to another */
-  function isAtLeastAsExpressiveAs(_Attribute $otherAttr) {
+  function isAtLeastAsExpressiveAs(Attribute $otherAttr) {
     return get_class($this) == get_class($otherAttr)
         && $this->getName() == $otherAttr->getName()
         && $this->getType() == $otherAttr->getType();

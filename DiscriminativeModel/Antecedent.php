@@ -34,7 +34,7 @@ abstract class _Antecedent {
   /**
    * Constructor
    */
-  function __construct(_Attribute $attribute) {
+  function __construct(Attribute $attribute) {
     $this->attribute   = $attribute;
     $this->attributeIndex   = $attribute->getIndex();
     $this->value       = NAN;
@@ -45,7 +45,7 @@ abstract class _Antecedent {
   }
 
 
-  static function createFromAttribute(_Attribute $attribute) : _Antecedent {
+  static function createFromAttribute(Attribute $attribute) : _Antecedent {
     switch (true) {
       case $attribute instanceof DiscreteAttribute:
         $antecedent = new DiscreteAntecedent($attribute);
@@ -90,7 +90,7 @@ abstract class _Antecedent {
     $this->attribute = clone $this->attribute;
   }
 
-  function getAttribute() : _Attribute
+  function getAttribute() : Attribute
   {
     return $this->attribute;
   }
@@ -129,7 +129,7 @@ class DiscreteAntecedent extends _Antecedent {
   /**
    * Constructor
    */
-  function __construct(_Attribute $attribute) {
+  function __construct(Attribute $attribute) {
     if(!($attribute instanceof DiscreteAttribute))
       die_error("DiscreteAntecedent requires a DiscreteAttribute. Got "
       . get_class($attribute) . " instead.");
@@ -222,10 +222,10 @@ class DiscreteAntecedent extends _Antecedent {
    */
   function toString(bool $short = false) : string {
     if ($short) {
-      return "{$this->attribute->getName()} == \"{$this->attribute->getDomain()[$this->value]}\"";
+      return "{$this->attribute->getName()} == \"{$this->attribute->reprVal($this->value)}\"";
     }
     else {
-      return "DiscreteAntecedent: ({$this->attribute->getName()} == \"{$this->attribute->getDomain()[$this->value]}\") (maxInfoGain={$this->maxInfoGain}, accuRate={$this->accuRate}, cover={$this->cover}, accu={$this->accu})";
+      return "DiscreteAntecedent: ({$this->attribute->getName()} == \"{$this->attribute->reprVal($this->value)}\") (maxInfoGain={$this->maxInfoGain}, accuRate={$this->accuRate}, cover={$this->cover}, accu={$this->accu})";
     }
   }
 
@@ -233,7 +233,7 @@ class DiscreteAntecedent extends _Antecedent {
    * Print a serialized representation of the antecedent
    */
   function serialize() : string {
-    return "{$this->attribute->getName()} == '{$this->attribute->getDomain()[$this->value]}'";
+    return "{$this->attribute->getName()} == '{$this->attribute->reprVal($this->value)}'";
   }
 }
 
@@ -250,7 +250,7 @@ class ContinuousAntecedent extends _Antecedent {
   /**
    * Constructor
    */
-  function __construct(_Attribute $attribute) {
+  function __construct(Attribute $attribute) {
     if(!($attribute instanceof ContinuousAttribute))
       die_error("ContinuousAntecedent requires a ContinuousAttribute. Got "
       . get_class($attribute) . " instead.");

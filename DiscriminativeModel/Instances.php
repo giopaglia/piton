@@ -98,7 +98,7 @@ class Instances {
     while(!feof($f))  {
       $line = strtolower(fgets($f));
       if (startsWith($line, "@attribute")) {
-        $attributes[] = _Attribute::createFromARFF($line);
+        $attributes[] = Attribute::createFromARFF($line);
       }
       if (startsWith($line, "@data")) {
         break;
@@ -108,7 +108,7 @@ class Instances {
     array_unshift($attributes, $classAttr);
 
     /* Print the internal representation given the ARFF value read */
-    $getVal = function($ARFFVal, _Attribute $attr)
+    $getVal = function($ARFFVal, Attribute $attr)
     {
       $ARFFVal = trim($ARFFVal);
       if ($ARFFVal === "?") {
@@ -219,7 +219,7 @@ class Instances {
       $attribute->setIndex($k);
     }
   }
-  function getClassAttribute() : _Attribute {
+  function getClassAttribute() : Attribute {
     // Note: assuming the class attribute is the first
     return $this->getAttributes()[0];
   }
@@ -249,12 +249,12 @@ class Instances {
    * Functions for the single data instance
    */
   
-  function inst_valueOfAttr(int $i, _Attribute $attr) {
+  function inst_valueOfAttr(int $i, Attribute $attr) {
     $j = $attr->getIndex();
     return $this->inst_val($i, $j);
   }
 
-  // function inst_isMissing(int $i, _Attribute $attr) : bool {
+  // function inst_isMissing(int $i, Attribute $attr) : bool {
   //   return ($this->inst_valueOfAttr($i, $attr) === NULL);
   // }
   
@@ -280,7 +280,7 @@ class Instances {
   /**
    * Sort the instances by the values they hold for an attribute
    */
-  function sortByAttr(_Attribute $attr)
+  function sortByAttr(Attribute $attr)
   {
     if (DEBUGMODE > 2) echo "Instances->sortByAttr(" . $attr->toString() . ")" . PHP_EOL;
 
@@ -416,7 +416,7 @@ class Instances {
   /**
    * Number of unique values appearing in the data, for an attribute.
    */
-  function numDistinctValues(_Attribute $attr) : int {
+  function numDistinctValues(Attribute $attr) : int {
     $j = $attr->getIndex();
     $valPresence = [];
     for ($x = 0; $x < $this->numInstances(); $x++) {
@@ -446,7 +446,7 @@ class Instances {
     }
     
     /* Print the ARFF representation of a value of the attribute */
-    $getARFFRepr = function($val, _Attribute $attr)
+    $getARFFRepr = function($val, Attribute $attr)
     {
       return $val === NULL ? "?" : $attr->reprVal($val);
     };

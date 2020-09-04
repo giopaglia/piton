@@ -864,7 +864,7 @@ class DBFit {
     }
 
     /* Each column has a tree of attributes, because the set of attributes for the column depends on the recursion path. This is done in order to leverage predicates that are the most specific.  */
-    $column["attributes"][$this->getPathRepr($recursionPath)] = $attributes;
+    $this->setColumnAttributes($column, $recursionPath, $attributes);
     // var_dump($column);
   }
 
@@ -992,7 +992,7 @@ class DBFit {
     // var_dump("aoeu");
     // // var_dump($this->inputColumns);
     // foreach($this->inputColumns as $column) 
-    //   var_dump($this->getColumnAttributes($column));
+    //   var_dump($this->getColumnAttributes($column...));
     //   var_dump($this->getColNickname($this->getColumnName($column)));
     //   $raw_val = $raw_row[$this->getColNickname($this->getColumnName($column))];
     //   var_dump($raw_val);
@@ -1016,6 +1016,9 @@ class DBFit {
     /* If no model was trained for the current node, stop the recursion */
     if ($outputAttributes === NULL) {
       echo "Prediction-time recursion stops here due to lack of a model (recursionPath = " . toString($recursionPath) . ":" . PHP_EOL;
+      var_dump($this->outputColumns[$recursionLevel]["attributes"]);
+      var_dump($this->getPathRepr($recursionPath));
+      var_dump($this->outputColumns[$recursionLevel]);
       return [];
     }
     else {
@@ -1094,7 +1097,7 @@ class DBFit {
 
       /* Recursive step: recurse and predict the subtree of this predicted value */
       $predictions[] = [[$outputAttributes[$i_prob]->getName(), $predictedVal], $this->predictByIdentifier($idVal,
-          array_merge($recursionPath, [[$i_prob, $predictedVal]]))];
+          array_merge($recursionPath, [[$i_prob, $outputAttributes[$i_prob]->reprVal($predictedVal)]]))];
     }
 
     /* At root level, finally prints the whole prediction tree */
@@ -1149,7 +1152,7 @@ class DBFit {
 
   // function getOutputColumnAttributes() {
   //   // var_dump($this->outputColumns);
-  //   return array_map([$this, "getColumnAttributes"], $this->outputColumns);
+  //   return array_map([$this, "getColumnAttributes"], $this->outputColumns...);
   // }
   
 
@@ -1229,9 +1232,18 @@ class DBFit {
     return $col["mysql_type"];
   }
 
-  function getColumnAttributes(array &$col, array $recursionPath = []) {
-    // var_dump($col);
+  function getColumnAttributes(array &$col, array $recursionPath) : ?array {
+    // var_dump($col["attributes"]);
+    // var_dump("aoeu");
+    // var_dump($recursionPath);
     return isset($col["attributes"][$this->getPathRepr($recursionPath)]) ? $col["attributes"][$this->getPathRepr($recursionPath)] : NULL;
+  }
+
+  function setColumnAttributes(array &$col, array $recursionPath, ?array $attrs) {
+    // var_dump("ueoa");
+    // var_dump($recursionPath);
+
+    $col["attributes"][$this->getPathRepr($recursionPath)] = $attrs;
   }
 
   function getColumnTables(array &$col) {

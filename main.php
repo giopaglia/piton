@@ -66,7 +66,7 @@ function testMed3() {
 
 
   $db_fit->setIdentifierColumnName("Referti.ID");
-  $db_fit->setDefaultOption("textTreatment", ["BinaryBagOfWords", 10]);
+  // $db_fit->setDefaultOption("textTreatment", ["BinaryBagOfWords", 10]);
   $db_fit->setDefaultOption("textLanguage", "it");
   $db_fit->setInputColumns([
 ["Pazienti.SESSO", "ForceCategorical"]                   // gender
@@ -113,16 +113,19 @@ function testMed3() {
 ]);
   // $db_fit->setAllColumnsExcept("RaccomandazioniTerapeuticheUnitarie.ID");
   // $db_fit->setLimit(10);
-  // $db_fit->setLimit(10);
+  $db_fit->setLimit(10);
   // $db_fit->setLimit(100);
   $db_fit->setWhereClauses([
     [
-      "Pazienti.SESSO = 'F'",
+      // "Pazienti.SESSO = 'F'",
       "Referti.DATA_REFERTO BETWEEN '2018-07-18' AND '2020-08-31'"
     ],
     [
       "RaccomandazioniTerapeuticheUnitarie.TIPO != 'Indagini approfondimento'"
     ]
+    // ,[
+    //   "PrincipiAttivi.TIPO != 'Indagini approfondimento'"
+    // ]
     ]);
   $db_fit->setDefaultOption("dateTreatment", "DaysSince");
   $db_fit->setOutputColumns([

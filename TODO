@@ -1,8 +1,5 @@
 
-- salva dbfit su tabella come dicevamo
 - supporto, confidenza, poi derivi la bonta' (Relevance and reliability thresholds). TODO Domanda: perche' ogni regola va valutata (supporto e confidence) contro l'intero set di istanze di testing, dimenticandosi dell'ordine delle regole? TODO use non-weighted counterparts?
-- assicurarsi che il numero di istanze sia giusto
-
 Crea mappa di valori:
 	In PrincipiAttivi trova
 	ormone sost
@@ -12,9 +9,11 @@ Crea mappa di valori:
 		alendronato unico
 	vitamina d terapia e supplementazione
 		distingui principioattivo+quantita'
+	CALCIO?
+- assicurarsi che il numero di istanze sia giusto (stampa sqls)
 
 // TODO figure out, note: since the four root problems are independent, we use  splits that can be different (due to randomization)
-
+DO RANDOMIZE!
 
 
 - solve the prediction on one-column-more-attributes.

@@ -441,7 +441,7 @@ class RipperRule extends _Rule {
   function __toString() : string {
     return $this->toString();
   }
-  function toString(_Attribute $classAttr = NULL) : string {
+  function toString(Attribute $classAttr = NULL) : string {
     $ants = [];
     if ($this->hasAntecedents()) {
       for ($j = 0; $j < $this->getSize(); $j++) {
