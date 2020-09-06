@@ -225,7 +225,7 @@ class DBFit {
     foreach ($constraints as $constraint) {
       /* If any WHERE/JOIN-ON constraint forces the equality between two columns,
         drop one of the resulting attributes. */
-      if (preg_match("/\s*([a-z\d_\.]+)\s*=\s*([a-z\d_\.]+)\s*/i", $constraint, $matches)) {
+      if (preg_match("/^\s*([a-z\d_\.]+)\s*=\s*([a-z\d_\.]+)\s*$/i", $constraint, $matches)) {
         $fst = $matches[1];
         $snd = $matches[2];
 
@@ -240,7 +240,7 @@ class DBFit {
         }
       }
       // Drop attribute when forcing equality to a constant (because then the attributes is not informative)
-      if (preg_match("/\s*([a-z\d_\.]+)\s*=\s*('[a-z\d_\.]*')\s*/i", $constraint, $matches)) {
+      if (preg_match("/^\s*([a-z\d_\.]+)\s*=\s*('[a-z\d_\.]*')\s*$/i", $constraint, $matches)) {
         $col = $matches[1];
         if (!in_array($col, [$this->identifierColumnName, $outputColumnName])
           && !in_array($col, $columnsToIgnore)) {
@@ -249,7 +249,7 @@ class DBFit {
           die_error("Unexpected case encountered when removing redundant columns.");
         }
       }
-      if (preg_match("/\s*('[a-z\d_\.]*')\s*=\s*([a-z\d_\.]+)\s*/i", $constraint, $matches)) {
+      if (preg_match("/^\s*('[a-z\d_\.]*')\s*=\s*([a-z\d_\.]+)\s*$/i", $constraint, $matches)) {
         $col = $matches[2];
         if (!in_array($col, [$this->identifierColumnName, $outputColumnName])
           && !in_array($col, $columnsToIgnore)) {
@@ -453,11 +453,31 @@ class DBFit {
               case $this->getColumnTreatmentType($column) == "ForceSet":
 
                 /* TODO change explanation Append k values, one for each of the classes */
-                foreach ($attribute as $attr) {
-                  $classSet = $attr->getMetadata();
-                  // $val = intval($class == $raw_val);
-                  $val = intval(in_array($raw_val, $classSet));
-                  $attr_val[] = $val;
+                $transformer = $this->getColumnTreatmentArg($column, 1);
+                if ($transformer === NULL) {
+                  foreach ($attribute as $attr) {
+                    $classSet = $attr->getMetadata();
+                    // $val = intval($class == $raw_val);
+                    $val = intval(in_array($raw_val, $classSet));
+                    $attr_val[] = $val;
+                  }
+                } else {
+                  // $transformer = function ($x) { return [$x]; };
+                  $values = $transformer($raw_val);
+                  foreach ($attribute as $attr) {
+                    $classSet = $attr->getMetadata();
+                    // var_dump("classSet, values");
+                    // var_dump($classSet, $values);
+                    if ($values !== NULL) {
+                      // TODO check that this does the right thing. Maybe we want STRICT SETS?
+                      $val = intval(empty(array_diff($classSet, $values)));
+                    } else {
+                      $val = NULL;
+                    }
+                    // var_dump("val");
+                    // var_dump($val);
+                    $attr_val[] = $val;
+                  }
                 }
                 break;
                
@@ -769,17 +789,32 @@ class DBFit {
         /* Find unique values */
         $classes = [];
         $res = $this->SQLSelectColumns([$column], NULL, $recursionPath, NULL, true, true);
-        foreach ($res as $raw_row) {
-          $classes[] = $raw_row[$this->getColumnNickname($column)];
+        $transformer = $this->getColumnTreatmentArg($column, 1);
+        if ($transformer === NULL) {
+          foreach ($res as $raw_row) {
+            $classes[] = $raw_row[$this->getColumnNickname($column)];
+          }
+        } else {
+          // $transformer = function ($x) { return [$x]; };
+          foreach ($res as $raw_row) {
+            $values = $transformer($raw_row[$this->getColumnNickname($column)]);
+            if($values !== NULL) {
+              $classes = array_merge($classes, $values);
+            }
+          }
+          $classes = array_unique($classes);
         }
 
         if (!count($classes)) {
-          warn("Couldn't apply ForceSet (depth: $depth) " . $this->getColumnName($column) . ". No data instance found.");
+          warn("Couldn't apply ForceSet (depth: " . toString($depth) . ") to column " . $this->getColumnName($column) . ". No data instance found.");
           $attributes = NULL;
         }
         else {
-          if ($depth == -1) {
-            $depth = count($classes)-1;
+          if ($depth == NULL) {
+            $depth = 0;
+          }
+          else if ($depth == -1) {
+            $depth = count($classes) - 1;
           }
 
           $powerClasses = powerSet($classes, false, $depth+1);
@@ -787,6 +822,8 @@ class DBFit {
           // var_dump("powerClasses");
           // var_dump($powerClasses);
           $attributes = [];
+          // if (DEBUGMODE)
+          echo "Creating attributes for power domain: \n" . get_var_dump($powerClasses) . PHP_EOL;
 
           /* Create one attribute per set */
           foreach ($powerClasses as $classSet) {
@@ -826,7 +863,7 @@ class DBFit {
           case "BinaryBagOfWords":
 
             /* Generate binary attributes indicating the presence of each word */
-            $generateDictAttrs = function($dict) use ($attrName, &$column) {
+            $generateDictAttrs = function ($dict) use ($attrName, &$column) {
               $attributes = [];
               foreach ($dict as $word) {
                 $a = new DiscreteAttribute("'$word' in $attrName",
@@ -838,12 +875,13 @@ class DBFit {
             };
 
             /* The argument can be the dictionary size (k), or more directly the dictionary as an array of strings */
-            if (is_array($this->getColumnTreatmentArg($column, 0))) {
-              $dict = $this->getColumnTreatmentArg($column, 0);
+            $arg = $this->getColumnTreatmentArg($column, 0);
+            if (is_array($arg)) {
+              $dict = $arg;
               $attributes = $generateDictAttrs($dict);
             }
-            else if ( is_integer($this->getColumnTreatmentArg($column, 0))) {
-              $k = $this->getColumnTreatmentArg($column, 0);
+            else if ( is_integer($arg)) {
+              $k = $arg;
 
               /* Find $k most frequent words */
               $word_counts = [];
@@ -896,11 +934,14 @@ class DBFit {
                 }
                 $attributes = $generateDictAttrs($dict);
               }
-            }
-            else {
+            } else if ($arg === NULL) {
               die_error("Please specify a parameter (dictionary or dictionary size)"
                 . " for bag-of-words"
                 . " processing column '" . $this->getColumnName($column) . "'.");
+            } else {
+              die_error("Unknown type of parameter for bag-of-words"
+                . " (column '" . $this->getColumnName($column) . "'): "
+                . get_var_dump($arg) . ".");
             }
             break;
           default:
@@ -1219,12 +1260,12 @@ class DBFit {
   
 
   static function isEnumType(string $mysql_type) {
-    return preg_match("/enum.*/i", $mysql_type);
+    return preg_match("/^enum.*$/i", $mysql_type);
   }
 
   static function isTextType(string $mysql_type) {
-    return preg_match("/varchar.*/i", $mysql_type) ||
-           preg_match("/text.*/i", $mysql_type);
+    return preg_match("/^varchar.*$/i", $mysql_type) ||
+           preg_match("/^text.*$/i", $mysql_type);
   }
 
 
@@ -1255,7 +1296,7 @@ class DBFit {
           $this->setColumnTreatment($col, $this->defaultOptions["textTreatment"]);
         }
         else {
-          die_error("Please, specify a default treatment for text fields using ->setDefaultOption(\"textTreatment\", ...). For example, ->setDefaultOption(\"textTreatment\", [\"BinaryBagOfWords\", 10])");
+          die_error("A treatment for text fields is required. Please, specify one for column {$this->getColumnName($col)}, or set a default treatment for text fields using ->setDefaultOption(\"textTreatment\", ...). For example, ->setDefaultOption(\"textTreatment\", [\"BinaryBagOfWords\", 10])");
         }
         return $this->getColumnTreatment($col);
       }
@@ -1264,7 +1305,7 @@ class DBFit {
           $this->setColumnTreatment($col, $this->defaultOptions["dateTreatment"]);
         }
         else {
-          die_error("Please, specify a default treatment for date fields using ->setDefaultOption(\"dateTreatment\", ...). For example, ->setDefaultOption(\"dateTreatment\", \"DaysSince\")");
+          die_error("A treatment for date fields is required. Please, specify one for column {$this->getColumnName($col)}, or set a default treatment for date fields using ->setDefaultOption(\"dateTreatment\", ...). For example, ->setDefaultOption(\"dateTreatment\", \"DaysSince\")");
         }
         return $this->getColumnTreatment($col);
       }
@@ -1288,20 +1329,20 @@ class DBFit {
   }
 
   function setColumnTreatment(array &$col, $val) {
-    if ($val !== NULL)
+    if ($val !== NULL) {
       listify($val);
-    if ($val == ["ForceCategoricalBinary"]) {
-      $val = ["ForceSet", 0];
+
+      if ($val[0] == "ForceCategoricalBinary") {
+        $val = array_merge(["ForceSet", 0], array_slice($val, 1));
+      }
     }
-    else if ($val == ["ForceSet"]) {
-      $val = ["ForceSet", -1];
-    }
+
     $col["treatment"] = $val;
   }
-  function setColumnTreatmentArg(array &$col, int $j, $val) {
-    $j = ($j < 0 ? $j : 1+$j);
-    $this->getColumnTreatment($col)[$j] = $val;
-  }
+  // function setColumnTreatmentArg(array &$col, int $j, $val) {
+  //   $j = ($j < 0 ? $j : 1+$j);
+  //   $this->getColumnTreatment($col)[$j] = $val;
+  // }
   function getColumnAttrName(array &$col) {
     return $col["attrName"];
     // return !array_key_exists("attrName", $col) ?
@@ -1440,6 +1481,9 @@ class DBFit {
 
   function addInputColumn($col) : self
   {
+    // TODO put this check everywhere?
+    if(func_num_args()>count(get_defined_vars())) trigger_error(__FUNCTION__ . " was supplied more arguments than it needed. Got the following arguments:" . PHP_EOL . get_var_dump(func_get_args()), E_USER_WARNING);
+
     if (!count($this->inputTables)) {
       die_error("Must specify the concerning inputTables before the columns, through ->setInputTables() or ->addInputTable().");
     }
@@ -1617,14 +1661,23 @@ class DBFit {
 
     /* Find column */
         // TODO: CONVERT, CAST
+        // TODO Forse posso fare una query con limit 1 per vedere il tipo?
+    $columnName = $column["name"];
+    // TODO explain if null
+    if (preg_match("/^\s*IF\s*\([^,]*,\s*(.*)\s*,\s*NULL\s*\)\s*$/i", $column["name"], $matches)) {
+      $columnName = $matches[1];
+    }
+
     $mysql_type = NULL;
-    if (startsWith($column["name"], "CONCAT", false)) {
+    if (startsWith($columnName, "CONCAT", false)) {
       $mysql_type = "varchar";
     }
-    else if (startsWith($column["name"], "0+", false)) {
+    else if (startsWith($columnName, "0+", false)) {
       $mysql_type = "float";
     }
     else {
+      // TODO use prepare statement here and then mysql_select
+      //   https://www.php.net/manual/en/mysqli.prepare.php
       $sql = "SELECT * FROM `information_schema`.`columns` WHERE `table_name` IN "
             . mysql_set(array_map([$this, "getTableName"], $tables))
             . " AND (COLUMN_NAME = '" . $this->getColumnName($column) . "'"
@@ -1632,7 +1685,7 @@ class DBFit {
              . "')";
       $res = mysql_select($this->db, $sql, true);
       foreach ($res as $col) {
-        if (in_array($column["name"],
+        if (in_array($columnName,
             [$col["TABLE_NAME"].".".$col["COLUMN_NAME"], $col["COLUMN_NAME"]])) {
           $mysql_type = $col["COLUMN_TYPE"];
           break;
@@ -1642,7 +1695,7 @@ class DBFit {
 
     if ($mysql_type === NULL) {
       die_error("Couldn't retrieve information about column \""
-        . $column["name"] . "\"");
+        . $this->getColumnName($column) . "\"" . ($this->getColumnName($column) != $columnName ? " (-> \"$columnName\")" : "") . "." . PHP_EOL . "If it is an expression, please let me know the type. If it's a string, use CONCAT('', ...); if it's an integer, use 0+... .");
     }
     $column["mysql_type"] = $mysql_type;
   }

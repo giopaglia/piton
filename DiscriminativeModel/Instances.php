@@ -108,7 +108,7 @@ class Instances {
     array_unshift($attributes, $classAttr);
 
     /* Print the internal representation given the ARFF value read */
-    $getVal = function($ARFFVal, Attribute $attr)
+    $getVal = function ($ARFFVal, Attribute $attr)
     {
       $ARFFVal = trim($ARFFVal);
       if ($ARFFVal === "?") {
@@ -450,7 +450,7 @@ class Instances {
     }
     
     /* Print the ARFF representation of a value of the attribute */
-    $getARFFRepr = function($val, Attribute $attr)
+    $getARFFRepr = function ($val, Attribute $attr)
     {
       return $val === NULL ? "?" : $attr->reprVal($val);
     };

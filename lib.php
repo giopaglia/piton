@@ -172,6 +172,13 @@ function join_paths() {
     return join('/', $paths);
 }
 
+// # Source: https://www.php.net/manual/en/function.explode.php#111307
+// Use preg_split istead
+// function multiexplode(array $delimiters, string $string) : array {
+//   $ready = str_replace($delimiters, $delimiters[0], $string);
+//   return explode($delimiters[0], $ready);
+// }
+
 /*
  * This is a Python/Ruby style zip()
  *

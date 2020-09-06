@@ -430,13 +430,14 @@ class RuleBasedModel extends DiscriminativeModel {
       die_error("Query failed: $sql");
     $stmt->close();
 
-    $sql = "CREATE VIEW IF NOT EXISTS `" . self::$indexTableName . "_view` AS SELECT modelName, numRules, totN, trainN, testN, positives, negatives, TP, TN, FP, FN, accuracy, sensitivity, specificity, PPV, NPV  FROM `" . self::$indexTableName . "` ORDER BY `tableName` ASC";
-    $stmt = $db->prepare($sql);
-    if (!$stmt)
-      die_error("Incorrect SQL query: $sql");
-    if (!$stmt->execute())
-      die_error("Query failed: $sql");
-    $stmt->close();
+    // IF NOT EXISTS
+    // $sql = "CREATE VIEW `" . self::$indexTableName . "_view` AS SELECT modelName, numRules, totN, trainN, testN, positives, negatives, TP, TN, FP, FN, accuracy, sensitivity, specificity, PPV, NPV  FROM `" . self::$indexTableName . "` ORDER BY `tableName` ASC";
+    // $stmt = $db->prepare($sql);
+    // if (!$stmt)
+    //   die_error("Incorrect SQL query: $sql");
+    // if (!$stmt->execute())
+    //   die_error("Query failed: $sql");
+    // $stmt->close();
 
     // $globalIndicatorsStr = "";
     // $globalIndicatorsStr .= 

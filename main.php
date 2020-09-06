@@ -66,6 +66,7 @@ function testMed3() {
 
   // $db_fit->setLimit(20);
   // $db_fit->setLimit(100);
+  // $db_fit->setLimit(500);
   
   $db_fit->setWhereClauses(
     [
@@ -93,7 +94,7 @@ function testMed3() {
   $db_fit->addInputColumn("Anamnesi.TERAPIA_STATO");
   $db_fit->addInputColumn("Anamnesi.TERAPIA_ANNI_SOSPENSIONE");
   $db_fit->addInputColumn("Anamnesi.TERAPIA_OSTEOPROTETTIVA_ORMONALE");
-  $db_fit->addInputColumn("Anamnesi.TERAPIA_OSTEOPROTETTIVA_SPECIFICA");
+  $db_fit->addInputColumn(["Anamnesi.TERAPIA_OSTEOPROTETTIVA_SPECIFICA", "ForceCategorical"]);
   $db_fit->addInputColumn("Anamnesi.VITAMINA_D_TERAPIA_OSTEOPROTETTIVA");
   $db_fit->addInputColumn("Anamnesi.TERAPIA_ALTRO_CHECKBOX");
   // bmi
@@ -102,7 +103,7 @@ function testMed3() {
   // checkbox+value("Anamnesi.FRATTURA_VERTEBRE_CHECKBOX" "Anamnesi.FRATTURA_VERTEBRE")
   $db_fit->addInputColumn(["CONCAT('', IF(Anamnesi.FRATTURA_VERTEBRE_CHECKBOX, Anamnesi.FRATTURA_VERTEBRE, 'No'))", "ForceCategorical", "Anamnesi.N_FRATTURE_VERTEBRE"]);
   // fragility fractures in hip (one or more)
-  $db_fit->addInputColumn("CONCAT('', IFNULL(Anamnesi.FRATTURA_FEMORE, 0, Anamnesi.FRATTURA_FEMORE))", "ForceCategorical", "Anamnesi.N_FRATTURE_FEMORE");
+  $db_fit->addInputColumn(["CONCAT('', IF(ISNULL(Anamnesi.FRATTURA_FEMORE), 0, Anamnesi.FRATTURA_FEMORE))", "ForceCategorical", "Anamnesi.N_FRATTURE_FEMORE"]);
   // fragility fractures in other sites (one or more)
   $db_fit->addInputColumn("Anamnesi.FRATTURA_SITI_DIVERSI");
   // familiarity
@@ -113,21 +114,27 @@ function testMed3() {
   // current corticosteoroid use
   // checkbox+value("Anamnesi.USO_CORTISONE_CHECKBOX" "Anamnesi.USO_CORTISONE")
   $db_fit->addInputColumn(["CONCAT('', IF(Anamnesi.USO_CORTISONE_CHECKBOX, Anamnesi.USO_CORTISONE, 'No'))", "ForceCategorical", "Anamnesi.N_USO_CORTISONE"]);
-  // current illnesses (TODO tratta questi come insieme)
+  // current illnesses
   $db_fit->addInputColumn("Anamnesi.MALATTIE_ATTUALI_ARTRITE_REUM");
   $db_fit->addInputColumn("Anamnesi.MALATTIE_ATTUALI_ARTRITE_PSOR");
   $db_fit->addInputColumn("Anamnesi.MALATTIE_ATTUALI_LUPUS");
   $db_fit->addInputColumn("Anamnesi.MALATTIE_ATTUALI_SCLERODERMIA");
   $db_fit->addInputColumn("Anamnesi.MALATTIE_ATTUALI_ALTRE_CONNETTIVITI");
   // secondary causes
-  $db_fit->addInputColumn("Anamnesi.CAUSE_OSTEOPOROSI_SECONDARIA", [function ($input) {
-      $input... 
-      TODO 
-      SELECT DISTINCT CAUSE_OSTEOPOROSI_SECONDARIA FROM `Anamnesi`, ...]
-  });
+  $db_fit->addInputColumn(["Anamnesi.CAUSE_OSTEOPOROSI_SECONDARIA", ["ForceCategoricalBinary", function ($input) {
+      $input = trim($input);
+      if ($input == "NULL") {
+        $values = NULL;
+      } else {
+        $values = preg_split("/[\n\r]+/", $input);
+      }
+      // var_dump($values);
+      return $values;
+    }
+  ]]);
   // alcol abuse
   // checkbox+value("Anamnesi.ALCOL_CHECKBOX" "Anamnesi.ALCOL")
-  $db_fit->addInputColumn("CONCAT('', IF(Anamnesi.ALCOL_CHECKBOX, Anamnesi.ALCOL, 'No'))", "ForceCategorical", "Anamnesi.N_ALCOL");
+  $db_fit->addInputColumn(["CONCAT('', IF(Anamnesi.ALCOL_CHECKBOX, Anamnesi.ALCOL, 'No'))", "ForceCategorical", "Anamnesi.N_ALCOL"]);
   // clinical information (20 fields)PATOLOGIE_UTERINE_CHECKBOX
   $db_fit->addInputColumn("Anamnesi.NEOPLASIA_CHECKBOX");
   $db_fit->addInputColumn("Anamnesi.SINTOMI_VASOMOTORI");
@@ -158,10 +165,10 @@ function testMed3() {
   $db_fit->addInputColumn("Anamnesi.FEMORE_Z_SCORE");
   // spine (normal, osteopenic, osteoporotic)
   // checkbox+value("Diagnosi.SITUAZIONE_COLONNA_CHECKBOX" "Diagnosi.SITUAZIONE_COLONNA")
-  $db_fit->addInputColumn(["CONCAT('', IF(Diagnosi.SITUAZIONE_COLONNA_CHECKBOX, Diagnosi.SITUAZIONE_COLONNA, 'Normale'))", "ForceCategorical", "Diagnosi.N_SITUAZIONE_COLONNA"]
+  $db_fit->addInputColumn(["CONCAT('', IF(Diagnosi.SITUAZIONE_COLONNA_CHECKBOX, Diagnosi.SITUAZIONE_COLONNA, 'Normale'))", "ForceCategorical", "Diagnosi.N_SITUAZIONE_COLONNA"]);
   // hip (normal, osteopenic, osteoporotic)
   // merge(checkbox+value(Diagnosi.SITUAZIONE_FEMORE_SN...),checkbox+value(SITUAZIONE_FEMORE_DX...))
-  $db_fit->addInputColumn(["IF(Diagnosi.SITUAZIONE_FEMORE_SN_CHECKBOX, Diagnosi.SITUAZIONE_FEMORE_SN, IF(Diagnosi.SITUAZIONE_FEMORE_DX_CHECKBOX, Diagnosi.SITUAZIONE_FEMORE_DX, 'Normale'))", NULL, "Diagnosi.SITUAZIONE_FEMORE"]);
+  $db_fit->addInputColumn(["CONCAT('', IF(Diagnosi.SITUAZIONE_FEMORE_SN_CHECKBOX, Diagnosi.SITUAZIONE_FEMORE_SN, IF(Diagnosi.SITUAZIONE_FEMORE_DX_CHECKBOX, Diagnosi.SITUAZIONE_FEMORE_DX, 'Normale')))", "ForceCategorical", "Diagnosi.SITUAZIONE_FEMORE"]);
   
   $db_fit->addInputColumn("Diagnosi.OSTEOPOROSI_GRAVE");
   $db_fit->addInputColumn("Diagnosi.COLONNA_NON_ANALIZZABILE");
@@ -262,7 +269,7 @@ function testMed2() {
   // , "ForceCategoricalBinary"
   );
   $lr = new PRip();
-  // $lr->setNumOptimizations(10); TODO
+  // $lr->setNumOptimizations(10);
   $lr->setNumOptimizations(3);
   $db_fit->setLearner($lr);
   $db_fit->test_all_capabilities();
@@ -461,7 +468,7 @@ function testMed() {
      ,"ForceCategoricalBinary"
   );
   $lr = new PRip();
-  // $lr->setNumOptimizations(10); TODO
+  // $lr->setNumOptimizations(10);
   $lr->setNumOptimizations(3);
   $db_fit->setLearner($lr);
   $db_fit->test_all_capabilities();
