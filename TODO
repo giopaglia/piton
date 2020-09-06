@@ -1,84 +1,80 @@
+DROP TABLE `phptest`.`models__index`
 
-- supporto, confidenza, poi derivi la bonta' (Relevance and reliability thresholds). TODO Domanda: perche' ogni regola va valutata (supporto e confidence) contro l'intero set di istanze di testing, dimenticandosi dell'ordine delle regole? TODO use non-weighted counterparts?
-Crea mappa di valori:
-	In PrincipiAttivi trova
-	ormone sost
-		tutti e quattro
-	osteoprotettiva
-		ignoriamo posologia
-		alendronato unico
-	vitamina d terapia e supplementazione
-		distingui principioattivo+quantita'
-	CALCIO?
-
-TODO
-	SELECT * FROM `PrincipiAttivi` ORDER BY `PrincipiAttivi`.`ID` ASC
-
-	ID   	NOME	FORMATO	QUANTITA	
-	1	Calcio carbonato	NULL	600 mg	
-	2	Calcio carbonato	NULL	1000 mg	
-	3	Calcio citrato	NULL	500 mg	
-	4	Calcio citrato	NULL	1000 mg	
-	5	Tibolone	NULL	2.5 mg	
-	6	Risedronato	Compresse	75 mg	
-	7	Alendronato	Compresse	70 mg	
-	8	Alendronato	Compresse effervescenti	70 mg	
-	9	Ibandronato	Compresse	150 mg	
-	10	Risedronato	Compresse	35 mg	
-	11	Calcifediolo	Capsule molli	0.266 mg	
-	12	Calcifediolo	Gocce	NULL	
-	13	Colecalciferolo	Flacone	25000 UI	
-	14	Colecalciferolo	Flacone monodose	50000 UI	
-	15	Colecalciferolo	Flacone monodose	25000 UI	
-	16	Colecalciferolo	Gocce	10000 UI	
-	17	Estradiolo + Drospirenone	NULL	1 mg / 2 mg	
-	18	Estrogeni coniugati equini + Bazedoxifene	NULL	0.4 mg / 20 mg	
-	19	Terapia ormonale sostitutiva	NULL	NULL	
-	20	Raloxifene	Compresse	60 mg	
-	21	Bazedoxifene	Compresse	20 mg	
-	22	Teriparatide	Soluzione iniettabile sotto cute	20 mcg	
-	23	Denosumab	Soluzione iniettabile sotto cute	NULL	
-	24	Zoledronato	NULL	5 mg	
-	25	Clodronato	Fiale	200 mg	
-
-	SELECT DISTINCT CONCAT(PrincipiAttivi.NOME, ' ', COALESCE(PrincipiAttivi.QUANTITA,'')) AS PRINCIPIO FROM Anamnesi INNER JOIN Referti ON Anamnesi.ID_REFERTO = Referti.ID INNER JOIN Diagnosi ON Diagnosi.ID_REFERTO = Referti.ID INNER JOIN RaccomandazioniTerapeutiche ON RaccomandazioniTerapeutiche.ID_REFERTO = Referti.ID INNER JOIN Pazienti ON Pazienti.ID = Referti.ID_PAZIENTE INNER JOIN Densitometrie ON Densitometrie.ID_REFERTO = Referti.ID INNER JOIN RaccomandazioniTerapeuticheUnitarie ON RaccomandazioniTerapeuticheUnitarie.ID_RACCOMANDAZIONE_TERAPEUTICA = RaccomandazioniTerapeutiche.ID INNER JOIN ElementiTerapici ON ElementiTerapici.ID_RACCOMANDAZIONE_TERAPEUTICA_UNITARIA = RaccomandazioniTerapeuticheUnitarie.ID INNER JOIN PrincipiAttivi ON ElementiTerapici.ID_PRINCIPIO_ATTIVO = PrincipiAttivi.ID WHERE Referti.DATA_REFERTO BETWEEN '2018-07-18' AND '2020-08-31' AND RaccomandazioniTerapeuticheUnitarie.TIPO != 'Indagini approfondimento' 
-
-PRINCIPIO 	
-Teriparatide 20 mcg
-Colecalciferolo 10000 UI
-Calcio carbonato 600 mg
-Risedronato 75 mg
-Calcio citrato 500 mg
-Calcifediolo 0.266 mg
-Clodronato 200 mg
-Denosumab NULL
-Alendronato 70 mg
-Colecalciferolo 25000 UI
-Colecalciferolo 50000 UI
-Zoledronato 5 mg
-Ibandronato 150 mg
-Estradiolo + Drospirenone 1 mg / 2 mg
-Estrogeni coniugati equini + Bazedoxifene 0.4 mg /...
-Risedronato 35 mg
-Tibolone 2.5 mg
-Bazedoxifene 20 mg
-Terapia ormonale sostitutiva NULL
-Raloxifene 60 mg
-
-- assicurarsi che il numero di istanze sia giusto (stampa sqls)
-
-// TODO figure out, note: since the four root problems are independent, we use  splits that can be different (due to randomization)
 DO RANDOMIZE!
 
+- Dicevi che il trattamento come insieme avviene solo per le colonne in entrata, giusto? Soprattutto per le terapie precedenti. Ho impostato e testato la cosa, poi vediamo se
+
+? current illnesses
+   ? secondary causes (ho trovato Anamnesi.CAUSE_OSTEOPOROSI_SECONDARIA_CHECKBOX e Anamnesi.CAUSE_OSTEOPOROSI_SECONDARIA, ma il secondo e' un campo di testo, mentre nel paper hai scritto che il trattamento sara' B, e cioe' come insieme.
+i
+Allora. Dal punto di vista concettuale sono entrambi insiemi. Dal punto di vista pratico, allo stato attuale, no, e questo va cambiato. Ai fini dell'esperimento, dobbiamo fare le cose come le abbiamo. Quindi:
+
+current illnesses: sono i campi da malattie_attuali_checkbox a malattie_attuali_altre_connettiviti, che sono tutti binari. Vanno trasformati in un solo campo insieme che contiene l'insieme delle malattie attuali tra quelle listate, o insieme vuoto se checkbox è negativo.
+secondary causes: sono i due campi causa_osteoporosi_checkbox e causa_osteoporosi secondaria. Se il primo è negativo, insieme vuoto, senno, l'insieme contenuto nel secondo; sembra campo testo, ma non è, perchè sono presi da menu a tendina.Ecco perchè ho detto che sono entrambi insiemi.
+
+Non so se gli altri che hai messo sono da spiegare oppure no. 
+
+terapia ormonale con secondo livello
+terapia osteoprotettiva con secondo livello
+le altre no.
+
+
+Segui cose su dropbox, quella cosa del testo e newlines
+
+? "Pazienti.SESSO = 'F'"
+
+FRATTURA_FEMORE dovrebbe essere un checkbox+value, ma non esiste il relativo campo checkbox. Secondo te in Anamnesi.FRATTURA_FEMORE, i NULL equivalgono in realta' a una nuova classe "0"?
+	SELECT DISTINCT FRATTURA_FEMORE FROM `Anamnesi` 
+FRATTURA_SITI_DIVERSI_ALTRO, trasformare in binario. e' un campo di testo, faccio binary bag of words.
+	SELECT DISTINCT FRATTURA_SITI_DIVERSI,FRATTURA_SITI_DIVERSI_ALTRO FROM `Anamnesi` 
+Diagnosi.SITUAZIONE_FEMORE_SN_CHECKBOX, Diagnosi.SITUAZIONE_FEMORE_DX_CHECKBOX: ho trovato un referto dove entrambi i femori sono 1. E 20 dove nessun femore e' 1! Che facciamo?
+	SELECT *, Diagnosi.SITUAZIONE_FEMORE_SN_CHECKBOX, Diagnosi.SITUAZIONE_FEMORE_SN, Diagnosi.SITUAZIONE_FEMORE_DX_CHECKBOX, Diagnosi.SITUAZIONE_FEMORE_DX, IF(Diagnosi.SITUAZIONE_FEMORE_SN_CHECKBOX, Diagnosi.SITUAZIONE_FEMORE_SN, IF(Diagnosi.SITUAZIONE_FEMORE_DX_CHECKBOX, Diagnosi.SITUAZIONE_FEMORE_DX, 'Normale')) FROM `Diagnosi` WHERE ISNULL(SITUAZIONE_FEMORE_SN) AND ISNULl(SITUAZIONE_FEMORE_DX) 
+
+cosa e' COLONNA_PARZ_NON_ANALIZZABILE?
+
+Diagnosi.FRAX_APPLICABILE fa diventare il frax NULL ?
+
+Per il DEFRAX: problema ci sono 135 diagnosi con defra non applicabile ma valore defra non nullo
+SELECT COUNT(*),
+FRAX_AGGIUSTATO_APPLICABILE,
+FRAX_AGGIUSTATO_PERCENTUALE,
+FRAX_FRATTURE_MAGGIORI_AGGIUSTATO_VALORE,
+FRAX_COLLO_FEMORE_AGGIUSTATO_PERCENTUALE,
+FRAX_COLLO_FEMORE_AGGIUSTATO_VALORE
+IF(Diagnosi.FRAX_AGGIUSTATO_APPLICABILE,0+IF(Diagnosi.FRAX_AGGIUSTATO_PERCENTUALE, 0, FRAX_FRATTURE_MAGGIORI_AGGIUSTATO_VALORE),NULL)
+IF(Diagnosi.FRAX_AGGIUSTATO_APPLICABILE,0+IF(Diagnosi.FRAX_COLLO_FEMORE_AGGIUSTATO_PERCENTUALE, 0, FRAX_COLLO_FEMORE_AGGIUSTATO_VALORE),NULL)
+
+FROM `Diagnosi` GROUP BY
+FRAX_AGGIUSTATO_APPLICABILE,
+FRAX_AGGIUSTATO_PERCENTUALE,
+FRAX_FRATTURE_MAGGIORI_AGGIUSTATO_VALORE,
+FRAX_COLLO_FEMORE_AGGIUSTATO_PERCENTUALE,
+FRAX_COLLO_FEMORE_AGGIUSTATO_VALORE
+IF(Diagnosi.FRAX_AGGIUSTATO_APPLICABILE,0+IF(Diagnosi.FRAX_AGGIUSTATO_PERCENTUALE, 0, FRAX_FRATTURE_MAGGIORI_AGGIUSTATO_VALORE),NULL)
+IF(Diagnosi.FRAX_AGGIUSTATO_APPLICABILE,0+IF(Diagnosi.FRAX_COLLO_FEMORE_AGGIUSTATO_PERCENTUALE, 0, FRAX_COLLO_FEMORE_AGGIUSTATO_VALORE),NULL)
+
+#####################################################
+
+- inputColumns ?
+	? current illnesses
+	? secondary causes
+	, "Anamnesi.CAUSE_OSTEOPOROSI_SECONDARIA_CHECKBOX" //(ForceSet?)
+	// , "Anamnesi.CAUSE_OSTEOPOROSI_SECONDARIA" text (ForceSet?)
+	// ?  ForceSet previous/current hormonal therapy
+	// ?  ForceSet previous/current osteoprotective therapy
+	// ?  ForceSet previous/current vitamin D supplementation
+	// ? clinical information (20 fields)
+  ForceSet (terapie vecchie sono set-wise, terapie nuove boolean)
+
+// TODO figure out, note: since the four root problems are independent, we use  splits that can be different (due to randomization)
+
+
+- supporto, confidenza, poi derivi la bonta' (Relevance and reliability thresholds). TODO Domanda: perche' ogni regola va valutata (supporto e confidence) contro l'intero set di istanze di testing, dimenticandosi dell'ordine delle regole? TODO use non-weighted counterparts?
+
+#####################################################
 
 - solve the prediction on one-column-more-attributes.
-		then maybe hardcode in the sql that a given column must have that value, at prediction time?
-
-- ForceSet
-- ForceCategoricalSet
-
-terapie vecchie sono set-wise 
-terapie nuove boolean
+	then maybe hardcode in the sql that a given column must have that value, at prediction time?
 
 - provide method for creating arbitrary attributes:
 - provide method for creating column categorical from a checkbox+value pair of attrs, with reverse=false flag:
@@ -88,7 +84,6 @@ terapie nuove boolean
 - map
 - merge di due o piu colonne in un solo attributo (situazione_femore_sn,dx), in piu' forza categorico (left and right hip)
 
-#####################################################3
 
 - TODO don't recurse when the outcome is false... NO_thing is not entirely safe
 TODO: at prediction time just interrogate the database once and then use that same row for every level

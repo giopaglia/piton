@@ -206,12 +206,16 @@ class Instances {
    * Remove instances with missing values for the output column
    */
   function removeUselessInsts() {
+    if (DEBUGMODE) $c = 0;
     for ($x = $this->numInstances() - 1; $x >= 0; $x--) {
       if ($this->inst_classValue($x) === NULL) {
         $this->sumOfWeights -= $this->inst_weight($x);
         array_splice($this->data, $x, 1);
+        if (DEBUGMODE) $c++;
       }
     }
+    if (DEBUGMODE && $c)
+      echo "Removed $c useless instances" . PHP_EOL;
   }
 
   function reindexAttributes() {
@@ -504,7 +508,7 @@ class Instances {
     $atts_str = [];
     foreach ($this->getAttributes() as $i => $att) {
       // $atts_str[] = substr($att->toString(), 0, 7);
-      $atts_str[] = "[$i]:" . $att->toString();
+      $atts_str[] = "[$i]:" . $att->toString(false) . PHP_EOL;
     }
     if ($short) {
       $out_str .= "Instances{{$this->numInstances()} instances; "
@@ -512,7 +516,7 @@ class Instances {
     } else {
       $out_str .= "\n";
       $out_str .= "Instances{{$this->numInstances()} instances; "
-        . ($this->numAttributes()-1) . "+1 attributes [" . join(";", $atts_str) . "]}";
+        . ($this->numAttributes()-1) . "+1 attributes [" . PHP_EOL . join(";", $atts_str) . "]}";
       $out_str .= "\n";
       $out_str .= str_repeat("======|=", $this->numAttributes()+1) . "|\n";
       $out_str .= "";

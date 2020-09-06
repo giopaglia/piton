@@ -2,8 +2,8 @@
 
 define("PACKAGE_NAME", "DBFit");
 define("MODELS_FOLDER", "models");
-// define("DEBUGMODE", false);
-define("DEBUGMODE", 1);
+define("DEBUGMODE", false);
+// define("DEBUGMODE", 1);
 
 /* Library of generic utils */
 
@@ -106,6 +106,13 @@ function listify(&$v) { // TODO , $depth = 1
   }
 }
 
+function is_array_of_strings($arr) {
+  if (!is_array($arr)) return false;
+  foreach ($arr as $v)
+    if (!is_string($v))
+      return false;
+  return true;
+}
 function clone_object(object $o) {return clone $o;}
 
 # Source: https://www.php.net/manual/en/function.array-diff.php#110572
@@ -286,8 +293,8 @@ function prefixisify(&$string, $prefix) {
     $string = $prefix . $string;
   }
 }
-function startsWith($haystack, $needle) { return $needle === "" || strrpos($haystack, $needle, -strlen($haystack)) !== false; }
-function endsWith($haystack, $needle)   { return $needle === "" || (($temp = strlen($haystack) - strlen($needle)) >= 0 && strpos($haystack, $needle, $temp) !== false); }
+function startsWith($haystack, $needle, $caseSensitive = true) { return $needle === "" ||  ($caseSensitive ? (strrpos($haystack, $needle, -strlen($haystack)) !== false) : (strripos($haystack, $needle, -strlen($haystack)) !== false)); }
+function endsWith($haystack, $needle, $caseSensitive = true)   { return $needle === "" || (($temp = strlen($haystack) - strlen($needle)) >= 0 && ($caseSensitive ? (strpos($haystack, $needle, $temp) !== false) : (stripos($haystack, $needle, $temp) !== false))); }
 function safePrefix($haystack, $needle) { return (startsWith($haystack, $needle) ? $haystack : $needle . $haystack); }
 function safeSuffix($haystack, $needle) { return (endsWith($haystack, $needle)   ? $haystack : $haystack . $needle); }
 ?>

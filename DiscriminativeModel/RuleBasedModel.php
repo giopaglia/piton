@@ -9,7 +9,7 @@ include "RuleStats.php";
  */
 abstract class DiscriminativeModel {
 
-  static $prefix = "models__";
+  static $prefix = "models__m";
   static $indexTableName = "models__index";
 
   abstract function fit(Instances &$data, Learner &$learner);
@@ -158,10 +158,7 @@ class RuleBasedModel extends DiscriminativeModel {
         if ($rule->covers($testData, $x)) {
           if (DEBUGMODE > 1) echo $r;
           $idx = $rule->getConsequent();
-          if ($returnClassIndices)
-            $predictions[] = $classAttr->reprVal($idx);
-          else
-            $predictions[] = $idx;
+          $predictions[] = ($returnClassIndices ? $idx : $classAttr->reprVal($idx));
           break;
         }
       }
@@ -407,9 +404,10 @@ class RuleBasedModel extends DiscriminativeModel {
     //   die_error("Query failed: $sql");
     // $stmt->close();
 
-
     $sql = "CREATE TABLE IF NOT EXISTS `" . self::$indexTableName . "`";
     $sql .= " (ID INT AUTO_INCREMENT PRIMARY KEY, date DATETIME NOT NULL, modelName TEXT NOT NULL, tableName TEXT NOT NULL, classId INT NOT NULL, className TEXT NOT NULL";
+    $sql .= ", numRules INT DEFAULT NULL";
+    $sql .= ", totN FLOAT DEFAULT NULL";
     $sql .= ", trainN FLOAT DEFAULT NULL";
     $sql .= ", testN FLOAT DEFAULT NULL";
     $sql .= ", positives FLOAT DEFAULT NULL";
@@ -432,6 +430,14 @@ class RuleBasedModel extends DiscriminativeModel {
       die_error("Query failed: $sql");
     $stmt->close();
 
+    $sql = "CREATE VIEW IF NOT EXISTS `" . self::$indexTableName . "_view` AS SELECT modelName, numRules, totN, trainN, testN, positives, negatives, TP, TN, FP, FN, accuracy, sensitivity, specificity, PPV, NPV  FROM `" . self::$indexTableName . "` ORDER BY `tableName` ASC";
+    $stmt = $db->prepare($sql);
+    if (!$stmt)
+      die_error("Incorrect SQL query: $sql");
+    if (!$stmt->execute())
+      die_error("Query failed: $sql");
+    $stmt->close();
+
     // $globalIndicatorsStr = "";
     // $globalIndicatorsStr .= 
     // $globalIndicatorsStr .= 
@@ -447,7 +453,10 @@ class RuleBasedModel extends DiscriminativeModel {
     // 
 
     $sql = "INSERT INTO `" . self::$indexTableName . "`";
-    $sql .= " (date, modelName, tableName, classId, className";
+    $sql .= " (date, modelName, tableName, classId, className, numRules";
+    if ($trainData !== NULL && $testData !== NULL) {
+      $sql .= ", totN";
+    }
     if ($trainData !== NULL) {
       $sql .= ", trainN";
     }
@@ -473,6 +482,10 @@ class RuleBasedModel extends DiscriminativeModel {
       if ($testData !== NULL) {
         if (isset($measures[$classId])) {
           $valueSql = "'" . date('Y-m-d H:i:s') . "', '$modelName', '$tableName', $classId, '$className'";
+          $valueSql .= ", " . strval(count($this->getRules()));
+          if ($trainData !== NULL && $testData !== NULL) {
+            $valueSql .= ", " . strval($trainData->numInstances()+$testData->numInstances());
+          }
           if ($trainData !== NULL) {
             $valueSql .= ", " . strval($trainData->numInstances());
           }
@@ -483,6 +496,8 @@ class RuleBasedModel extends DiscriminativeModel {
           $valuesSql[] = $valueSql;
           if (DEBUGMODE > -1) {
             echo "    '$className', ($classId): " . PHP_EOL;
+            if ($trainData !== NULL && $testData !== NULL)
+              echo "    totN: " . ($trainData->numInstances()+$testData->numInstances()) . PHP_EOL;
             if ($trainData !== NULL)
               echo "    trainN: {$trainData->numInstances()}" . PHP_EOL;
             if ($testData !== NULL)
@@ -585,20 +600,29 @@ class RuleBasedModel extends DiscriminativeModel {
 
   /* Print a textual representation of the rule */
   function __toString () : string {
+    $rules = $this->getRules();
+    $attrs = $this->getAttributes();
     $out_str = "    ";
-    $out_str .= "RuleBasedModel with rules & attributes: " . PHP_EOL . "    ";
-    foreach ($this->getRules() as $x => $rule) {
+    $out_str .= "RuleBasedModel with "
+              . count($rules) . " rules & "
+              . count($attrs) . " attributes: " . PHP_EOL . "    ";
+    foreach ($rules as $x => $rule) {
       $out_str .= "R" . $x . ": " . $rule->toString() . PHP_EOL . "    ";
     }
     // foreach ($this->getAttributes() as $x => $attr) {
     //   $out_str .= $x . ": " . $attr->toString() . PHP_EOL . "    ";
     // }
-    $attrs = $this->getAttributes();
+    if (count($attrs)) {
     $x = 0;               $out_str .= "A" . $x . ": " . $attrs[$x]->toString(false) . PHP_EOL . "    ";
-    $x = 1;               $out_str .= "A" . $x . ": " . $attrs[$x]->toString() . PHP_EOL . "    ";
-    $x = 2;               $out_str .= "A" . $x . ": " . $attrs[$x]->toString() . PHP_EOL . "    ";
+      if (count($attrs)>2) {
+    $x = 1;               $out_str .= "A" . $x . ": " . $attrs[$x]->toString(false) . PHP_EOL . "    ";
+    } if (count($attrs)>3) {
+    $x = 2;               $out_str .= "A" . $x . ": " . $attrs[$x]->toString(false) . PHP_EOL . "    ";
+    } if (count($attrs)>4) {
                           $out_str .= "..." . PHP_EOL . "    ";
-    $x = count($attrs)-1; $out_str .= "A" . $x . ": " . $attrs[$x]->toString() . PHP_EOL . "    ";
+    }
+    $x = count($attrs)-1; $out_str .= "A" . $x . ": " . $attrs[$x]->toString(false) . PHP_EOL . "    ";
+    }
     return $out_str;
   }
 }

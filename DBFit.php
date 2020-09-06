@@ -418,13 +418,32 @@ class DBFit {
           // var_dump($i_col);
           // var_dump($raw_row);
           // var_dump($this->getColumnTreatmentType($column));
-          $raw_val = $raw_row[$this->getColNickname($this->getColumnName($column))];
+          $raw_val = $raw_row[$this->getColumnNickname($column)];
           // var_dump($raw_val);
 
           if ($raw_val === NULL) {
-            // Empty column -> empty vals for all the column's attributes
-            foreach ($attribute as $attr) {
-              $attr_val[] = NULL;
+            // Avoid NULL values for the output column.
+            // For example, a NULL value may also be due to a LEFT JOIN
+            if ($i_col === 0) {
+              // TODO bring back this error notice. Only valid when some join is not an inner join
+              // if ... die_error("About to push NULL values for output attribute. " . PHP_EOL . join(PHP_EOL . ",", array_map("toString", $attribute)));
+              
+              foreach ($attribute as $attr) {
+                if ($attr->getType() == "bool") {
+                  $attr_val[] = intval(0);
+                }
+                else {
+                  die_error("Found a NULL value for the output column " . $this->getColumnName($column)
+                  . " ($i_col) , but failed to translate it into a value for attribute of type '{$attr->getType()}': $attr. "
+                  . "Is this value given by OUTER JOIN operations?"
+                  );
+                }
+              }
+            } else {
+              // Empty column -> empty vals for all the column's attributes
+              foreach ($attribute as $attr) {
+                $attr_val[] = NULL;
+              }
             }
           }
           else {
@@ -466,7 +485,7 @@ class DBFit {
                 /* For categorical attributes, use the class index as value */
                 if ($attribute instanceof DiscreteAttribute) {
                   if (is_bool($raw_val)) {
-                    // does this happen?
+                    // does this ever happen?
                     $raw_val = intval($raw_val);
                   }
                   $val = $attribute->getKey($raw_val);
@@ -475,6 +494,8 @@ class DBFit {
                     if (in_array($this->getColumnTreatmentType($column), ["ForceCategorical"])) {
                       $attribute->pushDomainVal($raw_val);
                       $val = $attribute->getKey($raw_val);
+                      // var_dump("ciaobel");
+                      // var_dump($raw_val);
                     }
                     else {
                       die_error("Something's off. Couldn't find element in domain of attribute {$attribute->getName()}: " . get_var_dump($raw_val));
@@ -607,24 +628,21 @@ class DBFit {
     $cols_str = [];
 
     if ($outputColumn != NULL) {
-      $name = $this->getColumnName($outputColumn);
       if ($idVal !== NULL) {
-        $cols_str[] = "NULL AS " . $this->getColNickname($name);
+        $cols_str[] = "NULL AS " . $this->getColumnNickname($outputColumn);
       }
       else {
-        $cols_str[] = $name . " AS " . $this->getColNickname($name);
+        $cols_str[] = $this->getColumnName($outputColumn) . " AS " . $this->getColumnNickname($outputColumn);
       }
     }
 
     foreach ($columns as $col) {
-      $name = $this->getColumnName($col);
-      $cols_str[] = $name . " AS " . $this->getColNickname($name);
+      $cols_str[] = $this->getColumnName($col) . " AS " . $this->getColumnNickname($col);
     }
 
     /* Add identifier column */
     if ($this->identifierColumnName !== NULL && !$distinct) {
-      $name = $this->identifierColumnName;
-      $cols_str[] = $name . " AS " . $this->getColNickname($name);
+      $cols_str[] = $this->identifierColumnName . " AS " . $this->getColNickname($this->identifierColumnName);
     }
 
     $sql .= "SELECT " . ($distinct ? "DISTINCT " : "") . mysql_list($cols_str, "noop");
@@ -657,10 +675,17 @@ class DBFit {
     /* WHERE */
     $whereClauses = $this->getSQLWhereClauses($idVal, $recursionPath);
 
+    if ($distinct) {
+      if (count($columns) > 1) {
+        die_error("Unexpected case: are you sure you want to ask for distinct rows with more than one field?" . PHP_EOL . $sql);
+      }
+      $whereClauses[] = "!ISNULL(" . $this->getColumnName($columns[0]) . ")";
+    }
+
     if (count($whereClauses)) {
       $sql .= " WHERE " . join(" AND ", $whereClauses);
     }
-
+    
     /* LIMIT */
     if ($idVal === NULL && $this->limit !== NULL) {
       $sql .= " LIMIT {$this->limit}";
@@ -675,8 +700,8 @@ class DBFit {
       since PHP MySQL connections do not allow to access result fields
       using this notation. Therefore, each column is aliased to table_DOT_column */
   function getColNickname($colName) {
-    if (strstr($colName, '(') === false) {
-      return str_replace(".", "_DOT_", $colName);
+    if (strstr($colName, "(") === false) {
+      return str_replace(".", "_", $colName);
     }
     else {
       return "X" . md5($colName);
@@ -689,6 +714,7 @@ class DBFit {
     foreach ($this->inputTables as $table) {
       $constraints = array_merge($constraints, $this->getTableJoinClauses($table));
     }
+    // TODO add those for the outputColumns, same as in getSQL... ?
     return $constraints;
   }
 
@@ -711,7 +737,10 @@ class DBFit {
       $whereClauses[] = $this->identifierColumnName . " = $idVal";
     }
     else {
-      $whereClauses = array_merge($whereClauses, $this->whereClauses[1]);
+      // Append where clauses for the current hierarchy level
+      if (isset($this->whereClauses[1+count($recursionPath)])) {
+        $whereClauses = array_merge($whereClauses, $this->whereClauses[1+count($recursionPath)]);
+      }
       $outAttrs = $this->getOutputColumnNames();
       foreach ($recursionPath as $recursionLevel => $node) {
         // $this->getOutputColumnAttributes()[$recursionLevel][$node[0]]->getName();
@@ -741,7 +770,7 @@ class DBFit {
         $classes = [];
         $res = $this->SQLSelectColumns([$column], NULL, $recursionPath, NULL, true, true);
         foreach ($res as $raw_row) {
-          $classes[] = $raw_row[$this->getColNickname($this->getColumnName($column))];
+          $classes[] = $raw_row[$this->getColumnNickname($column)];
         }
 
         if (!count($classes)) {
@@ -754,8 +783,9 @@ class DBFit {
           }
 
           $powerClasses = powerSet($classes, false, $depth+1);
-          var_dump("powerClasses");
-          var_dump($powerClasses);
+          // TODO check
+          // var_dump("powerClasses");
+          // var_dump($powerClasses);
           $attributes = [];
 
           /* Create one attribute per set */
@@ -827,7 +857,7 @@ class DBFit {
                 $this->stop_words[$lang] = explode("\n", file_get_contents($lang . "-stopwords.txt"));
               }
               foreach ($res as $raw_row) {
-                $text = $raw_row[$this->getColNickname($this->getColumnName($column))];
+                $text = $raw_row[$this->getColumnNickname($column)];
                 
                 if ($text !== NULL) {
                   $words = $this->text2words($text, $lang);
@@ -939,8 +969,8 @@ class DBFit {
       /* Obtain and train, test set */
       list($trainData, $testData) = $this->getDataSplit($data);
       
-      echo "TRAIN" . PHP_EOL . $trainData->toString(DEBUGMODE < 0) . PHP_EOL;
-      echo "TEST" . PHP_EOL . $testData->toString(DEBUGMODE < 0) . PHP_EOL;
+      echo "TRAIN" . PHP_EOL . $trainData->toString(DEBUGMODE <= 0) . PHP_EOL;
+      echo "TEST" . PHP_EOL . $testData->toString(DEBUGMODE <= 0) . PHP_EOL;
       
       /* Train */
       $model_name = $this->getModelName($recursionPath, $i_prob);
@@ -980,10 +1010,13 @@ class DBFit {
             . count($outputAttributes) . ")) "
           . " with domain " . toString($outputAttribute->getDomain())
           . ". " . PHP_EOL;
-        foreach ($outputAttribute->getDomain() as $classValue) {
-          echo "Recursion on classValue $classValue for attribute \""
+        foreach ($outputAttribute->getDomain() as $className) {
+          echo "Recursion on className $className for attribute \""
           . $outputAttribute->getName() . "\". " . PHP_EOL;
-          $this->updateModel(array_merge($recursionPath, [[$i_prob, $classValue]]));
+          // TODO right now I'm not recurring when a "NO_" outcome happens. This is not supersafe, there must be a nice generalization.
+          if (!startsWith($className, "NO_")) {
+            $this->updateModel(array_merge($recursionPath, [[$i_prob, $className]]));
+          }
         }
       }
     }
@@ -1021,8 +1054,8 @@ class DBFit {
     // // var_dump($this->inputColumns);
     // foreach($this->inputColumns as $column) 
     //   var_dump($this->getColumnAttributes($column...));
-    //   var_dump($this->getColNickname($this->getColumnName($column)));
-    //   $raw_val = $raw_row[$this->getColNickname($this->getColumnName($column))];
+    //   var_dump($this->getColumnNickname($column));
+    //   $raw_val = $raw_row[$this->getColumnNickname($column)];
     //   var_dump($raw_val);
     // }
 
@@ -1116,13 +1149,17 @@ class DBFit {
       // var_dump($model->getAttributes());
       
       /* Perform local prediction */
-      $predictedVal = $model->predict($data);
+      $predictedVal = $model->predict($data, true);
       $predictedVal = $predictedVal[0];
       echo "predicted value: \"$predictedVal\"" . PHP_EOL;
 
       /* Recursive step: recurse and predict the subtree of this predicted value */
-      $predictions[] = [[$outputAttributes[$i_prob]->getName(), $predictedVal], $this->predictByIdentifier($idVal,
-          array_merge($recursionPath, [[$i_prob, $outputAttributes[$i_prob]->reprVal($predictedVal)]]))];
+      $className = $outputAttributes[$i_prob]->reprVal($predictedVal);
+      // TODO right now I'm not recurring when a "NO_" outcome happens. This is not supersafe, there must be a nice generalization.
+      if (!startsWith($className, "NO_")) {
+        $predictions[] = [[$outputAttributes[$i_prob]->getName(), $predictedVal], $this->predictByIdentifier($idVal,
+          array_merge($recursionPath, [[$i_prob, $className]]))];
+      }
     }
 
     /* At root level, finally prints the whole prediction tree */
@@ -1197,6 +1234,9 @@ class DBFit {
   function &getTableJoinClauses(array $tab) {
     return $tab["joinClauses"];
   }
+  function pushTableJoinClause(array &$tab, string $clause) {
+    $tab["joinClauses"][] = $clause;
+  }
   function &getTableJoinType(array $tab) {
     return $tab["joinType"];
   }
@@ -1242,6 +1282,11 @@ class DBFit {
     $tr = $this->getColumnTreatment($col);
     return !is_array($tr) || !isset($tr[$j]) ? NULL : $tr[$j];
   }
+
+  function getColumnNickname($col) {
+    return $this->getColNickname($this->getColumnAttrName($col));
+  }
+
   function setColumnTreatment(array &$col, $val) {
     if ($val !== NULL)
       listify($val);
@@ -1297,9 +1342,12 @@ class DBFit {
         $tr = $this->getColumnTreatmentType($col);
       }
       if (isset(self::$col2attr_type[$mysql_type])) {
-        return self::$col2attr_type[$mysql_type][$tr];
+        if (!isset(self::$col2attr_type[$mysql_type][strval($tr)])) {
+          die_error("Can't apply treatment " . toString($tr) . " on column of type \"$mysql_type\" ({$this->getColumnName($col)})!");
+        }
+        return self::$col2attr_type[$mysql_type][strval($tr)];
       } else {
-        die_error("Unknown column type: \"$mysql_type\"! Code must be expanded to cover this one!");
+        die_error("Unknown column type: \"$mysql_type\"! Code must be expanded in order to cover this one!");
       }
     }
   }
@@ -1465,7 +1513,7 @@ class DBFit {
   function addOutputColumn($col) : self
   {
     if (!count($this->inputColumns)) {
-      die_error("You must set the columns in use before the output columns.");
+      die_error("You must set the input columns in use before the output columns.");
     }
 
     if (!is_array($this->outputColumns)) {
@@ -1491,6 +1539,9 @@ class DBFit {
       
       if (isset($col[1])) {
         $these_tables = array_map([$this, "readTable"], $col[1]);
+        // Avoid NULL values for the output columns. TODO note: assuming the last table is the one where the column comes from
+        $this->pushTableJoinClause($these_tables[array_key_last($these_tables)], "!ISNULL(" . $new_col["name"] . ")");
+
         // tables also include all of the tables of the previous output layers? Can't think of a use-case, though
         $prev_tables = [];
         foreach ($this->outputColumns as $outputCol) {
@@ -1565,9 +1616,13 @@ class DBFit {
     // var_dump($tables);
 
     /* Find column */
+        // TODO: CONVERT, CAST
     $mysql_type = NULL;
-    if (startsWith($column["name"], "CONCAT")) {
+    if (startsWith($column["name"], "CONCAT", false)) {
       $mysql_type = "varchar";
+    }
+    else if (startsWith($column["name"], "0+", false)) {
+      $mysql_type = "float";
     }
     else {
       $sql = "SELECT * FROM `information_schema`.`columns` WHERE `table_name` IN "
@@ -1694,11 +1749,15 @@ class DBFit {
   {
     // TODO explain new hierachical structure, and make this more elastic
     listify($whereClauses);
+    if (is_array_of_strings($whereClauses)) {
+      $whereClauses = [$whereClauses];
+    }
+
     foreach ($whereClauses as $whereClausesSet) {
-      foreach ($whereClausesSet as $jc) {
+      foreach ($whereClausesSet as $i => $jc) {
         if (!is_string($jc)) {
-          die_error("Non-string value encountered in whereClauses: "
-          . "\"$jc\": ");
+          die_error("Non-string value encountered in whereClauses at $i-th level: "
+          . get_var_dump($jc));
         }
       }
     }
@@ -1778,8 +1837,10 @@ class DBFit {
       /* Train+test split */
       case is_array($this->trainingMode):
         $trRat = $this->trainingMode[0]/($this->trainingMode[0]+$this->trainingMode[1]);
-        // TODO 
-        // $data->randomize();
+        // TODO RANDOMIZE
+        echo "Randomize!" . PHP_EOL;
+        srand(make_seed());
+        $data->randomize();
         $rt = Instances::partition($data, $trRat);
         
         break;

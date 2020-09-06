@@ -199,7 +199,7 @@ class DiscreteAttribute extends Attribute {
   function __toString() : string {
     return $this->toString();
   }
-  function toString($short = true) : string {
+  function toString($short = false) : string {
     return $short ? $this->name : "[DiscreteAttribute '{$this->name}' (type {$this->type}): " . get_arr_dump($this->domain) . " ]";
   }
 
@@ -284,8 +284,8 @@ class ContinuousAttribute extends Attribute {
   function __toString() : string {
     return $this->toString();
   }
-  function toString() : string {
-    return $this->name;
+  function toString($short = false) : string {
+    return $short ? $this->name : "[ContinuousAttribute '{$this->name}' (type {$this->type}) ]";
   }
 }
 
