@@ -1,11 +1,10 @@
 DROP TABLE `phptest`.`models__index`
 CREATE VIEW `models__index_view` AS SELECT modelName, numRules, totN, trainN, testN, positives, negatives, TP, TN, FP, FN, accuracy, sensitivity, specificity, PPV, NPV  FROM `models__index` ORDER BY `tableName` ASC
-DO RANDOMIZE!
+SELECT * FROM `models__index`
+where tableName in (SELECT DISTINCT tableName FROM `models__index`  )
+ORDER BY `models__index`.`date` DESC , `models__index`.`tableName` ASC
 
-- quella cosa del testo e newlines
-- terapia ormonale con secondo livello
-  terapia osteoprotettiva con secondo livello
-  le altre no.
+DO RANDOMIZE!
 
 
 ? FRATTURA_FEMORE dovrebbe essere un checkbox+value, ma non esiste il relativo campo checkbox. Secondo te in Anamnesi.FRATTURA_FEMORE, i NULL equivalgono in realta' a una nuova classe "0"?
@@ -14,6 +13,9 @@ DO RANDOMIZE!
 	SELECT DISTINCT FRATTURA_SITI_DIVERSI,FRATTURA_SITI_DIVERSI_ALTRO FROM `Anamnesi` 
 ? Diagnosi.SITUAZIONE_FEMORE_SN_CHECKBOX, Diagnosi.SITUAZIONE_FEMORE_DX_CHECKBOX: ho trovato un referto dove entrambi i femori sono (entrambi osteoporotici). (E casi 20 dove nessun femore e' fratturato)!
 	SELECT Diagnosi.ID, Diagnosi.SITUAZIONE_FEMORE_SN_CHECKBOX, Diagnosi.SITUAZIONE_FEMORE_SN, Diagnosi.SITUAZIONE_FEMORE_DX_CHECKBOX, Diagnosi.SITUAZIONE_FEMORE_DX, IF(Diagnosi.SITUAZIONE_FEMORE_SN_CHECKBOX, Diagnosi.SITUAZIONE_FEMORE_SN, IF(Diagnosi.SITUAZIONE_FEMORE_DX_CHECKBOX, Diagnosi.SITUAZIONE_FEMORE_DX, 'Normale')) FROM `Diagnosi` WHERE (ISNULL(SITUAZIONE_FEMORE_SN) AND ISNULl(SITUAZIONE_FEMORE_DX)) OR (SITUAZIONE_FEMORE_SN = SITUAZIONE_FEMORE_DX)
+SITUAZIONE_COLONNA_CHECKBOX cosa significa? Mancanda di dato o situazione di normalita'? Perche' c'e' a volte SITUAZIONE_COLONNA_CHECKBOX e' 1 e SITUAZIONE_COLONNA e' 'Situazione di normalita'. Ci sono anche 2 casi dove SITUAZIONE_COLONNA_CHECKBOX e' 0 e SITUAZIONE_COLONNA e' 'Situazione di normalita'
+	SELECT COUNT(*) ,Diagnosi.SITUAZIONE_COLONNA_CHECKBOX, Diagnosi.SITUAZIONE_COLONNA FROM `Diagnosi` GROUP by Diagnosi.SITUAZIONE_COLONNA_CHECKBOX, Diagnosi.SITUAZIONE_COLONNA 
+
 ? "Pazienti.SESSO = 'F'"
 ? cosa e' COLONNA_PARZ_NON_ANALIZZABILE?
 ? applicabile: Diagnosi.FRAX_APPLICABILE fa diventare il frax NULL ?

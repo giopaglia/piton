@@ -309,6 +309,22 @@ class DBFit {
       $attributes = array_merge([$outputAttributes], $inputAttributes);
       $columns = array_merge([$outputColumn], $this->inputColumns);
 
+      if ($idVal === NULL && !count($recursionPath)) {
+        echo "LEVEL 0 attributes list:" . PHP_EOL;
+        foreach ($attributes as $i_col => $attrs) {
+          if ($attrs === NULL) {
+            echo "[$i_col]: " . toString($attrs) . PHP_EOL;
+          } else if (count($attrs) > 1) {
+            foreach ($attrs as $i => $attr)
+              echo "[$i_col], $i/" . count($attrs) . ": " . $attr->toString() . PHP_EOL;
+          } else if(count($attrs) == 1) {
+            echo "[$i_col]: " . $attrs[0]->toString() . PHP_EOL;
+          } else {
+            echo "[$i_col]: " . toString($attrs) . PHP_EOL;
+          }
+        }
+      }
+      
       /* Finally obtain data */
       $res = $this->SQLSelectColumns($this->inputColumns, $idVal, $recursionPath, $outputColumn);
       $data = $this->readRawData($res, $attributes, $columns);
@@ -511,17 +527,14 @@ class DBFit {
                   $val = $attribute->getKey($raw_val);
                   /* When forcing categorical attributes, push the missing values to the domain; otherwise, any missing domain class will raise error */
                   if ($val === false) {
-                    if (in_array($this->getColumnTreatmentType($column), ["ForceCategorical"])) {
-                      $attribute->pushDomainVal($raw_val);
-                      $val = $attribute->getKey($raw_val);
-                      // var_dump("ciaobel");
-                      // var_dump($raw_val);
-                    }
-                    else {
-                      die_error("Something's off. Couldn't find element in domain of attribute {$attribute->getName()}: " . get_var_dump($raw_val));
-                    }
-                    // echo "adomain";
-                    // var_dump($attribute->getDomain());
+                    // TODO for ForceCategorical, do the select distinct query instead of doing this
+                    // if (in_array($this->getColumnTreatmentType($column), ["ForceCategorical"])) {
+                    //   $attribute->pushDomainVal($raw_val);
+                    //   $val = $attribute->getKey($raw_val);
+                    // }
+                    // else {
+                    die_error("Something's off. Couldn't find element in domain of attribute {$attribute->getName()}: " . get_var_dump($raw_val));
+                    // }
                   }
                 }
                 /* Dates & Datetime values */
@@ -758,8 +771,10 @@ class DBFit {
     }
     else {
       // Append where clauses for the current hierarchy level
+        var_dump("yeah" . strval(1+count($recursionPath)));
       if (isset($this->whereClauses[1+count($recursionPath)])) {
         $whereClauses = array_merge($whereClauses, $this->whereClauses[1+count($recursionPath)]);
+        var_dump($whereClauses);
       }
       $outAttrs = $this->getOutputColumnNames();
       foreach ($recursionPath as $recursionLevel => $node) {
@@ -823,7 +838,7 @@ class DBFit {
           // var_dump($powerClasses);
           $attributes = [];
           // if (DEBUGMODE)
-          echo "Creating attributes for power domain: \n" . get_var_dump($powerClasses) . PHP_EOL;
+          // echo "Creating attributes for power domain: \n" . get_var_dump($powerClasses) . PHP_EOL;
 
           /* Create one attribute per set */
           foreach ($powerClasses as $classSet) {
@@ -847,7 +862,26 @@ class DBFit {
         break;
       /* Forcing a categorical attribute */
       case $this->getColumnTreatmentType($column) == "ForceCategorical":
-        $attributes = [new DiscreteAttribute($attrName, "enum")];
+
+        /* Find unique values */
+        $classes = [];
+        $res = $this->SQLSelectColumns([$column], NULL, $recursionPath, NULL, true, true);
+        $transformer = $this->getColumnTreatmentArg($column, 0);
+        if ($transformer === NULL) {
+          foreach ($res as $raw_row) {
+            $classes[] = $raw_row[$this->getColumnNickname($column)];
+          }
+        } else {
+          die_error("TODO transformer as first argument of ForceCategorical");
+          // ...
+        }
+
+        if (!count($classes)) {
+          warn("Couldn't apply ForceSet (depth: " . toString($depth) . ") to column " . $this->getColumnName($column) . ". No data instance found.");
+          $attributes = NULL;
+        }
+
+        $attributes = [new DiscreteAttribute($attrName, "enum", $classes)];
         break;
       /* Numeric column */
       case in_array($this->getColumnAttrType($column), ["int", "float", "double"]):
@@ -964,7 +998,6 @@ class DBFit {
 
     /* Each column has a tree of attributes, because the set of attributes for the column depends on the recursion path. This is done in order to leverage predicates that are the most specific.  */
     $this->setColumnAttributes($column, $recursionPath, $attributes);
-    // var_dump($column);
   }
 
   /* Train and test all the model tree on the available data, and save to database */
@@ -1482,7 +1515,7 @@ class DBFit {
   function addInputColumn($col) : self
   {
     // TODO put this check everywhere?
-    if(func_num_args()>count(get_defined_vars())) trigger_error(__FUNCTION__ . " was supplied more arguments than it needed. Got the following arguments:" . PHP_EOL . get_var_dump(func_get_args()), E_USER_WARNING);
+    if(func_num_args()>count(get_defined_vars())) trigger_error(__FUNCTION__ . " was supplied more arguments than it needed. Got the following arguments:" . PHP_EOL . toString(func_get_args()), E_USER_WARNING);
 
     if (!count($this->inputTables)) {
       die_error("Must specify the concerning inputTables before the columns, through ->setInputTables() or ->addInputTable().");
@@ -1542,6 +1575,8 @@ class DBFit {
   }
   function setOutputColumns($outputColumns) : self
   {
+    if(func_num_args()>count(get_defined_vars())) trigger_error(__FUNCTION__ . " was supplied more arguments than it needed. Got the following arguments:" . PHP_EOL . toString(func_get_args()), E_USER_WARNING);
+
     if ($outputColumns === NULL) {
       $this->outputColumns = [];
     } else {
@@ -1556,6 +1591,8 @@ class DBFit {
 
   function addOutputColumn($col) : self
   {
+    if(func_num_args()>count(get_defined_vars())) trigger_error(__FUNCTION__ . " was supplied more arguments than it needed. Got the following arguments:" . PHP_EOL . toString(func_get_args()), E_USER_WARNING);
+
     if (!count($this->inputColumns)) {
       die_error("You must set the input columns in use before the output columns.");
     }
@@ -1640,7 +1677,9 @@ class DBFit {
   }
 
   function check_columnName(string $colName) : self
-  { 
+  {
+    if(func_num_args()>count(get_defined_vars())) trigger_error(__FUNCTION__ . " was supplied more arguments than it needed. Got the following arguments:" . PHP_EOL . toString(func_get_args()), E_USER_WARNING);
+
     if (count($this->inputTables) > 1) {
       if (!preg_match("/.*\..*/i", $colName)) {
         die_error("Invalid column name: '"
@@ -1654,6 +1693,8 @@ class DBFit {
 
   function assignColumnMySQLType(array &$column)
   {
+    if(func_num_args()>count(get_defined_vars())) trigger_error(__FUNCTION__ . " was supplied more arguments than it needed. Got the following arguments:" . PHP_EOL . toString(func_get_args()), E_USER_WARNING);
+
     /* Obtain column type */
     $tables = array_merge($this->inputTables, $this->getColumnTables($column));
 
@@ -1773,6 +1814,8 @@ class DBFit {
 
   function setOutputColumnName(?string $outputColumnName, $treatment = "ForceCategorical") : self
   {
+    if(func_num_args()>count(get_defined_vars())) trigger_error(__FUNCTION__ . " was supplied more arguments than it needed. Got the following arguments:" . PHP_EOL . toString(func_get_args()), E_USER_WARNING);
+
     if ($outputColumnName !== NULL) {
       return $this->setOutputColumns([[$outputColumnName, $treatment]]);
     }
@@ -1788,6 +1831,8 @@ class DBFit {
 
   function setIdentifierColumnName(?string $identifierColumnName) : self
   {
+    if(func_num_args()>count(get_defined_vars())) trigger_error(__FUNCTION__ . " was supplied more arguments than it needed. Got the following arguments:" . PHP_EOL . toString(func_get_args()), E_USER_WARNING);
+
     if ($identifierColumnName !== NULL) {
       if (in_array($identifierColumnName, $this->getOutputColumnNames())) {
         die_error("Identifier column ('{$identifierColumnName}') cannot be considered as the output column.");
@@ -1800,6 +1845,8 @@ class DBFit {
 
   function setWhereClauses($whereClauses) : self
   {
+    if(func_num_args()>count(get_defined_vars())) trigger_error(__FUNCTION__ . " was supplied more arguments than it needed. Got the following arguments:" . PHP_EOL . toString(func_get_args()), E_USER_WARNING);
+
     // TODO explain new hierachical structure, and make this more elastic
     listify($whereClauses);
     if (is_array_of_strings($whereClauses)) {

@@ -68,12 +68,16 @@ function testMed3() {
   // $db_fit->setLimit(100);
   // $db_fit->setLimit(500);
   
-  $db_fit->setWhereClauses(
+  $db_fit->setWhereClauses([
     [
       "Pazienti.SESSO = 'F'",
       "Referti.DATA_REFERTO BETWEEN '2018-07-18' AND '2020-08-31'"
+    ],
+    [],
+    [
+      "FIND_IN_SET(RaccomandazioniTerapeuticheUnitarie.TIPO, 'Terapie osteoprotettive,Terapie ormonali') > 0",
     ]
-  );
+  ]);
 
   $lr = new PRip();
   $lr->setNumOptimizations(3);
@@ -101,7 +105,7 @@ function testMed3() {
   $db_fit->addInputColumn("Anamnesi.BMI");
   // fragility fractures in spine (one or more)
   // checkbox+value("Anamnesi.FRATTURA_VERTEBRE_CHECKBOX" "Anamnesi.FRATTURA_VERTEBRE")
-  $db_fit->addInputColumn(["CONCAT('', IF(Anamnesi.FRATTURA_VERTEBRE_CHECKBOX, Anamnesi.FRATTURA_VERTEBRE, 'No'))", "ForceCategorical", "Anamnesi.N_FRATTURE_VERTEBRE"]);
+  $db_fit->addInputColumn(["CONCAT('', IF(Anamnesi.FRATTURA_VERTEBRE_CHECKBOX, Anamnesi.FRATTURA_VERTEBRE, '0'))", "ForceCategorical", "Anamnesi.N_FRATTURE_VERTEBRE"]);
   // fragility fractures in hip (one or more)
   $db_fit->addInputColumn(["CONCAT('', IF(ISNULL(Anamnesi.FRATTURA_FEMORE), 0, Anamnesi.FRATTURA_FEMORE))", "ForceCategorical", "Anamnesi.N_FRATTURE_FEMORE"]);
   // fragility fractures in other sites (one or more)
