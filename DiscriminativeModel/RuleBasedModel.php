@@ -39,8 +39,8 @@ abstract class DiscriminativeModel {
 
   /* Save model to database */
   function dumpToDB(object &$db, string $tableName) {
-    //if (DEBUGMODE > 2) 
-      echo "DiscriminativeModel->dumpToDB($tableName)" . PHP_EOL;
+    if (DEBUGMODE)
+      echo "DiscriminativeModel->dumpToDB('$tableName')" . PHP_EOL;
 
     $tableName = self::$prefix . $tableName;
     
@@ -212,7 +212,8 @@ class RuleBasedModel extends DiscriminativeModel {
 
   // Test a model TODO explain
   function test(Instances $testData) : array {
-    echo "RuleBasedModel->test(" . $testData->toString(true) . ")" . PHP_EOL;
+    if (DEBUGMODE)
+      echo "RuleBasedModel->test(" . $testData->toString(true) . ")" . PHP_EOL;
 
     $ground_truths = [];
     
@@ -311,8 +312,8 @@ class RuleBasedModel extends DiscriminativeModel {
 
   /* Save model to database */
   function saveToDB(object &$db, string $modelName, string $tableName, ?Instances &$testData = NULL, ?Instances &$trainData = NULL) {
-    //if (DEBUGMODE > 2) 
-      echo "RuleBasedModel->saveToDB($tableName)" . PHP_EOL;
+    if (DEBUGMODE)
+      echo "RuleBasedModel->saveToDB('$modelName', '$tableName', ...)" . PHP_EOL;
     
     if ($testData !== NULL) {
       $testData = clone $testData;

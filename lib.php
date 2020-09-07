@@ -19,12 +19,12 @@ function die_error($msg = NULL)
   if ($msg === NULL) {
     $msg = "An error occurred.";
   }
-  die("ERROR! " . $msg);
+  die("<b>ERROR!</b> " . $msg);
 }
 
 function warn($msg)
 {
-  echo "WARNING! " . $msg . PHP_EOL;
+  echo "<b>WARNING!</b> " . $msg . PHP_EOL;
 }
 
 function mysql_set($arr, $map_function = "mysql_quote_str") { return "(" . mysql_list($arr, $map_function) . ")"; }

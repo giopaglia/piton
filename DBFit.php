@@ -326,7 +326,12 @@ class DBFit {
       }
       
       /* Finally obtain data */
-      $res = $this->SQLSelectColumns($this->inputColumns, $idVal, $recursionPath, $outputColumn);
+      $silentSQL = (count($recursionPath) && $recursionPath[count($recursionPath)-1][0] != 0);
+      if (!$silentSQL) {
+        echo "Example query for LEVEL " . $recursionLevel . ", " . toString($recursionPath);
+      }
+      $res = $this->SQLSelectColumns($this->inputColumns, $idVal, $recursionPath, $outputColumn,
+        $silentSQL);
       $data = $this->readRawData($res, $attributes, $columns);
       
       /* Deflate attribute and data arrays (breaking the symmetry with columns) */
@@ -771,10 +776,10 @@ class DBFit {
     }
     else {
       // Append where clauses for the current hierarchy level
-        var_dump("yeah" . strval(1+count($recursionPath)));
+        // var_dump("yeah" . strval(1+count($recursionPath)));
       if (isset($this->whereClauses[1+count($recursionPath)])) {
         $whereClauses = array_merge($whereClauses, $this->whereClauses[1+count($recursionPath)]);
-        var_dump($whereClauses);
+        // var_dump($whereClauses);
       }
       $outAttrs = $this->getOutputColumnNames();
       foreach ($recursionPath as $recursionLevel => $node) {
@@ -877,7 +882,7 @@ class DBFit {
         }
 
         if (!count($classes)) {
-          warn("Couldn't apply ForceSet (depth: " . toString($depth) . ") to column " . $this->getColumnName($column) . ". No data instance found.");
+          warn("Couldn't apply ForceCategorical to column " . $this->getColumnName($column) . ". No data instance found.");
           $attributes = NULL;
         }
 
@@ -1043,8 +1048,11 @@ class DBFit {
       /* Obtain and train, test set */
       list($trainData, $testData) = $this->getDataSplit($data);
       
-      echo "TRAIN" . PHP_EOL . $trainData->toString(DEBUGMODE <= 0) . PHP_EOL;
-      echo "TEST" . PHP_EOL . $testData->toString(DEBUGMODE <= 0) . PHP_EOL;
+      // echo "TRAIN" . PHP_EOL . $trainData->toString(DEBUGMODE <= 0) . PHP_EOL;
+      // echo "TEST" . PHP_EOL . $testData->toString(DEBUGMODE <= 0) . PHP_EOL;
+      
+      echo "TRAIN: " . $trainData->numInstances() . " instances" . PHP_EOL;
+      echo "TEST: " . $testData->numInstances() . " instances" . PHP_EOL;
       
       /* Train */
       $model_name = $this->getModelName($recursionPath, $i_prob);
@@ -1085,10 +1093,10 @@ class DBFit {
           . " with domain " . toString($outputAttribute->getDomain())
           . ". " . PHP_EOL;
         foreach ($outputAttribute->getDomain() as $className) {
-          echo "Recursion on className $className for attribute \""
-          . $outputAttribute->getName() . "\". " . PHP_EOL;
           // TODO right now I'm not recurring when a "NO_" outcome happens. This is not supersafe, there must be a nice generalization.
           if (!startsWith($className, "NO_")) {
+            echo "Recursion on class '$className' for attribute \""
+              . $outputAttribute->getName() . "\". " . PHP_EOL;
             $this->updateModel(array_merge($recursionPath, [[$i_prob, $className]]));
           }
         }
@@ -1216,7 +1224,7 @@ class DBFit {
         die_error("Something's off. Model '$model_name' is not a DiscriminativeModel. " . get_var_dump($model));
       }
 
-      echo "Using model '$model_name' for prediction." . PHP_EOL;
+      // echo "Using model '$model_name' for prediction." . PHP_EOL;
       // echo $model . PHP_EOL;
 
       // var_dump($data->getAttributes());
@@ -1225,14 +1233,15 @@ class DBFit {
       /* Perform local prediction */
       $predictedVal = $model->predict($data, true);
       $predictedVal = $predictedVal[0];
-      echo "predicted value: \"$predictedVal\"" . PHP_EOL;
+      $className = $outputAttributes[$i_prob]->reprVal($predictedVal);
+      echo "Prediction: [$predictedVal] '$className' (using model '$model_name')" . PHP_EOL;
 
       /* Recursive step: recurse and predict the subtree of this predicted value */
-      $className = $outputAttributes[$i_prob]->reprVal($predictedVal);
       // TODO right now I'm not recurring when a "NO_" outcome happens. This is not supersafe, there must be a nice generalization.
       if (!startsWith($className, "NO_")) {
         $predictions[] = [[$outputAttributes[$i_prob]->getName(), $predictedVal], $this->predictByIdentifier($idVal,
           array_merge($recursionPath, [[$i_prob, $className]]))];
+        echo PHP_EOL;
       }
     }
 
@@ -1796,8 +1805,8 @@ class DBFit {
     $end = microtime(TRUE);
     echo "updateModel took " . ($end - $start) . " seconds to complete." . PHP_EOL;
     
-    echo "AVAILABLE MODELS" . PHP_EOL;
-    var_dump(array_keys($this->models));
+    echo "AVAILABLE MODELS:" . PHP_EOL;
+    var_dump($this->listAvailableModels());
     // TODO
     // $start = microtime(TRUE);
     // $this->model->LoadFromDB($this->db, str_replace(".", ":", $this->getOutputColumnAttributes()[0]))->getName();
@@ -1810,6 +1819,10 @@ class DBFit {
       $end = microtime(TRUE);
       echo "predictByIdentifier took " . ($end - $start) . " seconds to complete." . PHP_EOL;
     }
+  }
+
+  function listAvailableModels() {
+    return array_keys($this->models);
   }
 
   function setOutputColumnName(?string $outputColumnName, $treatment = "ForceCategorical") : self
@@ -1938,7 +1951,7 @@ class DBFit {
       case is_array($this->trainingMode):
         $trRat = $this->trainingMode[0]/($this->trainingMode[0]+$this->trainingMode[1]);
         // TODO RANDOMIZE
-        echo "Randomize!" . PHP_EOL;
+        echo "Randomizing!" . PHP_EOL;
         srand(make_seed());
         $data->randomize();
         $rt = Instances::partition($data, $trRat);

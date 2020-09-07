@@ -71,7 +71,7 @@ function testMed3() {
   $db_fit->setWhereClauses([
     [
       "Pazienti.SESSO = 'F'",
-      "Referti.DATA_REFERTO BETWEEN '2018-07-18' AND '2020-08-31'"
+      "Referti.DATA_REFERTO BETWEEN '2018-09-01' AND '2020-08-31'"
     ],
     [],
     [
@@ -226,12 +226,22 @@ function testMed3() {
     ]
   ]);
 
-  $db_fit->test_all_capabilities();
+  $start = microtime(TRUE);
+  $db_fit->updateModel();
+  $end = microtime(TRUE);
+  echo "updateModel took " . ($end - $start) . " seconds to complete." . PHP_EOL;
+  
+  echo "AVAILABLE MODELS:" . PHP_EOL;
+  var_dump($db_fit->listAvailableModels());
+
+  $this->predictByIdentifier(1);
+
+  // $db_fit->test_all_capabilities();
   // $db_fit->predictByIdentifier(15);
   // $db_fit->predictByIdentifier(1);
   // $db_fit->predictByIdentifier(2);
-  $db_fit->predictByIdentifier(9);
-  $db_fit->predictByIdentifier(3);
+  // $db_fit->predictByIdentifier(9);
+  // $db_fit->predictByIdentifier(3);
 }
 
 function testMed2() {
