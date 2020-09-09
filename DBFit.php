@@ -286,7 +286,8 @@ class DBFit {
     
     /* Check that some data is found and the output attributes were correctly computed */
     if (!is_array($outputAttributes)) {
-      warn("Couldn't derive output attributes for output column {$this->getColumnName($outputColumn)}!");
+      // warn("Couldn't derive output attributes for output column {$this->getColumnName($outputColumn)}!");
+      echo "Couldn't derive output attributes for output column {$this->getColumnName($outputColumn)}!" . PHP_EOL;
     }
     else {
       $rawDataframe = [];
@@ -784,11 +785,6 @@ class DBFit {
     if (count($whereClauses)) {
       $sql .= " WHERE " . join(" AND ", $whereClauses);
     }
-    
-    /* LIMIT */
-    if ($idVal === NULL && $this->limit !== NULL) {
-      $sql .= " LIMIT {$this->limit}";
-    }
 
     /* ORDER BY */
     if (!$distinct && count($this->orderByClauses)) {
@@ -796,6 +792,11 @@ class DBFit {
            . join(", ", array_map(function ($clause) { return (is_string($clause) ? $clause : $clause[0] . " " . $clause[1]); }, $this->orderByClauses));
     }
     
+    /* LIMIT */
+    if ($idVal === NULL && $this->limit !== NULL) {
+      $sql .= " LIMIT {$this->limit}";
+    }
+
     /* Query database */
     $res = mysql_select($this->db, $sql, $silent);
     return $res;
@@ -893,7 +894,7 @@ class DBFit {
         }
 
         if (!count($classes)) {
-          warn("Couldn't apply ForceSet (depth: " . toString($depth) . ") to column " . $this->getColumnName($column) . ". No data instance found.");
+          // warn("Couldn't apply ForceSet (depth: " . toString($depth) . ") to column " . $this->getColumnName($column) . ". No data instance found.");
           $attributes = NULL;
         }
         else {
@@ -1120,17 +1121,17 @@ class DBFit {
       // echo "TRAIN" . PHP_EOL . $trainData->toString(DEBUGMODE <= 0) . PHP_EOL;
       // echo "TEST" . PHP_EOL . $testData->toString(DEBUGMODE <= 0) . PHP_EOL;
       
-      // TODO RANDOMIZE
-      // echo "Randomizing!" . PHP_EOL;
-      // srand(make_seed());
-      // $trainData->randomize();
-      
       echo "TRAIN: " . $trainData->numInstances() . " instances" . PHP_EOL;
       echo "TEST: " . $testData->numInstances() . " instances" . PHP_EOL;
       
-      $trainData->save_CSV("datasets/" . $this->getModelName($recursionPath, $i_prob) . "-TRAIN.csv");
-      $testData->save_CSV("datasets/" . $this->getModelName($recursionPath, $i_prob) . "-TEST.csv");
+      // $trainData->save_CSV("datasets/" . $this->getModelName($recursionPath, $i_prob) . "-TRAIN.csv");
+      // $testData->save_CSV("datasets/" . $this->getModelName($recursionPath, $i_prob) . "-TEST.csv");
       
+      if ($i_prob == 0) {
+        $trainData->save_CSV("datasets/" . $this->getModelName($recursionPath, NULL) . "-TRAIN.csv", false);
+        $testData->save_CSV("datasets/" . $this->getModelName($recursionPath, NULL) . "-TEST.csv", false);
+      }
+
       /* Train */
       $model_name = $this->getModelName($recursionPath, $i_prob);
       $model_id = $this->getModelName($recursionPath, $i_prob, true);
@@ -1231,40 +1232,40 @@ class DBFit {
       return [];
     }
 
-    // TODO avoid reading outputAttributes here, find an alternative solution
-    $outputAttributes = $this->getColumnAttributes($this->outputColumns[$recursionLevel], $recursionPath);
-
-    /* If no model was trained for the current node, stop the recursion */
-    if ($outputAttributes === NULL) {
-      echo "Prediction-time recursion stops here due to lack of a model (recursionPath = " . toString($recursionPath) . ":" . PHP_EOL;
-      return [];
-    }
-    else {
-      /* Check if the models needed were trained */
-      // TODO: note that atm, unless this module is misused, either all models should be there, or none of them should
-      $atLeastOneModel = false;
-      foreach ($outputAttributes as $i_prob => $outputAttribute) {
-        $model_name = $this->getModelName($recursionPath, $i_prob);
-        if ((isset($this->models[$model_name]))) {
-          $atLeastOneModel = true;
-        }
-      }
-      if (!$atLeastOneModel) {
-        echo "Prediction-time recursion stops here due to lack of models (recursionPath = " . toString($recursionPath) . ":" . PHP_EOL;
-
-        foreach ($outputAttributes as $i_prob => $outputAttribute) {
-          $model_name = $this->getModelName($recursionPath, $i_prob);
-          echo "$model_name" . PHP_EOL;
-        }
-        return [];
-      }
-    }
-    
     $predictions = [];
     
     /* Read the dataframes specific to this recursion path */
     $rawDataframe = $this->readData($idVal, $recursionPath);
     $numDataframes = $this->numDataframes($rawDataframe);
+
+    /* If no model was trained for the current node, stop the recursion */
+    if ($rawDataframe === NULL) {
+      echo "Prediction-time recursion stops here due to lack of a model (recursionPath = " . toString($recursionPath) . ":" . PHP_EOL;
+      return [];
+    }
+    // else {
+    // TODO avoid reading outputAttributes here, find an alternative solution
+    // $outputAttributes = $this->getColumnAttributes($this->outputColumns[$recursionLevel], $recursionPath);
+    //   /* Check if the models needed were trained */
+    //   // TODO: note that atm, unless this module is misused, either all models should be there, or none of them should
+    //   $atLeastOneModel = false;
+    //   foreach ($outputAttributes as $i_prob => $outputAttribute) {
+    //     $model_name = $this->getModelName($recursionPath, $i_prob);
+    //     if ((isset($this->models[$model_name]))) {
+    //       $atLeastOneModel = true;
+    //     }
+    //   }
+    //   if (!$atLeastOneModel) {
+    //     echo "Prediction-time recursion stops here due to lack of models (recursionPath = " . toString($recursionPath) . ":" . PHP_EOL;
+
+    //     foreach ($outputAttributes as $i_prob => $outputAttribute) {
+    //       $model_name = $this->getModelName($recursionPath, $i_prob);
+    //       echo "$model_name" . PHP_EOL;
+    //     }
+    //     return [];
+    //   }
+    // }
+    
 
     /* Check: if no data available stop recursion */
     if ($rawDataframe === NULL || !$numDataframes) {
@@ -1312,13 +1313,13 @@ class DBFit {
       /* Perform local prediction */
       $predictedVal = $model->predict($data, true);
       $predictedVal = $predictedVal[0];
-      $className = $outputAttributes[$i_prob]->reprVal($predictedVal);
+      $className = $data->getClassAttribute()->reprVal($predictedVal);
       echo "Prediction: [$predictedVal] '$className' (using model '$model_name')" . PHP_EOL;
 
       /* Recursive step: recurse and predict the subtree of this predicted value */
       // TODO right now I'm not recurring when a "NO_" outcome happens. This is not supersafe, there must be a nice generalization.
       if (!startsWith($className, "NO_")) {
-        $predictions[] = [[$outputAttributes[$i_prob]->getName(), $predictedVal], $this->predictByIdentifier($idVal,
+        $predictions[] = [[$data->getClassAttribute()->getName(), $predictedVal], $this->predictByIdentifier($idVal,
           array_merge($recursionPath, [[$i_prob, $className]]))];
         echo PHP_EOL;
       }
@@ -1446,7 +1447,7 @@ class DBFit {
   }
 
   function getColumnNickname($col) {
-    return $this->getColNickname($this->getColumnAttrName($col));
+    return $this->getColNickname($this->getColumnName($col));
   }
 
   function setColumnTreatment(array &$col, $val) {
@@ -1831,7 +1832,7 @@ class DBFit {
   
 
   /* TODO explain */
-  function getModelName(array $recursionPath, int $i_prob, $short = false) : string {
+  function getModelName(array $recursionPath, ?int $i_prob, $short = false) : string {
 
     $name_chunks = [];
     foreach ($recursionPath as $recursionLevel => $node) {
@@ -2063,6 +2064,12 @@ class DBFit {
         die_error("Unknown training mode: " . toString($this->trainingMode));
         break;
     }
+
+    // TODO RANDOMIZE
+    // echo "Randomizing!" . PHP_EOL;
+    // srand(make_seed());
+    // $rt[0]->randomize();
+    
     return $rt;
   }
 

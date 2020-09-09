@@ -162,6 +162,15 @@ class Instances {
   function numAttributes() : int { return count($this->attributes); }
   function numInstances() : int { return count($this->data); }
 
+  function _getInstance(int $i, bool $includeClassAttr) : array
+  {
+    if ($includeClassAttr) {
+      return array_slice($this->data[$i], 0, -1);
+    }
+    else {
+      return array_slice($this->data[$i], 1, -1);
+    }
+  }
   function getInstance(int $i) : array { return array_slice($this->data[$i], 0, -1); }
   function getInstances() : array {
     return array_map([$this, "getInstance"], range(0, $this->numInstances()-1));
@@ -480,14 +489,15 @@ class Instances {
   /**
    * Save data to file, CSV format
    */
-  function save_CSV(string $path) {
+  function save_CSV(string $path, bool $includeClassAttr = true) {
     if (DEBUGMODE > 2) echo "Instances->save_CSV($path)" . PHP_EOL;
     postfixisify($path, ".csv");
     $f = fopen($path, "w");
 
     /* Attributes */
+    $attributes = $this->getAttributes($includeClassAttr);
     $attrs_str = [];
-    foreach ($this->getAttributes() as $attr) {
+    foreach ($attributes as $attr) {
       $attrs_str[] = $attr->getName();
     }
     if($this->isWeighted()) {
@@ -505,12 +515,12 @@ class Instances {
     
     if(!$this->isWeighted()) {
       foreach ($this->data as $k => $inst) {
-        fputcsv($f, array_map($getCSVRepr, $this->getInstance($k), $this->getAttributes()));
+        fputcsv($f, array_map($getCSVRepr, $this->_getInstance($k, $includeClassAttr), $attributes));
       }
     }
     else {
       foreach ($this->data as $k => $inst) {
-        fputcsv($f, array_merge(array_map($getCSVRepr, $this->getInstance($k), $this->getAttributes()), [$this->inst_weight($k)]));
+        fputcsv($f, array_merge(array_map($getCSVRepr, $this->_getInstance($k, $includeClassAttr), $attributes), [$this->inst_weight($k)]));
       }
     }
 

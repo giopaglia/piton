@@ -88,110 +88,111 @@ function testMed3($lr) {
   // $db_fit->addInputColumn(["Referti.DATA_REFERTO", "DaysSince"]);
   
   // gender
-  $db_fit->addInputColumn(["Pazienti.SESSO", "ForceCategorical"]);
+  $db_fit->addInputColumn(["Pazienti.SESSO", "ForceCategorical", "gender"]);
   // menopause state (if relevant)
-  $db_fit->addInputColumn(["Pazienti.DATA_NASCITA", "YearsSince", "Pazienti.Age"]);
-  $db_fit->addInputColumn("Anamnesi.STATO_MENOPAUSALE");
+  $db_fit->addInputColumn(["Pazienti.DATA_NASCITA", "YearsSince", "age"]);
+  $db_fit->addInputColumn(["Anamnesi.STATO_MENOPAUSALE", NULL, "menopause state"]);
   // age at last menopause (if relevant)
-  $db_fit->addInputColumn("Anamnesi.ETA_MENOPAUSA");
-  $db_fit->addInputColumn(["CONCAT('', COALESCE(Anamnesi.TERAPIA_STATO,'Mai'))", "ForceCategorical"]);
-  $db_fit->addInputColumn("Anamnesi.TERAPIA_ANNI_SOSPENSIONE");
-  $db_fit->addInputColumn("0+COALESCE(Anamnesi.TERAPIA_OSTEOPROTETTIVA_ORMONALE,0)");
-  $db_fit->addInputColumn(["CONCAT('', COALESCE(Anamnesi.TERAPIA_OSTEOPROTETTIVA_SPECIFICA,'0'))", "ForceCategorical"]);
-  $db_fit->addInputColumn("Anamnesi.VITAMINA_D_TERAPIA_OSTEOPROTETTIVA");
-  $db_fit->addInputColumn("0+COALESCE(Anamnesi.TERAPIA_ALTRO_CHECKBOX,0)");
+  $db_fit->addInputColumn(["Anamnesi.ETA_MENOPAUSA", NULL, "age at last menopause"]);
+  $db_fit->addInputColumn(["CONCAT('', COALESCE(Anamnesi.TERAPIA_STATO,'Mai'))", "ForceCategorical", "therapy status"]);
+  $db_fit->addInputColumn(["Anamnesi.TERAPIA_ANNI_SOSPENSIONE", NULL, "years of suspension"]);
+  $db_fit->addInputColumn(["0+COALESCE(Anamnesi.TERAPIA_OSTEOPROTETTIVA_ORMONALE,0)", NULL, "hormonal osteoprotective therapy"]);
+  $db_fit->addInputColumn(["CONCAT('', COALESCE(Anamnesi.TERAPIA_OSTEOPROTETTIVA_SPECIFICA,'0'))", "ForceCategorical", "specific osteoprotective therapy"]);
+  $db_fit->addInputColumn(["Anamnesi.VITAMINA_D_TERAPIA_OSTEOPROTETTIVA", NULL, "vitamin D based osteoprotective therapy"]);
+  $db_fit->addInputColumn(["0+COALESCE(Anamnesi.TERAPIA_ALTRO_CHECKBOX,0)", NULL, "other osteoprotective therapy"]);
   // bmi
-  $db_fit->addInputColumn("Anamnesi.BMI");
+  $db_fit->addInputColumn(["Anamnesi.BMI", NULL, "body mass index"]);
   // fragility fractures in spine (one or more)
   // checkbox+value("Anamnesi.FRATTURA_VERTEBRE_CHECKBOX" "Anamnesi.FRATTURA_VERTEBRE")
   // $db_fit->addInputColumn(["CONCAT('', IF(Anamnesi.FRATTURA_VERTEBRE_CHECKBOX, Anamnesi.FRATTURA_VERTEBRE, '0'))", "ForceCategorical", "Anamnesi.N_FRATTURE_VERTEBRE"]);
-  $db_fit->addInputColumn(["CONCAT('', IF(ISNULL(Anamnesi.FRATTURA_VERTEBRE), '0', Anamnesi.FRATTURA_VERTEBRE))", "ForceCategorical", "Anamnesi.N_FRATTURE_VERTEBRE"]);
+  $db_fit->addInputColumn(["CONCAT('', IF(ISNULL(Anamnesi.FRATTURA_VERTEBRE), '0', Anamnesi.FRATTURA_VERTEBRE))", "ForceCategorical", "spinal fractures"]);
   // fragility fractures in hip (one or more)
-  $db_fit->addInputColumn(["CONCAT('', IF(ISNULL(Anamnesi.FRATTURA_FEMORE), '0', Anamnesi.FRATTURA_FEMORE))", "ForceCategorical", "Anamnesi.N_FRATTURE_FEMORE"]);
+  $db_fit->addInputColumn(["CONCAT('', IF(ISNULL(Anamnesi.FRATTURA_FEMORE), '0', Anamnesi.FRATTURA_FEMORE))", "ForceCategorical", "femoral fractures"]);
   // fragility fractures in other sites (one or more)
-  $db_fit->addInputColumn("0+COALESCE(Anamnesi.FRATTURA_SITI_DIVERSI,0)");
+  $db_fit->addInputColumn(["0+COALESCE(Anamnesi.FRATTURA_SITI_DIVERSI,0)", NULL, "fractures in other sites"]);
   // familiarity
-  $db_fit->addInputColumn("Anamnesi.FRATTURA_FAMILIARITA");
+  $db_fit->addInputColumn(["Anamnesi.FRATTURA_FAMILIARITA", NULL, "fracture familiarity"]);
   // current smoker
   // checkbox+value("Anamnesi.ABUSO_FUMO_CHECKBOX" "Anamnesi.ABUSO_FUMO")
-  $db_fit->addInputColumn(["CONCAT('', IF(ISNULL(Anamnesi.ABUSO_FUMO_CHECKBOX),'No',IF(Anamnesi.ABUSO_FUMO_CHECKBOX, Anamnesi.ABUSO_FUMO, 'No')))", "ForceCategorical", "Anamnesi.N_ABUSO_FUMO"]);
-  // current corticosteoroid use
-  // checkbox+value("Anamnesi.USO_CORTISONE_CHECKBOX" "Anamnesi.USO_CORTISONE")
-  $db_fit->addInputColumn(["CONCAT('', IF(ISNULL(Anamnesi.USO_CORTISONE_CHECKBOX),'No',IF(Anamnesi.USO_CORTISONE_CHECKBOX, Anamnesi.USO_CORTISONE, 'No')))", "ForceCategorical", "Anamnesi.N_USO_CORTISONE"]);
-  // current illnesses
-  $db_fit->addInputColumn("0+COALESCE(Anamnesi.MALATTIE_ATTUALI_ARTRITE_REUM,0)");
-  $db_fit->addInputColumn("0+COALESCE(Anamnesi.MALATTIE_ATTUALI_ARTRITE_PSOR,0)");
-  $db_fit->addInputColumn("0+COALESCE(Anamnesi.MALATTIE_ATTUALI_LUPUS,0)");
-  $db_fit->addInputColumn("0+COALESCE(Anamnesi.MALATTIE_ATTUALI_SCLERODERMIA,0)");
-  $db_fit->addInputColumn("0+COALESCE(Anamnesi.MALATTIE_ATTUALI_ALTRE_CONNETTIVITI,0)");
-  // secondary causes
-  $db_fit->addInputColumn(["Anamnesi.CAUSE_OSTEOPOROSI_SECONDARIA", ["ForceCategoricalBinary", function ($input) {
-      $input = trim($input);
-      if ($input == "NULL") {
-        $values = NULL;
-      } else {
-        $values = preg_split("/[\n\r]+/", $input);
-      }
-      // var_dump($values);
-      return $values;
-    }
-  ]]);
+  $db_fit->addInputColumn(["CONCAT('', IF(ISNULL(Anamnesi.ABUSO_FUMO_CHECKBOX),'No',IF(Anamnesi.ABUSO_FUMO_CHECKBOX, Anamnesi.ABUSO_FUMO, 'No')))", "ForceCategorical", "current smoker"]);
   // alcol abuse
   // checkbox+value("Anamnesi.ALCOL_CHECKBOX" "Anamnesi.ALCOL")
-  $db_fit->addInputColumn(["CONCAT('', IF(ISNULL(Anamnesi.ALCOL_CHECKBOX),NULL,IF(Anamnesi.ALCOL_CHECKBOX, Anamnesi.ALCOL, 'No')))", "ForceCategorical", "Anamnesi.N_ALCOL"]);
+  $db_fit->addInputColumn(["CONCAT('', IF(ISNULL(Anamnesi.ALCOL_CHECKBOX),NULL,IF(Anamnesi.ALCOL_CHECKBOX, Anamnesi.ALCOL, 'No')))", "ForceCategorical", "alcohol use"]);
+  // current corticosteoroid use
+  // checkbox+value("Anamnesi.USO_CORTISONE_CHECKBOX" "Anamnesi.USO_CORTISONE")
+  $db_fit->addInputColumn(["CONCAT('', IF(ISNULL(Anamnesi.USO_CORTISONE_CHECKBOX),'No',IF(Anamnesi.USO_CORTISONE_CHECKBOX, Anamnesi.USO_CORTISONE, 'No')))", "ForceCategorical", "cortisone"]);
+  // current illnesses
+  $db_fit->addInputColumn(["0+COALESCE(Anamnesi.MALATTIE_ATTUALI_ARTRITE_REUM,0)", NULL, "rheumatoid arthritis"]);
+  $db_fit->addInputColumn(["0+COALESCE(Anamnesi.MALATTIE_ATTUALI_ARTRITE_PSOR,0)", NULL, "psoriatic arthritis"]);
+  $db_fit->addInputColumn(["0+COALESCE(Anamnesi.MALATTIE_ATTUALI_LUPUS,0)", NULL, "lupus"]);
+  $db_fit->addInputColumn(["0+COALESCE(Anamnesi.MALATTIE_ATTUALI_SCLERODERMIA,0)", NULL, "scleroderma"]);
+  $db_fit->addInputColumn(["0+COALESCE(Anamnesi.MALATTIE_ATTUALI_ALTRE_CONNETTIVITI,0)", NULL, "other connective tissue diseases"]);
+  // secondary causes
+  // $db_fit->addInputColumn(["Anamnesi.CAUSE_OSTEOPOROSI_SECONDARIA", ["ForceCategoricalBinary", function ($input) {
+  //     $input = trim($input);
+  //     if ($input == "NULL") {
+  //       $values = NULL;
+  //     } else {
+  //       $values = preg_split("/[\n\r]+/", $input);
+  //     }
+  //     // var_dump($values);
+  //     return $values;
+  //   }
+  // ]]);
   // clinical information (20 fields)
-  $db_fit->addInputColumn("0+COALESCE(Anamnesi.PATOLOGIE_UTERINE_CHECKBOX,0)");
-  $db_fit->addInputColumn("0+COALESCE(Anamnesi.NEOPLASIA_CHECKBOX,0)");
-  $db_fit->addInputColumn("0+COALESCE(Anamnesi.SINTOMI_VASOMOTORI,0)");
-  $db_fit->addInputColumn("0+COALESCE(Anamnesi.SINTOMI_DISTROFICI,0)");
-  $db_fit->addInputColumn("0+COALESCE(Anamnesi.DISLIPIDEMIA_CHECKBOX,0)");
-  $db_fit->addInputColumn("0+COALESCE(Anamnesi.IPERTENSIONE,0)");
-  $db_fit->addInputColumn("0+COALESCE(Anamnesi.RISCHIO_TEV,0)");
-  $db_fit->addInputColumn("0+COALESCE(Anamnesi.PATOLOGIA_CARDIACA,0)");
-  $db_fit->addInputColumn("0+COALESCE(Anamnesi.PATOLOGIA_VASCOLARE,0)");
-  $db_fit->addInputColumn("0+COALESCE(Anamnesi.INSUFFICIENZA_RENALE,0)");
-  $db_fit->addInputColumn("0+COALESCE(Anamnesi.PATOLOGIA_RESPIRATORIA,0)");
-  $db_fit->addInputColumn("0+COALESCE(Anamnesi.PATOLOGIA_CAVO_ORALE_CHECKBOX,0)");
-  $db_fit->addInputColumn("0+COALESCE(Anamnesi.PATOLOGIA_EPATICA,0)");
-  $db_fit->addInputColumn("0+COALESCE(Anamnesi.PAROLOGIA_ESOFAGEA,0)");
-  $db_fit->addInputColumn("0+COALESCE(Anamnesi.GASTRO_DUODENITE,0)");
-  $db_fit->addInputColumn("0+COALESCE(Anamnesi.GASTRO_RESEZIONE,0)");
-  $db_fit->addInputColumn("0+COALESCE(Anamnesi.RESEZIONE_INTESTINALE,0)");
-  $db_fit->addInputColumn("0+COALESCE(Anamnesi.MICI,0)");
-  $db_fit->addInputColumn("0+COALESCE(Anamnesi.VITAMINA_D,0)");
-  $db_fit->addInputColumn("0+COALESCE(Anamnesi.ALTRE_PATOLOGIE_CHECKBOX,0)");
-  // previous DXA spine total T score
-  $db_fit->addInputColumn("Anamnesi.COLONNA_T_SCORE");
+  $db_fit->addInputColumn(["0+COALESCE(Anamnesi.PATOLOGIE_UTERINE_CHECKBOX,0)", NULL, "endometriosis"]);
+  $db_fit->addInputColumn(["0+COALESCE(Anamnesi.NEOPLASIA_CHECKBOX,0)", NULL, "neoplasia"]);
+  $db_fit->addInputColumn(["0+COALESCE(Anamnesi.SINTOMI_VASOMOTORI,0)", NULL, "vasomotor symptoms"]);
+  $db_fit->addInputColumn(["0+COALESCE(Anamnesi.SINTOMI_DISTROFICI,0)", NULL, "distrofic symptoms"]);
+  $db_fit->addInputColumn(["0+COALESCE(Anamnesi.DISLIPIDEMIA_CHECKBOX,0)", NULL, "dyslipidemia"]);
+  $db_fit->addInputColumn(["0+COALESCE(Anamnesi.IPERTENSIONE,0)", NULL, "hypertension"]);
+  $db_fit->addInputColumn(["0+COALESCE(Anamnesi.RISCHIO_TEV,0)", NULL, "venous thromboembolism risk factors"]);
+  $db_fit->addInputColumn(["0+COALESCE(Anamnesi.PATOLOGIA_CARDIACA,0)", NULL, "cardiac pathologies"]);
+  $db_fit->addInputColumn(["0+COALESCE(Anamnesi.PATOLOGIA_VASCOLARE,0)", NULL, "vascular pathologies"]);
+  $db_fit->addInputColumn(["0+COALESCE(Anamnesi.INSUFFICIENZA_RENALE,0)", NULL, "kidney failure"]);
+  $db_fit->addInputColumn(["0+COALESCE(Anamnesi.PATOLOGIA_RESPIRATORIA,0)", NULL, "respiratory pathologies"]);
+  $db_fit->addInputColumn(["0+COALESCE(Anamnesi.PATOLOGIA_CAVO_ORALE_CHECKBOX,0)", NULL, "oral pathologies"]);
+  $db_fit->addInputColumn(["0+COALESCE(Anamnesi.PATOLOGIA_EPATICA,0)", NULL, "hepatic pathologies"]);
+  $db_fit->addInputColumn(["0+COALESCE(Anamnesi.PAROLOGIA_ESOFAGEA,0)", NULL, "esophageal pathologies"]);
+  $db_fit->addInputColumn(["0+COALESCE(Anamnesi.GASTRO_DUODENITE,0)", NULL, "gastroduodenitis"]);
+  $db_fit->addInputColumn(["0+COALESCE(Anamnesi.GASTRO_RESEZIONE,0)", NULL, "gastrectomy"]);
+  $db_fit->addInputColumn(["0+COALESCE(Anamnesi.RESEZIONE_INTESTINALE,0)", NULL, "bowel resection"]);
+  $db_fit->addInputColumn(["0+COALESCE(Anamnesi.MICI,0)", NULL, "inflammatory bowel disease"]);
+  $db_fit->addInputColumn(["0+COALESCE(Anamnesi.ALTRE_PATOLOGIE_CHECKBOX,0)", NULL, "other diseases"]);
+  $db_fit->addInputColumn(["0+COALESCE(Anamnesi.VITAMINA_D,0)", NULL, "vitamin D-25OH"]);
   // previous DXA spine total Z score
-  $db_fit->addInputColumn("Anamnesi.COLONNA_Z_SCORE");
-  // previous DXA hip total T score
-  $db_fit->addInputColumn("Anamnesi.FEMORE_T_SCORE");
+  $db_fit->addInputColumn(["Anamnesi.COLONNA_Z_SCORE", NULL, "previous spine Z-score"]);
+  // previous DXA spine total T score
+  $db_fit->addInputColumn(["Anamnesi.COLONNA_T_SCORE", NULL, "previous spine T-score"]);
   // previous DXA hip total Z score
-  $db_fit->addInputColumn("Anamnesi.FEMORE_Z_SCORE");
+  $db_fit->addInputColumn(["Anamnesi.FEMORE_Z_SCORE", NULL, "previous femur Z-score"]);
+  // previous DXA hip total T score
+  $db_fit->addInputColumn(["Anamnesi.FEMORE_T_SCORE", NULL, "previous femur Z-score"]);
   // spine (normal, osteopenic, osteoporotic)
   // checkbox+value("Diagnosi.SITUAZIONE_COLONNA_CHECKBOX" "Diagnosi.SITUAZIONE_COLONNA")
   // $db_fit->addInputColumn(["CONCAT('', IF(Diagnosi.SITUAZIONE_COLONNA_CHECKBOX, Diagnosi.SITUAZIONE_COLONNA, 'Normale'))", "ForceCategorical", "Diagnosi.N_SITUAZIONE_COLONNA"]);
-  $db_fit->addInputColumn(["Diagnosi.SITUAZIONE_COLONNA", "ForceCategorical", "Diagnosi.N_SITUAZIONE_COLONNA"]);
+  $db_fit->addInputColumn(["Diagnosi.SITUAZIONE_COLONNA", "ForceCategorical", "spine status"]);
   // hip (normal, osteopenic, osteoporotic)
   // merge(checkbox+value(Diagnosi.SITUAZIONE_FEMORE_SN...),checkbox+value(SITUAZIONE_FEMORE_DX...))
-  $db_fit->addInputColumn(["CONCAT('', IF(Diagnosi.SITUAZIONE_FEMORE_SN_CHECKBOX, Diagnosi.SITUAZIONE_FEMORE_SN, IF(Diagnosi.SITUAZIONE_FEMORE_DX_CHECKBOX, Diagnosi.SITUAZIONE_FEMORE_DX, NULL)))", "ForceCategorical", "Diagnosi.SITUAZIONE_FEMORE"]);
+  $db_fit->addInputColumn(["CONCAT('', IF(Diagnosi.SITUAZIONE_FEMORE_SN_CHECKBOX, Diagnosi.SITUAZIONE_FEMORE_SN, IF(Diagnosi.SITUAZIONE_FEMORE_DX_CHECKBOX, Diagnosi.SITUAZIONE_FEMORE_DX, NULL)))", "ForceCategorical", "femur status"]);
 
-  $db_fit->addInputColumn("Diagnosi.OSTEOPOROSI_GRAVE");
-  $db_fit->addInputColumn(["CONCAT('', IF(!ISNULL(Diagnosi.COLONNA_NON_ANALIZZABILE) AND !ISNULL(Diagnosi.VERTEBRE_NON_ANALIZZATE_CHECKBOX),IF(Diagnosi.COLONNA_NON_ANALIZZABILE,'No',IF(Diagnosi.VERTEBRE_NON_ANALIZZATE_CHECKBOX,'Parzialmente','Tutta')),NULL))", "ForceCategorical", "Diagnosi.COLONNA_ANALIZZABILE"]);
-  $db_fit->addInputColumn("Diagnosi.COLONNA_VALORI_SUPERIORI");
-  $db_fit->addInputColumn(["CONCAT('', IF(ISNULL(Diagnosi.FEMORE_NON_ANALIZZABILE),NULL,IF(Diagnosi.FEMORE_NON_ANALIZZABILE,'0','1')))", "ForceCategorical", "Diagnosi.FEMORE_ANALIZZABILE"]);
+  // $db_fit->addInputColumn("Diagnosi.OSTEOPOROSI_GRAVE");
+
+  $db_fit->addInputColumn(["CONCAT('', IF(!ISNULL(Diagnosi.COLONNA_NON_ANALIZZABILE) AND !ISNULL(Diagnosi.VERTEBRE_NON_ANALIZZATE_CHECKBOX),IF(Diagnosi.COLONNA_NON_ANALIZZABILE,'No',IF(Diagnosi.VERTEBRE_NON_ANALIZZATE_CHECKBOX,'Parzialmente','Tutta')),NULL))", "ForceCategorical", "portion of analyzed spine"]);
+  $db_fit->addInputColumn(["Diagnosi.COLONNA_VALORI_SUPERIORI", NULL, "spine with too high density values"]);
+  $db_fit->addInputColumn(["CONCAT('', IF(ISNULL(Diagnosi.FEMORE_NON_ANALIZZABILE),NULL,IF(Diagnosi.FEMORE_NON_ANALIZZABILE,'0','1')))", "ForceCategorical", "femur is analyzed"]);
   
   // FRAX
   // nullif(Diagnosi.FRAX_APPLICABILE, checkbox+value("Diagnosi.FRAX_PERCENTUALE" "Diagnosi.FRAX_FRATTURE_MAGGIORI" true))
-  $db_fit->addInputColumn(["0+COALESCE(Diagnosi.FRAX_APPLICABILE,0)"]);
-  $db_fit->addInputColumn(["IF(Diagnosi.FRAX_APPLICABILE,0+IF(ISNULL(Diagnosi.FRAX_PERCENTUALE),NULL,IF(Diagnosi.FRAX_PERCENTUALE, 0, Diagnosi.FRAX_FRATTURE_MAGGIORI)),NULL)", NULL, "Diagnosi.ALG_FRAX_FRATTURE"]);
+  $db_fit->addInputColumn(["0+COALESCE(Diagnosi.FRAX_APPLICABILE,0)", NULL, "FRAX is applicable"]);
+  $db_fit->addInputColumn(["IF(Diagnosi.FRAX_APPLICABILE,0+IF(ISNULL(Diagnosi.FRAX_PERCENTUALE),NULL,IF(Diagnosi.FRAX_PERCENTUALE, 0, Diagnosi.FRAX_FRATTURE_MAGGIORI)),NULL)", NULL, "FRAX (major fractures)"]);
   // nullif(Diagnosi.FRAX_APPLICABILE, checkbox+value("Diagnosi.FRAX_COLLO_FEMORE_PERCENTUALE" "Diagnosi.FRAX_COLLO_FEMORE" true))
-  $db_fit->addInputColumn(["IF(Diagnosi.FRAX_APPLICABILE,0+IF(ISNULL(Diagnosi.FRAX_COLLO_FEMORE_PERCENTUALE),NULL,IF(Diagnosi.FRAX_COLLO_FEMORE_PERCENTUALE, 0, Diagnosi.FRAX_COLLO_FEMORE)),NULL)", NULL, "Diagnosi.ALG_FRAX_FEMORE"]);
+  $db_fit->addInputColumn(["IF(Diagnosi.FRAX_APPLICABILE,0+IF(ISNULL(Diagnosi.FRAX_COLLO_FEMORE_PERCENTUALE),NULL,IF(Diagnosi.FRAX_COLLO_FEMORE_PERCENTUALE, 0, Diagnosi.FRAX_COLLO_FEMORE)),NULL)", NULL, "FRAX (femur)"]);
 
   // DeFRA
   // map(["Diagnosi.DEFRA" => true, "Diagnosi.DEFRA_PERCENTUALE_01" => 0, "Diagnosi.DEFRA_PERCENTUALE_50" => 50])
-  $db_fit->addInputColumn(["0+COALESCE(Diagnosi.DEFRA_APPLICABILE,0)"]);
-  $db_fit->addInputColumn(["IF(Diagnosi.DEFRA_APPLICABILE,0+IF(ISNULL(Diagnosi.DEFRA_PERCENTUALE_01),NULL,IF(Diagnosi.DEFRA_PERCENTUALE_01, 0,IF(ISNULL(Diagnosi.DEFRA_PERCENTUALE_50),NULL,IF(Diagnosi.DEFRA_PERCENTUALE_50, 50, Diagnosi.DEFRA)))),NULL)", NULL, "Diagnosi.ALG_DEFRA"]);
+  $db_fit->addInputColumn(["0+COALESCE(Diagnosi.DEFRA_APPLICABILE,0)", NULL, "DeFRA is applicable"]);
+  $db_fit->addInputColumn(["IF(Diagnosi.DEFRA_APPLICABILE,0+IF(ISNULL(Diagnosi.DEFRA_PERCENTUALE_01),NULL,IF(Diagnosi.DEFRA_PERCENTUALE_01, 0,IF(ISNULL(Diagnosi.DEFRA_PERCENTUALE_50),NULL,IF(Diagnosi.DEFRA_PERCENTUALE_50, 50, Diagnosi.DEFRA)))),NULL)", NULL, "DeFRA"]);
 
   // FRAX_AGGIUSTATO
   // $db_fit->addInputColumn(["IF(Diagnosi.FRAX_AGGIUSTATO_APPLICABILE,0+IF(Diagnosi.FRAX_AGGIUSTATO_PERCENTUALE, 0, FRAX_FRATTURE_MAGGIORI_AGGIUSTATO_VALORE),NULL)", NULL, "Diagnosi.ALG_FRAX_AGG_FRATTURE"]);
@@ -200,18 +201,18 @@ function testMed3($lr) {
   // TBS
   // $db_fit->addInputColumn(["IF(Diagnosi.TBS_COLONNA_APPLICABILE,0+IF(Diagnosi.TBS_COLONNA_PERCENTUALE, 0, TBS_COLONNA_VALORE),NULL)", NULL, "Diagnosi.ALG_TBS"]);
 
-  $db_fit->addInputColumn("Densitometrie.SPINE_CHECKBOX");
-  $db_fit->addInputColumn("Densitometrie.HIP_R_CHECKBOX");
-  $db_fit->addInputColumn("Densitometrie.HIP_L_CHECKBOX");
+  // $db_fit->addInputColumn("Densitometrie.SPINE_CHECKBOX");
+  // $db_fit->addInputColumn("Densitometrie.HIP_R_CHECKBOX");
+  // $db_fit->addInputColumn("Densitometrie.HIP_L_CHECKBOX");
 
-  // current DXA spine total T score
-  $db_fit->addInputColumn("Densitometrie.TOT_T_SCORE");
   // current DXA spine total Z score
-  $db_fit->addInputColumn("Densitometrie.TOT_Z_SCORE");
-  // current DXA hip total T score
-  $db_fit->addInputColumn("Densitometrie.NECK_T_SCORE");
+  $db_fit->addInputColumn(["Densitometrie.TOT_Z_SCORE", NULL, "spine Z-score"]);
+  // current DXA spine total T score
+  $db_fit->addInputColumn(["Densitometrie.TOT_T_SCORE", NULL, "spine T-score"]);
   // current DXA hip total Z score
-  $db_fit->addInputColumn("Densitometrie.NECK_Z_SCORE");
+  $db_fit->addInputColumn(["Densitometrie.NECK_Z_SCORE", NULL, "femur Z-score"]);
+  // current DXA hip total T score
+  $db_fit->addInputColumn(["Densitometrie.NECK_T_SCORE", NULL, "femur T-score"]);
 
   $db_fit->setOutputColumns([
     ["RaccomandazioniTerapeuticheUnitarie.TIPO",
