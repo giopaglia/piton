@@ -203,7 +203,7 @@ class DBFit {
 
   /** Given the path to a recursion node, read data from database, pre-process it,
        build instance objects. At each node, there is an output column which might generate different attributes, so there are k different problems, and this function computes k sets of instances, with same input attributes/values and different output ones. */
-  private function readData($idVal = NULL, array $recursionPath = []) : array {
+  private function readData($idVal = NULL, array $recursionPath = []) : ?array {
 
     $recursionLevel = count($recursionPath);
     echo "DBFit->readData(ID: " . toString($idVal) . ", LEVEL $recursionLevel (path " . toString($recursionPath) . "))" . PHP_EOL;
@@ -282,13 +282,15 @@ class DBFit {
     }
     $outputAttributes = $this->getColumnAttributes($outputColumn, $recursionPath);
 
-    $dataframes = [];
+    $rawDataframe = NULL;
     
     /* Check that some data is found and the output attributes were correctly computed */
     if (!is_array($outputAttributes)) {
       warn("Couldn't derive output attributes for output column {$this->getColumnName($outputColumn)}!");
     }
     else {
+      $rawDataframe = [];
+
       /* Check that the output attributes are discrete (i.e nominal) */
       foreach ($outputAttributes as $i_prob => $outputAttribute) {
         if (!($outputAttribute instanceof DiscreteAttribute)) {
@@ -415,48 +417,57 @@ class DBFit {
 
         fclose($f);
       }
-
-      /* Generate many dataframes, each with a single output attribute (one per each of the output attributes fore this column) */
-      $numOutputAttributes = count($outputAttributes);
-      // echo "Output attributes: "; var_dump($outputAttributes);
-      foreach ($outputAttributes as $i_prob => $outputAttribute) {
-        // echo "Problem $i_prob/" . $numOutputAttributes . PHP_EOL;
-
-        /* Build instances for this output attribute */
-        $outputAttr = clone $final_attributes[$i_prob];
-        $inputAttrs = array_map("clone_object", array_slice($final_attributes, $numOutputAttributes));
-        $outputVals = array_column($final_data, $i_prob);
-        $attrs = array_merge([$outputAttr], $inputAttrs);
-        $data = [];
-        foreach ($final_data as $i => $row) {
-          $data[] = array_merge([$outputVals[$i]], array_slice($row, $numOutputAttributes));
-        }
-
-        $dataframe = new Instances($attrs, $data);
-        
-        // if (DEBUGMODE || !$silentExcelOutput) {
-        //   // $dataframe->save_ARFF("datasets/" . $this->getModelName($recursionPath, $i_prob) . ".arff");
-        //   if ($idVal === NULL) {
-        //     $dataframe->save_CSV("datasets/" . $this->getModelName($recursionPath, $i_prob) . ".csv");
-        //   } else {
-        //     // $dataframe->save_CSV("datasets/" . $this->getModelName($recursionPath, $i_prob) . "-$idVal.csv");
-        //   }
-        // }
-
-        // if (DEBUGMODE && $idVal === NULL) {
-        //   // $dataframe->save_ARFF("arff/" . $this->getModelName($recursionPath, $i_prob) . ".arff");
-        //   // echo $dataframe->toString(false);
-        // }
-        
-        $dataframes[] = $dataframe;
-      }
-
-      echo count($dataframes) . " dataframes computed " . PHP_EOL;
+      $rawDataframe = [$final_attributes, $final_data, $outputAttributes];
     }
 
-    return $dataframes;
+    return $rawDataframe;
   }
 
+  private function numDataframes(?array $rawDataframe) : int {
+    if ($rawDataframe === NULL) { return 0; }
+    list($final_attributes, $final_data, $outputAttributes) = $rawDataframe;
+    $numOutputAttributes = count($outputAttributes);
+    return $numOutputAttributes;
+  }
+
+  private function generateDataframes(array $rawDataframe) : Generator {
+    /* Generate many dataframes, each with a single output attribute (one per each of the output attributes fore this column) */
+    list($final_attributes, $final_data, $outputAttributes) = $rawDataframe;
+    $numOutputAttributes = count($outputAttributes);
+    // echo "Output attributes: "; var_dump($outputAttributes);
+    foreach ($outputAttributes as $i_prob => $outputAttribute) {
+      // echo "Problem $i_prob/" . $numOutputAttributes . PHP_EOL;
+
+      /* Build instances for this output attribute */
+      $outputAttr = clone $final_attributes[$i_prob];
+      $inputAttrs = array_map("clone_object", array_slice($final_attributes, $numOutputAttributes));
+      $outputVals = array_column($final_data, $i_prob);
+      $attrs = array_merge([$outputAttr], $inputAttrs);
+      $data = [];
+      foreach ($final_data as $i => $row) {
+        $data[] = array_merge([$outputVals[$i]], array_slice($row, $numOutputAttributes));
+      }
+
+      $dataframe = new Instances($attrs, $data);
+      
+      // if (DEBUGMODE || !$silentExcelOutput) {
+      //   // $dataframe->save_ARFF("datasets/" . $this->getModelName($recursionPath, $i_prob) . ".arff");
+      //   if ($idVal === NULL) {
+      //     $dataframe->save_CSV("datasets/" . $this->getModelName($recursionPath, $i_prob) . ".csv");
+      //   } else {
+      //     // $dataframe->save_CSV("datasets/" . $this->getModelName($recursionPath, $i_prob) . "-$idVal.csv");
+      //   }
+      // }
+
+      // if (DEBUGMODE && $idVal === NULL) {
+      //   // $dataframe->save_ARFF("arff/" . $this->getModelName($recursionPath, $i_prob) . ".arff");
+      //   // echo $dataframe->toString(false);
+      // }
+      
+      yield $dataframe;
+    }
+    // echo count($dataframes) . " dataframes computed " . PHP_EOL; 
+  }
 
   /** Helper function for ->readData() that performs the pre-processing steps.
       For each mysql data row, derive a new data row.
@@ -1072,10 +1083,11 @@ class DBFit {
     }
 
     /* Read the dataframes specific to this recursion path */
-    $dataframes = $this->readData(NULL, $recursionPath);
+    $rawDataframe = $this->readData(NULL, $recursionPath);
+    $numDataframes = $this->numDataframes($rawDataframe);
     
     /* Check: if no data available stop recursion */
-    if (!count($dataframes)) {
+    if ($rawDataframe === NULL || !$numDataframes) {
       echo "Train-time recursion stops here due to lack of data (recursionPath = " . toString($recursionPath)
          . "). " . PHP_EOL;
       if ($recursionLevel == 0) {
@@ -1085,12 +1097,13 @@ class DBFit {
     }
 
     /* Obtain output attributes */
-    $outputAttributes = $this->getColumnAttributes($this->outputColumns[$recursionLevel], $recursionPath);
+    // $outputAttributes = $this->getColumnAttributes($this->outputColumns[$recursionLevel], $recursionPath);
     
     /* For each attribute, train subtree */
-    foreach ($dataframes as $i_prob => $data) {
-      echo "Problem $i_prob/" . count($dataframes) . PHP_EOL;
-      $outputAttribute = $outputAttributes[$i_prob];
+    foreach ($this->generateDataframes($rawDataframe) as $i_prob => $data) {
+      echo "Problem $i_prob/" . $numDataframes . PHP_EOL;
+      // $outputAttribute = $outputAttributes[$i_prob];
+      $outputAttribute = $data->getClassAttribute();
 
       /* If no data available, skip training */
       if (!$data->numInstances()) {
@@ -1107,16 +1120,16 @@ class DBFit {
       // echo "TRAIN" . PHP_EOL . $trainData->toString(DEBUGMODE <= 0) . PHP_EOL;
       // echo "TEST" . PHP_EOL . $testData->toString(DEBUGMODE <= 0) . PHP_EOL;
       
+      // TODO RANDOMIZE
+      // echo "Randomizing!" . PHP_EOL;
+      // srand(make_seed());
+      // $trainData->randomize();
+      
       echo "TRAIN: " . $trainData->numInstances() . " instances" . PHP_EOL;
       echo "TEST: " . $testData->numInstances() . " instances" . PHP_EOL;
       
       $trainData->save_CSV("datasets/" . $this->getModelName($recursionPath, $i_prob) . "-TRAIN.csv");
       $testData->save_CSV("datasets/" . $this->getModelName($recursionPath, $i_prob) . "-TEST.csv");
-      
-      // TODO RANDOMIZE
-      // echo "Randomizing!" . PHP_EOL;
-      // srand(make_seed());
-      // $trainData->randomize();
       
       /* Train */
       $model_name = $this->getModelName($recursionPath, $i_prob);
@@ -1147,13 +1160,13 @@ class DBFit {
       /* Recursion base case */
       if ($recursionLevel+1 == count($this->outputColumns)) {
         echo "Train-time recursion stops here (recursionPath = " . toString($recursionPath)
-           . ", problem $i_prob/" . count($dataframes) . ") : '$model_name'. " . PHP_EOL;
+           . ", problem $i_prob/" . $numDataframes . ") : '$model_name'. " . PHP_EOL;
       }
       else {
         /* Recursive step: for each output class value, recurse and train the subtree */
         echo "Branching at depth $recursionLevel on attribute \""
           . $outputAttribute->getName() . "\" ($i_prob/"
-            . count($outputAttributes) . ")) "
+            . $numDataframes . ")) "
           . " with domain " . toString($outputAttribute->getDomain())
           . ". " . PHP_EOL;
         foreach ($outputAttribute->getDomain() as $className) {
@@ -1218,6 +1231,7 @@ class DBFit {
       return [];
     }
 
+    // TODO avoid reading outputAttributes here, find an alternative solution
     $outputAttributes = $this->getColumnAttributes($this->outputColumns[$recursionLevel], $recursionPath);
 
     /* If no model was trained for the current node, stop the recursion */
@@ -1249,10 +1263,11 @@ class DBFit {
     $predictions = [];
     
     /* Read the dataframes specific to this recursion path */
-    $dataframes = $this->readData($idVal, $recursionPath);
+    $rawDataframe = $this->readData($idVal, $recursionPath);
+    $numDataframes = $this->numDataframes($rawDataframe);
 
     /* Check: if no data available stop recursion */
-    if (!count($dataframes)) {
+    if ($rawDataframe === NULL || !$numDataframes) {
       echo "Prediction-time recursion stops here due to lack of data (recursionPath = " . toString($recursionPath)
          . "). " . PHP_EOL;
       if ($recursionLevel == 0) {
@@ -1262,8 +1277,8 @@ class DBFit {
     }
 
     /* For each attribute, predict subtree */
-    foreach ($dataframes as $i_prob => $data) {
-      echo "Problem $i_prob/" . count($dataframes) . PHP_EOL;
+    foreach ($this->generateDataframes($rawDataframe) as $i_prob => $data) {
+      echo "Problem $i_prob/" . $numDataframes . PHP_EOL;
       // echo "Data: " . $data->toString(true) . PHP_EOL;
 
       /* If no data available, skip training */
@@ -1275,7 +1290,7 @@ class DBFit {
 
       /* Check that a unique data instance is retrieved */
       if ($data->numInstances() !== 1) {
-        die_error("Found more than one instance at predict time. Is this wanted? Id: {$this->identifierColumnName} = $idVal");
+        die_error("Found more than one instance at predict time. Is this wanted? ID: {$this->identifierColumnName} = $idVal");
       }
 
       /* Retrieve model */
