@@ -426,7 +426,7 @@ class PRip extends Learner {
             }
             $revision = clone $oldRule;
 
-            /* For revision, first remove the data covered by the old rule */
+            /* For revision, only consider the data already covered by the old rule */
             $newGrowData = Instances::createEmpty($growData);
             /* Split data */
             for ($b = 0; $b < $growData->numInstances(); $b++) {

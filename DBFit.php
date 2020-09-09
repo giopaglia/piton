@@ -27,7 +27,7 @@ class DBFit {
     *
     
     For each table, the name must be specified. The name alone is sufficient for
-    the first specified table, so the first term can be the name in the form of a string (e.g "patient"). For the remaining tables, join criteria can be specified, by means of 'joinClauses' and 'joinType'.
+    the first specified table, so the first term can be the name in the form of a string (e.g. "patient"). For the remaining tables, join criteria can be specified, by means of 'joinClauses' and 'joinType'.
     If one wants to specify these parameters, then the table-term should be an array [tableName, joinClauses=[], joinType="INNER JOIN"].
     joinClauses is a list of 'MySQL constraint strings' such as "patent.ID = report.patientID", used in the JOIN operation. If a single constraint is desired, then joinClauses can also simply be the string represeting the constraint (as compared to the array containing the single constraint).
     The join type, defaulted to "INNER JOIN", is the MySQL type of join.
@@ -39,7 +39,7 @@ class DBFit {
 
     *
     
-    For each input column, the name must be specified, and it makes up sufficient information. As such, a term can simply be the name of the input column (e.g "Age").
+    For each input column, the name must be specified, and it makes up sufficient information. As such, a term can simply be the name of the input column (e.g. "Age").
     When dealing with more than one MySQL table, it is mandatory that each column name references the table it belongs using the dot notation, as in "patient.Age".
     Additional parameters can be supplied for managing the column pre-processing.
     The generic form for a column-term is [columnName, treatment=NULL, attrName=columnName].
@@ -53,7 +53,7 @@ class DBFit {
       (TODO generalize: "ForceBinary" generates k binary attributes from a generic nominal attribute of domain size k.)
       For text fields, "BinaryBagOfWords" can be used to generate k binary attributes, each representing the presence of one of the most frequent words.
       When a treatment is desired, the column-term must be an array
-       [columnName, treatment=NULL] (e.g ["BirthDate", "ForceCategorical"])
+       [columnName, treatment=NULL] (e.g. ["BirthDate", "ForceCategorical"])
       Treatments may require/allow arguments, and these can be supplied through
        an array instead of a simple string. For example, "BinaryBagOfWords"
        requires a parameter k, representing the size of the dictionary.
@@ -111,6 +111,14 @@ class DBFit {
     - ["patient.Age > 30", "patient.Name IS NOT NULL"]
   */
   private $whereClauses;
+
+  /* TODO update
+    SQL ORDER BY clauses (array of strings, or single string)
+    For example:
+    - [["patient.Age", "DESC"]]
+    - ["patient.Age", ["patient.ID", "DESC"]]
+  */
+  private $OrderByClauses;
 
   /* SQL LIMIT term in the SELECT query (integer) */
   // TODO remove? Just for debug? because note that rn we use the same value at every recursion level. Maybe we want to specify a different value for every outputLevel?
@@ -185,6 +193,7 @@ class DBFit {
     $this->setOutputColumns([]);
     $this->setIdentifierColumnName(NULL);
     $this->whereClauses = NULL;
+    $this->setOrderByClauses([]);
     $this->limit = NULL;
 
     $this->models = [];
@@ -281,10 +290,10 @@ class DBFit {
     }
     else {
       /* Check that the output attributes are discrete (i.e nominal) */
-      foreach ($outputAttributes as $i_attr => $outputAttribute) {
+      foreach ($outputAttributes as $i_prob => $outputAttribute) {
         if (!($outputAttribute instanceof DiscreteAttribute)) {
           die_error("All output attributes must be categorical! '"
-            . $outputAttribute->getName() . "' ($i_attr-th of output column {$this->getColumnName($outputColumn)}) is not.");
+            . $outputAttribute->getName() . "' ($i_prob-th of output column {$this->getColumnName($outputColumn)}) is not.");
         }
       }
 
@@ -327,6 +336,8 @@ class DBFit {
       
       /* Finally obtain data */
       $silentSQL = (count($recursionPath) && $recursionPath[count($recursionPath)-1][0] != 0);
+      $silentExcelOutput = false;
+
       if (!$silentSQL) {
         echo "Example query for LEVEL " . $recursionLevel . ", " . toString($recursionPath);
       }
@@ -375,16 +386,46 @@ class DBFit {
         }
       }
       
+      if (DEBUGMODE || !$silentExcelOutput) {
+        // $dataframe->save_ARFF("datasets/" . $this->getModelName($recursionPath, NULL) . ".arff");
+        if ($idVal === NULL) {
+          $path = "datasets/" . toString($recursionPath) . ".csv";
+        } else {
+          $path = "datasets/" . toString($recursionPath) . "-$idVal.csv";
+        }
+        $f = fopen($path, "w");
+
+        /* Attributes */
+        $attrs_str = [];
+        foreach ($final_attributes as $attr) {
+          $attrs_str[] = $attr->getName();
+        }
+        fputcsv($f, $attrs_str);
+
+        /* Print the CSV representation of a value of the attribute */
+        $getCSVRepr = function ($val, Attribute $attr)
+        {
+          return $val === NULL ? "" : $attr->reprVal($val);
+        };
+        
+        /* Data */
+        foreach ($final_data as $k => $inst) {
+          fputcsv($f, array_map($getCSVRepr, $inst, $final_attributes));
+        }
+
+        fclose($f);
+      }
+
       /* Generate many dataframes, each with a single output attribute (one per each of the output attributes fore this column) */
       $numOutputAttributes = count($outputAttributes);
       // echo "Output attributes: "; var_dump($outputAttributes);
-      foreach ($outputAttributes as $i_attr => $outputAttribute) {
-        // echo "Problem $i_attr/" . $numOutputAttributes . PHP_EOL;
+      foreach ($outputAttributes as $i_prob => $outputAttribute) {
+        // echo "Problem $i_prob/" . $numOutputAttributes . PHP_EOL;
 
         /* Build instances for this output attribute */
-        $outputAttr = clone $final_attributes[$i_attr];
+        $outputAttr = clone $final_attributes[$i_prob];
         $inputAttrs = array_map("clone_object", array_slice($final_attributes, $numOutputAttributes));
-        $outputVals = array_column($final_data, $i_attr);
+        $outputVals = array_column($final_data, $i_prob);
         $attrs = array_merge([$outputAttr], $inputAttrs);
         $data = [];
         foreach ($final_data as $i => $row) {
@@ -393,11 +434,20 @@ class DBFit {
 
         $dataframe = new Instances($attrs, $data);
         
-        if (DEBUGMODE && $idVal === NULL) {
-          $dataframe->save_ARFF("instances");
-          // echo $dataframe->toString(false);
-        }
+        // if (DEBUGMODE || !$silentExcelOutput) {
+        //   // $dataframe->save_ARFF("datasets/" . $this->getModelName($recursionPath, $i_prob) . ".arff");
+        //   if ($idVal === NULL) {
+        //     $dataframe->save_CSV("datasets/" . $this->getModelName($recursionPath, $i_prob) . ".csv");
+        //   } else {
+        //     // $dataframe->save_CSV("datasets/" . $this->getModelName($recursionPath, $i_prob) . "-$idVal.csv");
+        //   }
+        // }
 
+        // if (DEBUGMODE && $idVal === NULL) {
+        //   // $dataframe->save_ARFF("arff/" . $this->getModelName($recursionPath, $i_prob) . ".arff");
+        //   // echo $dataframe->toString(false);
+        // }
+        
         $dataframes[] = $dataframe;
       }
 
@@ -729,6 +779,12 @@ class DBFit {
       $sql .= " LIMIT {$this->limit}";
     }
 
+    /* ORDER BY */
+    if (!$distinct && count($this->orderByClauses)) {
+      $sql .= " ORDER BY "
+           . join(", ", array_map(function ($clause) { return (is_string($clause) ? $clause : $clause[0] . " " . $clause[1]); }, $this->orderByClauses));
+    }
+    
     /* Query database */
     $res = mysql_select($this->db, $sql, $silent);
     return $res;
@@ -1053,6 +1109,14 @@ class DBFit {
       
       echo "TRAIN: " . $trainData->numInstances() . " instances" . PHP_EOL;
       echo "TEST: " . $testData->numInstances() . " instances" . PHP_EOL;
+      
+      $trainData->save_CSV("datasets/" . $this->getModelName($recursionPath, $i_prob) . "-TRAIN.csv");
+      $testData->save_CSV("datasets/" . $this->getModelName($recursionPath, $i_prob) . "-TEST.csv");
+      
+      // TODO RANDOMIZE
+      // echo "Randomizing!" . PHP_EOL;
+      // srand(make_seed());
+      // $trainData->randomize();
       
       /* Train */
       $model_name = $this->getModelName($recursionPath, $i_prob);
@@ -1771,12 +1835,22 @@ class DBFit {
     // var_dump($outAttrs[count($recursionPath)]);
     $recursionLevel = count($recursionPath);
     if (!$short) {
-      $currentLevelStr = str_replace(".", ":",
-             $this->getColumnAttributes($this->outputColumns[$recursionLevel], $recursionPath)[$i_prob]->getName());
-      $out = str_replace("/", ":", $path_name . "_" . $currentLevelStr);
+      if ($i_prob !== NULL) {
+        $currentLevelStr = str_replace(".", ".",
+               $this->getColumnAttributes($this->outputColumns[$recursionLevel], $recursionPath)[$i_prob]->getName());
+        $out = str_replace("/", ".", $path_name . "_" . $currentLevelStr);
+      }
+      else {
+        $out = str_replace("/", ".", $path_name);
+      }
     }
     else {
-      $out = $path_name . $i_prob;
+      if ($i_prob !== NULL) {
+        $out = $path_name . $i_prob;
+      }
+      else {
+        $out = $path_name;
+      }
     }
     return $out;
 
@@ -1878,6 +1952,22 @@ class DBFit {
     return $this;
   }
 
+  function setOrderByClauses($_orderByClauses) : self
+  {
+    $orderByClauses = [];
+    foreach ($_orderByClauses as $_clause) {
+      $clause = $_clause;
+      if (!is_string($_clause)) {
+        if (!is_array($_clause) || !is_string($_clause[0]) || !is_string($_clause[1])) {
+          die_error("An orderByClause has to be a string (e.g. a columnName) or an array [columnName, 'DESC']"
+          . get_var_dump($_clause));
+        }
+      }
+      $orderByClauses[] = $clause;
+    }
+    $this->orderByClauses = $orderByClauses;
+    return $this;
+  }
 
   function setLimit(?int $limit) : self
   {
@@ -1950,10 +2040,6 @@ class DBFit {
       /* Train+test split */
       case is_array($this->trainingMode):
         $trRat = $this->trainingMode[0]/($this->trainingMode[0]+$this->trainingMode[1]);
-        // TODO RANDOMIZE
-        echo "Randomizing!" . PHP_EOL;
-        srand(make_seed());
-        $data->randomize();
         $rt = Instances::partition($data, $trRat);
         
         break;

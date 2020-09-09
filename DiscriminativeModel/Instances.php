@@ -186,6 +186,18 @@ class Instances {
     return $this->sumOfWeights;
     // return array_sum($this->getWeights());
   }
+  function isWeighted() : bool {
+    $a = NULL;
+    for ($x = $this->numInstances() - 1; $x >= 0; $x--) {
+      // TODO explain that weights cannot be null
+      if ($a === NULL) {
+        $a = $this->inst_weight($x);
+      } else if ($a !== $this->inst_weight($x)) {
+        return true;
+      }
+    }
+    return false;
+  }
 
   /*
     // Dangerous
@@ -438,6 +450,7 @@ class Instances {
   function save_ARFF(string $path) {
     if (DEBUGMODE > 2) echo "Instances->save_ARFF($path)" . PHP_EOL;
     postfixisify($path, ".arff");
+    die_error("TODO: save_ARFF is experimental and has to be tested.");
     $f = fopen($path, "w");
     fwrite($f, "% Generated with \"" . PACKAGE_NAME . "\"\n");
     fwrite($f, "\n");
@@ -459,6 +472,46 @@ class Instances {
     fwrite($f, "\n@DATA\n");
     foreach ($this->data as $k => $inst) {
       fwrite($f, join(",", array_map($getARFFRepr, $this->getInstance($k), $this->getAttributes())) . ", {" . $this->inst_weight($k) . "}\n");
+    }
+
+    fclose($f);
+  }
+
+  /**
+   * Save data to file, CSV format
+   */
+  function save_CSV(string $path) {
+    if (DEBUGMODE > 2) echo "Instances->save_CSV($path)" . PHP_EOL;
+    postfixisify($path, ".csv");
+    $f = fopen($path, "w");
+
+    /* Attributes */
+    $attrs_str = [];
+    foreach ($this->getAttributes() as $attr) {
+      $attrs_str[] = $attr->getName();
+    }
+    if($this->isWeighted()) {
+      $attrs_str[] = "WEIGHT";
+    }
+    fputcsv($f, $attrs_str);
+
+    /* Print the CSV representation of a value of the attribute */
+    $getCSVRepr = function ($val, Attribute $attr)
+    {
+      return $val === NULL ? "" : $attr->reprVal($val);
+    };
+    
+    /* Data */
+    
+    if(!$this->isWeighted()) {
+      foreach ($this->data as $k => $inst) {
+        fputcsv($f, array_map($getCSVRepr, $this->getInstance($k), $this->getAttributes()));
+      }
+    }
+    else {
+      foreach ($this->data as $k => $inst) {
+        fputcsv($f, array_merge(array_map($getCSVRepr, $this->getInstance($k), $this->getAttributes()), [$this->inst_weight($k)]));
+      }
     }
 
     fclose($f);

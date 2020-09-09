@@ -1,39 +1,23 @@
+	numOptimizations:        Number of runs of optimizations
+	numFolds:        The number of folds to split data into Grow and Prune for IREP (One fold is used as pruning set.)
+	minNo:        Minimal weights of instance weights within a split
+	checkErr:        Whether check the error rate >= 0.5 in stopping criteria
+	usePruning:        Whether use pruning, i.e. the data is clean or not
+
+
+- force non-null values check nel codice?
+#####################################################
 DROP TABLE `phptest`.`models__index`
 CREATE VIEW `models__index_view` AS SELECT modelName, numRules, totN, trainN, testN, positives, negatives, TP, TN, FP, FN, accuracy, sensitivity, specificity, PPV, NPV  FROM `models__index` ORDER BY `tableName` ASC
 SELECT * FROM `models__index`
 where tableName in (SELECT DISTINCT tableName FROM `models__index`  )
 ORDER BY `models__index`.`date` DESC , `models__index`.`tableName` ASC
 
-DO RANDOMIZE!
-
-
-? FRATTURA_FEMORE dovrebbe essere un checkbox+value, ma non esiste il relativo campo checkbox. Secondo te in Anamnesi.FRATTURA_FEMORE, i NULL equivalgono in realta' a una nuova classe "0"?
-	SELECT DISTINCT FRATTURA_FEMORE FROM `Anamnesi` 
-? FRATTURA_SITI_DIVERSI_ALTRO, trasformare in binario. e' un campo di testo, faccio binary bag of words.
-	SELECT DISTINCT FRATTURA_SITI_DIVERSI,FRATTURA_SITI_DIVERSI_ALTRO FROM `Anamnesi` 
-? Diagnosi.SITUAZIONE_FEMORE_SN_CHECKBOX, Diagnosi.SITUAZIONE_FEMORE_DX_CHECKBOX: ho trovato un referto dove entrambi i femori sono (entrambi osteoporotici). (E casi 20 dove nessun femore e' fratturato)!
-	SELECT Diagnosi.ID, Diagnosi.SITUAZIONE_FEMORE_SN_CHECKBOX, Diagnosi.SITUAZIONE_FEMORE_SN, Diagnosi.SITUAZIONE_FEMORE_DX_CHECKBOX, Diagnosi.SITUAZIONE_FEMORE_DX, IF(Diagnosi.SITUAZIONE_FEMORE_SN_CHECKBOX, Diagnosi.SITUAZIONE_FEMORE_SN, IF(Diagnosi.SITUAZIONE_FEMORE_DX_CHECKBOX, Diagnosi.SITUAZIONE_FEMORE_DX, 'Normale')) FROM `Diagnosi` WHERE (ISNULL(SITUAZIONE_FEMORE_SN) AND ISNULl(SITUAZIONE_FEMORE_DX)) OR (SITUAZIONE_FEMORE_SN = SITUAZIONE_FEMORE_DX)
-SITUAZIONE_COLONNA_CHECKBOX cosa significa? Mancanda di dato o situazione di normalita'? Perche' c'e' a volte SITUAZIONE_COLONNA_CHECKBOX e' 1 e SITUAZIONE_COLONNA e' 'Situazione di normalita'. Ci sono anche 2 casi dove SITUAZIONE_COLONNA_CHECKBOX e' 0 e SITUAZIONE_COLONNA e' 'Situazione di normalita'
-	SELECT COUNT(*) ,Diagnosi.SITUAZIONE_COLONNA_CHECKBOX, Diagnosi.SITUAZIONE_COLONNA FROM `Diagnosi` GROUP by Diagnosi.SITUAZIONE_COLONNA_CHECKBOX, Diagnosi.SITUAZIONE_COLONNA 
-
-? "Pazienti.SESSO = 'F'"
-? cosa e' COLONNA_PARZ_NON_ANALIZZABILE?
-? applicabile: Diagnosi.FRAX_APPLICABILE fa diventare il frax NULL ?
-? errore: //$db_fit->addInputColumn("ID_RACCOMANDAZIONE_TERAPEUTICA");
-? segnalo probabile errore nel tipo della colonna Anamnesi.TERAPIA_OSTEOPROTETTIVA_SPECIFICA. dovrebbe essere tinyint
-? questione OSTEOPOROSI_GRAVE
-? supporto, confidenza, poi derivi la bonta' (Relevance and reliability thresholds). TODO Domanda: perche' ogni regola va valutata (supporto e confidence) contro l'intero set di istanze di testing, dimenticandosi dell'ordine delle regole? TODO use non-weighted counterparts?
-? come mai non risolviamo come insieme?
-
-
-
-#####################################################
 SELECT COUNT(*),
 TBS_COLONNA_APPLICABILE,
 TBS_COLONNA_PERCENTUALE,
 TBS_COLONNA_VALORE,
 IF(Diagnosi.TBS_COLONNA_APPLICABILE,0+IF(Diagnosi.TBS_COLONNA_PERCENTUALE, 0, TBS_COLONNA_VALORE),NULL)
-
 FROM `Diagnosi` GROUP BY
 TBS_COLONNA_APPLICABILE,
 TBS_COLONNA_PERCENTUALE,
@@ -41,6 +25,18 @@ TBS_COLONNA_VALORE,
 IF(Diagnosi.TBS_COLONNA_APPLICABILE,0+IF(Diagnosi.TBS_COLONNA_PERCENTUALE, 0, TBS_COLONNA_VALORE),NULL)
 
 #####################################################
+
+/*
+TODOs:
+- Text processing via NlpTools
+- Parallelize code ( https://medium.com/@rossbulat/true-php7-multi-threading-how-to-rebuild-php-and-use-pthreads-bed4243c0561 )
+- Implement an unweighted version of Instances
+- Fix those == that should actually be === https://stackoverflow.com/questions/12151997/why-does-1234-1234-test-evaluate-to-true#comment16259587_12151997
+- Add method setSQL() that directly asks for the SELECT - FROM - WHERE query;
+- Make sql querying secure with addslashes or whatever
+ */
+
+- Randomizza train indipendentemente (Non per JRip) magari un parametro randomizzasi/no
 
 - solve the prediction on one-column-more-attributes.
 	then maybe hardcode in the sql that a given column must have that value, at prediction time?

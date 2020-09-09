@@ -79,15 +79,12 @@ class RipperRule extends _Rule {
   }
 
   function coversAll(Instances &$data) : bool {
-    $covers = true;
-
     for ($i = 0; $i < $data->numInstances(); $i++) {
       if (!$this->covers($data, $i)) {
-        $covers = false;
-        break;
+        return false;
       }
     }
-    return $covers;
+    return true;
   }
 
   /**
@@ -119,6 +116,11 @@ class RipperRule extends _Rule {
     $tot       = $data->numInstances();
     $totWeight = $data->getSumOfWeights();
     
+    if ($data->isWeighted()) {
+      die_error("The code must be expanded to test with weighted datasets" . PHP_EOL);
+    }
+    // TODO use non-weighted counterparts?
+
     // if (DEBUGMODE > -1) echo "\$totWeight    : $totWeight    " . PHP_EOL;
     // if (DEBUGMODE > -1) echo "\$tot    : $tot    " . PHP_EOL;
     // $covered = 0;
@@ -145,7 +147,6 @@ class RipperRule extends _Rule {
         $totConsWeight += $data->inst_weight($i);
       }
     }
-    // TODO use non-weighted counterparts?
     
     $support      = safe_div($coveredWeight, $totWeight);
     $confidence   = safe_div(safe_div($tpWeight, $totWeight), $support);
