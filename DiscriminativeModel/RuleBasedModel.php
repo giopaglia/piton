@@ -320,14 +320,10 @@ class RuleBasedModel extends DiscriminativeModel {
       $testData->sortAttrsAs($this->attributes);
     }
 
-    if ($trainData !== NULL) {
-      $trainData = clone $trainData;
-      $trainData->sortAttrsAs($this->attributes);
-    }
-    
     $allData = NULL;
     if ($trainData !== NULL && $testData !== NULL) {
       $allData = clone $trainData;
+      $allData->sortAttrsAs($this->attributes);
       $allData->pushInstancesFrom($testData);
     }
 
@@ -358,10 +354,10 @@ class RuleBasedModel extends DiscriminativeModel {
         echo "  LOCAL EVALUATION:" . PHP_EOL;
     }
 
-    $numRulesAffRil = 0;
-    $numRulesAff = 0;
-    $numRulesRil = 0;
-    $numRulesNANR = 0;
+    $numRulesRA = 0;
+    $numRulesRNA = 0;
+    $numRulesNRA = 0;
+    $numRulesNRNA = 0;
 
     $arr_vals = [];
     foreach ($this->rules as $rule) {
@@ -377,21 +373,21 @@ class RuleBasedModel extends DiscriminativeModel {
             . "\", \"" . join(" AND ", $antds) . "\"";
 
       if ($testData !== NULL) {
-        $measures = $rule->computeMeasures($testData);
-        list($support, $confidence, $lift, $conviction) = $measures;
+        $ruleMeasures = $rule->computeMeasures($testData);
+        list($support, $confidence, $lift, $conviction) = $ruleMeasures;
         
-        $str .= "," . join(",", array_map("mysql_number", $measures));
+        $str .= "," . join(",", array_map("mysql_number", $ruleMeasures));
         
         $ril = $support > $rulesAffRilThesholds[0];
         $aff = $confidence > $rulesAffRilThesholds[1];
         if ($ril && $aff) {
-          $numRulesAffRil++;
+          $numRulesRA++;
         } else if ($ril) {
-          $numRulesRil++;
+          $numRulesRNA++;
         } else if ($aff) {
-          $numRulesAff++;
+          $numRulesNRA++;
         } else {
-          $numRulesNANR++;
+          $numRulesNRNA++;
         }
 
         if (DEBUGMODE > -1) {
@@ -436,21 +432,23 @@ class RuleBasedModel extends DiscriminativeModel {
 
     $sql = "CREATE TABLE IF NOT EXISTS `" . self::$indexTableName . "`";
     $sql .= " (ID INT AUTO_INCREMENT PRIMARY KEY, date DATETIME NOT NULL, modelName TEXT NOT NULL, tableName TEXT NOT NULL, classId INT NOT NULL, className TEXT NOT NULL";
-    $sql .= ", totNumRules INT DEFAULT NULL";
-    $sql .= ", numRulesAffRil INT DEFAULT NULL";
-    $sql .= ", numRulesAffNR INT DEFAULT NULL";
-    $sql .= ", numRulesNARil INT DEFAULT NULL";
-    $sql .= ", numRulesNANR INT DEFAULT NULL";
-    $sql .= ", percRulesAffRil DECIMAL(10,2) AS (`numRulesAffRil` / `totNumRules`)";
-    $sql .= ", percRulesAffNR DECIMAL(10,2) AS (`numRulesAffNR` / `totNumRules`)";
-    $sql .= ", percRulesNARil DECIMAL(10,2) AS (`numRulesNARil` / `totNumRules`)";
-    $sql .= ", percRulesNANR DECIMAL(10,2) AS (`numRulesNANR` / `totNumRules`)";
-    $sql .= ", totN DECIMAL(10,2) DEFAULT NULL";
-    $sql .= ", classShare DECIMAL(10,2) DEFAULT NULL";
-    $sql .= ", trainN DECIMAL(10,2) DEFAULT NULL";
-    $sql .= ", testN DECIMAL(10,2) DEFAULT NULL";
-    $sql .= ", positives DECIMAL(10,2) DEFAULT NULL";
-    $sql .= ", negatives DECIMAL(10,2) DEFAULT NULL";
+    $sql .= ", numRulesRA INT DEFAULT NULL";
+    $sql .= ", numRulesRNA INT DEFAULT NULL";
+    $sql .= ", numRulesNRA INT DEFAULT NULL";
+    $sql .= ", numRulesNRNA INT DEFAULT NULL";
+    $sql .= ", totNumRules INT AS (`numRulesRA` + `numRulesRNA` + `numRulesNRA` + `numRulesNRNA`)";
+    $sql .= ", percRulesRA DECIMAL(10,2) AS (`numRulesRA` / `totNumRules`)";
+    $sql .= ", percRulesRNA DECIMAL(10,2) AS (`numRulesRNA` / `totNumRules`)";
+    $sql .= ", percRulesNRA DECIMAL(10,2) AS (`numRulesNRA` / `totNumRules`)";
+    $sql .= ", percRulesNRNA DECIMAL(10,2) AS (`numRulesNRNA` / `totNumRules`)";
+    $sql .= ", totPositives DECIMAL(10,2) DEFAULT NULL";
+    $sql .= ", totNegatives DECIMAL(10,2) DEFAULT NULL";
+    $sql .= ", totN DECIMAL(10,2) AS (`totPositives` + `totNegatives`)";
+    $sql .= ", totClassShare DECIMAL(10,2) AS (`totPositives` / `totN`)";
+    $sql .= ", testPositives DECIMAL(10,2) DEFAULT NULL";
+    $sql .= ", testNegatives DECIMAL(10,2) DEFAULT NULL";
+    $sql .= ", testN DECIMAL(10,2) AS (`testPositives` + `testNegatives`)";
+    $sql .= ", trainN DECIMAL(10,2) AS (`totN` - `testN`)";
     $sql .= ", TP DECIMAL(10,2) DEFAULT NULL";
     $sql .= ", TN DECIMAL(10,2) DEFAULT NULL";
     $sql .= ", FP DECIMAL(10,2) DEFAULT NULL";
@@ -493,85 +491,77 @@ class RuleBasedModel extends DiscriminativeModel {
     // 
 
     $sql = "INSERT INTO `" . self::$indexTableName . "`";
-    $sql .= " (date, modelName, tableName, classId, className, totNumRules, numRulesAffRil, numRulesAffNR, numRulesNARil, numRulesNANR";
+    $sql .= " (date, modelName, tableName, classId, className";
+    $sql .= ", numRulesRA, numRulesRNA, numRulesNRA, numRulesNRNA";
     if ($allData !== NULL) {
-      $sql .= ", totN";
-      $sql .= ", classShare";
-    }
-    if ($trainData !== NULL) {
-      $sql .= ", trainN";
+      $sql .= ", totPositives, totNegatives";
+      $totMeasures = $this->test($allData);
     }
     if ($testData !== NULL) {
-      $sql .= ", testN";
-    }
-    if ($testData !== NULL) {
-      $sql .= ", positives, negatives, TP, TN, FP, FN, accuracy, sensitivity, specificity, PPV, NPV";
+      $sql .= ", testPositives, testNegatives, TP, TN, FP, FN, accuracy, sensitivity, specificity, PPV, NPV";
+      $testMeasures = $this->test($testData);
     }
     $sql .= ") VALUES (";
 
     $valuesSql = [];
-    if ($testData !== NULL) {
-      $measures = $this->test($testData);
-    }
     $classAttr = $this->getClassAttribute();
     
     if (DEBUGMODE > -1)
       if ($testData !== NULL)
         echo "  GLOBAL EVALUATION:" . PHP_EOL;
     
-    foreach ($classAttr->getDomain() as $classId => $className) {
-      if ($testData !== NULL) {
-        if (isset($measures[$classId])) {
-          $valueSql = "'" . date('Y-m-d H:i:s') . "', '$modelName', '$tableName', $classId, '$className'";
-          // TODO rule numbers should refer to the model, not the className. Mmm
-          $totNumRules = count($this->getRules());
-          $valueSql .= ", " . strval($totNumRules);
-          $valueSql .= ", " . strval($numRulesAffRil);
-          $valueSql .= ", " . strval($numRulesAff);
-          $valueSql .= ", " . strval($numRulesRil);
-          $valueSql .= ", " . strval($numRulesNANR);
-          if ($allData !== NULL) {
-            $valueSql .= ", " . strval($allData->numInstances());
-            $valueSql .= ", " . strval($allData->getClassShare($classId));
-          }
-          if ($trainData !== NULL) {
-            $valueSql .= ", " . strval($trainData->numInstances());
-          }
-          if ($testData !== NULL) {
-            $valueSql .= ", " . strval($testData->numInstances());
-          }
-          $valueSql .= ", " . join(", ", array_map("mysql_number", $measures[$classId])); 
-          $valuesSql[] = $valueSql;
-          if (intval(DEBUGMODE) > -1) {
-            echo "    '$className', ($classId): " . PHP_EOL;
-            if ($allData !== NULL)
-              echo "    totN: " . ($allData->numInstances()) . PHP_EOL;
-              echo "    classShare: " . ($allData->getClassShare($classId)) . PHP_EOL;
-            if ($trainData !== NULL)
-              echo "    trainN: {$trainData->numInstances()}" . PHP_EOL;
-            if ($testData !== NULL)
-              echo "    testN: {$testData->numInstances()}" . PHP_EOL;
-            list($positives, $negatives,
-              $TP, $TN, $FP, $FN,
-              $accuracy,
-              $sensitivity, $specificity, $PPV, $NPV) = $measures[$classId];
-            echo "      positives    : $positives\n";
-            echo "      negatives    : $negatives\n";
-            echo "      TP           : $TP\n";
-            echo "      TN           : $TN\n";
-            echo "      FP           : $FP\n";
-            echo "      FN           : $FN\n";
-            echo "      accuracy     : $accuracy\n";
-            echo "      sensitivity  : $sensitivity\n";
-            echo "      specificity  : $specificity\n";
-            echo "      PPV          : $PPV\n";
-            echo "      NPV          : $NPV\n";
-          }
-        }
+    foreach ($totMeasures as $classId => $totMeasures_) {
+      $className = $classAttr->reprVal($classId);
+
+      $valueSql = "'" . date('Y-m-d H:i:s') . "', '$modelName', '$tableName', $classId, '$className'";
+      // TODO rule numbers should refer to the model, not the className. Mmm
+      $valueSql .= ", " . strval($numRulesRA);
+      $valueSql .= ", " . strval($numRulesRNA);
+      $valueSql .= ", " . strval($numRulesNRA);
+      $valueSql .= ", " . strval($numRulesNRNA);
+
+      if ($allData !== NULL) {
+        // $valueSql .= ", " . strval($allData->numInstances());
+        list($totPositives, $totNegatives,
+          , , , ,
+          ,
+          , , , ) = $totMeasures[$classId];
+        $valueSql .= ", " . strval($totPositives);
+        $valueSql .= ", " . strval($totNegatives);
+        // $valueSql .= ", " . strval($allData->getClassShare($classId));
       }
-      else {
-        $valueSql = "'" . date('Y-m-d H:i:s') . "', '$modelName', '$tableName', $classId, '$className'";
+      if ($testData !== NULL) {
+        $valueSql .= ", " . join(", ", array_map("mysql_number", $testMeasures[$classId])); 
         $valuesSql[] = $valueSql;
+      }
+
+      if (intval(DEBUGMODE) > -1) {
+        echo "    '$className', ($classId): " . PHP_EOL;
+        if ($allData !== NULL) {
+          // echo "    totN: " . ($allData->numInstances()) . PHP_EOL;
+          echo "    totPositives: " . ($totPositives) . PHP_EOL;
+          echo "    totNegatives: " . ($totNegatives) . PHP_EOL;
+          // echo "    classShare: " . ($allData->getClassShare($classId)) . PHP_EOL;
+        }
+        if ($testData !== NULL) {
+          // echo "    testN: {$testData->numInstances()}" . PHP_EOL;
+          list($positives, $negatives,
+            $TP, $TN, $FP, $FN,
+            $accuracy,
+            $sensitivity, $specificity, $PPV, $NPV) = $testMeasures[$classId];
+          echo "    testN: " . ($positives+$negatives) . PHP_EOL;
+          echo "      positives    : $positives\n";
+          echo "      negatives    : $negatives\n";
+          echo "      TP           : $TP\n";
+          echo "      TN           : $TN\n";
+          echo "      FP           : $FP\n";
+          echo "      FN           : $FN\n";
+          echo "      accuracy     : $accuracy\n";
+          echo "      sensitivity  : $sensitivity\n";
+          echo "      specificity  : $specificity\n";
+          echo "      PPV          : $PPV\n";
+          echo "      NPV          : $NPV\n";
+        }
       }
     }
     $sql .= join("), (", $valuesSql) . ")";

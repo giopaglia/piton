@@ -154,8 +154,8 @@ class RipperRule extends _Rule {
     $lift         = safe_div($confidence, $supportCons);
     $conviction   = safe_div((1-$support), (1-$confidence));
 
-    if (DEBUGMODE) echo "\$confidence : $confidence " . PHP_EOL;
     if (DEBUGMODE) echo "\$support    : $support    " . PHP_EOL;
+    if (DEBUGMODE) echo "\$confidence : $confidence " . PHP_EOL;
     if (DEBUGMODE) echo "\$lift       : $lift       " . PHP_EOL;
     if (DEBUGMODE) echo "\$conviction : $conviction " . PHP_EOL;
     return [$support, $confidence, $lift, $conviction];
