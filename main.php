@@ -106,6 +106,7 @@ function testMed3($lr) {
   $db_fit->setIdentifierColumnName("Referti.ID");
 
   // TODO remove
+  // $db_fit->addInputColumn(["Referti.ID"]);
   // $db_fit->addInputColumn(["Referti.DATA_REFERTO", "DaysSince"]);
   
   // gender
@@ -242,6 +243,7 @@ function testMed3($lr) {
       [
         ["RaccomandazioniTerapeuticheUnitarie", ["RaccomandazioniTerapeuticheUnitarie.ID_RACCOMANDAZIONE_TERAPEUTICA = RaccomandazioniTerapeutiche.ID"
         , "RaccomandazioniTerapeuticheUnitarie.TIPO != 'Indagini approfondimento'"], "LEFT JOIN"]
+        // , "RaccomandazioniTerapeuticheUnitarie.TIPO = 'Vitamina D Supplementazione'"], "LEFT JOIN"]
       ],
       "ForceCategoricalBinary"],
     [

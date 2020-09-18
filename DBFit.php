@@ -345,16 +345,16 @@ class DBFit {
       }
       
       /* Finally obtain data */
-      $silentSQL = (count($recursionPath) && $recursionPath[count($recursionPath)-1][0] != 0);
+      // $silentSQL = (count($recursionPath) && $recursionPath[count($recursionPath)-1][0] != 0);
+      $silentSQL = false;
       $silentExcelOutput = false;
 
       if (!$silentSQL) {
-        echo "Example query for LEVEL " . $recursionLevel . ", " . toString($recursionPath);
+        echo "Example query for LEVEL " . $recursionLevel . ", " . toString($recursionPath) . PHP_EOL;
       }
       $res = $this->SQLSelectColumns($this->inputColumns, $idVal, $recursionPath, $outputColumn,
         $silentSQL);
       $data = $this->readRawData($res, $attributes, $columns);
-      
       /* Deflate attribute and data arrays (breaking the symmetry with columns) */
       
       $final_data = [];
@@ -466,6 +466,8 @@ class DBFit {
       //   // echo $dataframe->toString(false);
       // }
       
+      // echo $dataframe->toString(false, [0,1,2,3,4]);
+
       yield $dataframe;
     }
     // echo count($dataframes) . " dataframes computed " . PHP_EOL; 
@@ -503,8 +505,7 @@ class DBFit {
           // var_dump($raw_row);
           // var_dump($this->getColumnTreatmentType($column));
           $raw_val = $raw_row[$this->getColumnNickname($column)];
-          // var_dump($raw_val);
-
+          
           if ($raw_val === NULL) {
             // Avoid NULL values for the output column.
             // For example, a NULL value may also be due to a LEFT JOIN
