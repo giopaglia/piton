@@ -311,7 +311,7 @@ class RuleBasedModel extends DiscriminativeModel {
   }
 
   /* Save model to database */
-  function saveToDB(object &$db, string $modelName, string $tableName, ?Instances &$testData = NULL, ?Instances &$trainData = NULL) {
+  function saveToDB(object &$db, string $modelName, string $tableName, ?Instances &$testData = NULL, ?Instances &$trainData = NULL, $rulesAffRilThesholds = [0.2, 0.7]) {
     if (DEBUGMODE)
       echo "RuleBasedModel->saveToDB('$modelName', '$tableName', ...)" . PHP_EOL;
     
@@ -319,7 +319,18 @@ class RuleBasedModel extends DiscriminativeModel {
       $testData = clone $testData;
       $testData->sortAttrsAs($this->attributes);
     }
+
+    if ($trainData !== NULL) {
+      $trainData = clone $trainData;
+      $trainData->sortAttrsAs($this->attributes);
+    }
     
+    $allData = NULL;
+    if ($trainData !== NULL && $testData !== NULL) {
+      $allData = clone $trainData;
+      $allData->pushInstancesFrom($testData);
+    }
+
     $tableName = self::$prefix . $tableName;
 
     $sql = "DROP TABLE IF EXISTS `$tableName`";
@@ -331,7 +342,7 @@ class RuleBasedModel extends DiscriminativeModel {
     $stmt->close();
 
     $sql = "CREATE TABLE `$tableName`";
-    $sql .= " (ID INT AUTO_INCREMENT PRIMARY KEY, class VARCHAR(256) NOT NULL, rule TEXT NOT NULL, support FLOAT DEFAULT NULL, confidence FLOAT DEFAULT NULL, lift FLOAT DEFAULT NULL, conviction FLOAT DEFAULT NULL)";
+    $sql .= " (ID INT AUTO_INCREMENT PRIMARY KEY, class VARCHAR(256) NOT NULL, rule TEXT NOT NULL, support DECIMAL(10,2) DEFAULT NULL, confidence DECIMAL(10,2) DEFAULT NULL, lift DECIMAL(10,2) DEFAULT NULL, conviction DECIMAL(10,2) DEFAULT NULL)";
     // $sql .= "(class VARCHAR(256) PRIMARY KEY, regola TEXT)"; TODO why primary
 
     $stmt = $db->prepare($sql);
@@ -346,6 +357,11 @@ class RuleBasedModel extends DiscriminativeModel {
       if ($testData !== NULL)
         echo "  LOCAL EVALUATION:" . PHP_EOL;
     }
+
+    $numRulesAffRil = 0;
+    $numRulesAff = 0;
+    $numRulesRil = 0;
+    $numRulesNANR = 0;
 
     $arr_vals = [];
     foreach ($this->rules as $rule) {
@@ -362,10 +378,23 @@ class RuleBasedModel extends DiscriminativeModel {
 
       if ($testData !== NULL) {
         $measures = $rule->computeMeasures($testData);
+        list($support, $confidence, $lift, $conviction) = $measures;
+        
         $str .= "," . join(",", array_map("mysql_number", $measures));
+        
+        $ril = $support > $rulesAffRilThesholds[0];
+        $aff = $confidence > $rulesAffRilThesholds[1];
+        if ($ril && $aff) {
+          $numRulesAffRil++;
+        } else if ($ril) {
+          $numRulesRil++;
+        } else if ($aff) {
+          $numRulesAff++;
+        } else {
+          $numRulesNANR++;
+        }
 
         if (DEBUGMODE > -1) {
-          list($support, $confidence, $lift, $conviction) = $measures;
           echo "      support      : $support\n";
           echo "      confidence   : $confidence\n";
           echo "      lift         : $lift\n";
@@ -407,21 +436,30 @@ class RuleBasedModel extends DiscriminativeModel {
 
     $sql = "CREATE TABLE IF NOT EXISTS `" . self::$indexTableName . "`";
     $sql .= " (ID INT AUTO_INCREMENT PRIMARY KEY, date DATETIME NOT NULL, modelName TEXT NOT NULL, tableName TEXT NOT NULL, classId INT NOT NULL, className TEXT NOT NULL";
-    $sql .= ", numRules INT DEFAULT NULL";
-    $sql .= ", totN FLOAT DEFAULT NULL";
-    $sql .= ", trainN FLOAT DEFAULT NULL";
-    $sql .= ", testN FLOAT DEFAULT NULL";
-    $sql .= ", positives FLOAT DEFAULT NULL";
-    $sql .= ", negatives FLOAT DEFAULT NULL";
-    $sql .= ", TP FLOAT DEFAULT NULL";
-    $sql .= ", TN FLOAT DEFAULT NULL";
-    $sql .= ", FP FLOAT DEFAULT NULL";
-    $sql .= ", FN FLOAT DEFAULT NULL";
-    $sql .= ", accuracy FLOAT DEFAULT NULL";
-    $sql .= ", sensitivity FLOAT DEFAULT NULL";
-    $sql .= ", specificity FLOAT DEFAULT NULL";
-    $sql .= ", PPV FLOAT DEFAULT NULL";
-    $sql .= ", NPV FLOAT DEFAULT NULL";
+    $sql .= ", totNumRules INT DEFAULT NULL";
+    $sql .= ", numRulesAffRil INT DEFAULT NULL";
+    $sql .= ", numRulesAffNR INT DEFAULT NULL";
+    $sql .= ", numRulesNARil INT DEFAULT NULL";
+    $sql .= ", numRulesNANR INT DEFAULT NULL";
+    $sql .= ", percRulesAffRil DECIMAL(10,2) AS (`numRulesAffRil` / `totNumRules`)";
+    $sql .= ", percRulesAffNR DECIMAL(10,2) AS (`numRulesAffNR` / `totNumRules`)";
+    $sql .= ", percRulesNARil DECIMAL(10,2) AS (`numRulesNARil` / `totNumRules`)";
+    $sql .= ", percRulesNANR DECIMAL(10,2) AS (`numRulesNANR` / `totNumRules`)";
+    $sql .= ", totN DECIMAL(10,2) DEFAULT NULL";
+    $sql .= ", classShare DECIMAL(10,2) DEFAULT NULL";
+    $sql .= ", trainN DECIMAL(10,2) DEFAULT NULL";
+    $sql .= ", testN DECIMAL(10,2) DEFAULT NULL";
+    $sql .= ", positives DECIMAL(10,2) DEFAULT NULL";
+    $sql .= ", negatives DECIMAL(10,2) DEFAULT NULL";
+    $sql .= ", TP DECIMAL(10,2) DEFAULT NULL";
+    $sql .= ", TN DECIMAL(10,2) DEFAULT NULL";
+    $sql .= ", FP DECIMAL(10,2) DEFAULT NULL";
+    $sql .= ", FN DECIMAL(10,2) DEFAULT NULL";
+    $sql .= ", accuracy DECIMAL(10,2) DEFAULT NULL";
+    $sql .= ", sensitivity DECIMAL(10,2) DEFAULT NULL";
+    $sql .= ", specificity DECIMAL(10,2) DEFAULT NULL";
+    $sql .= ", PPV DECIMAL(10,2) DEFAULT NULL";
+    $sql .= ", NPV DECIMAL(10,2) DEFAULT NULL";
     $sql .= ")";
 
     $stmt = $db->prepare($sql);
@@ -455,9 +493,10 @@ class RuleBasedModel extends DiscriminativeModel {
     // 
 
     $sql = "INSERT INTO `" . self::$indexTableName . "`";
-    $sql .= " (date, modelName, tableName, classId, className, numRules";
-    if ($trainData !== NULL && $testData !== NULL) {
+    $sql .= " (date, modelName, tableName, classId, className, totNumRules, numRulesAffRil, numRulesAffNR, numRulesNARil, numRulesNANR";
+    if ($allData !== NULL) {
       $sql .= ", totN";
+      $sql .= ", classShare";
     }
     if ($trainData !== NULL) {
       $sql .= ", trainN";
@@ -484,9 +523,16 @@ class RuleBasedModel extends DiscriminativeModel {
       if ($testData !== NULL) {
         if (isset($measures[$classId])) {
           $valueSql = "'" . date('Y-m-d H:i:s') . "', '$modelName', '$tableName', $classId, '$className'";
-          $valueSql .= ", " . strval(count($this->getRules()));
-          if ($trainData !== NULL && $testData !== NULL) {
-            $valueSql .= ", " . strval($trainData->numInstances()+$testData->numInstances());
+          // TODO rule numbers should refer to the model, not the className. Mmm
+          $totNumRules = count($this->getRules());
+          $valueSql .= ", " . strval($totNumRules);
+          $valueSql .= ", " . strval($numRulesAffRil);
+          $valueSql .= ", " . strval($numRulesAff);
+          $valueSql .= ", " . strval($numRulesRil);
+          $valueSql .= ", " . strval($numRulesNANR);
+          if ($allData !== NULL) {
+            $valueSql .= ", " . strval($allData->numInstances());
+            $valueSql .= ", " . strval($allData->getClassShare($classId));
           }
           if ($trainData !== NULL) {
             $valueSql .= ", " . strval($trainData->numInstances());
@@ -496,10 +542,11 @@ class RuleBasedModel extends DiscriminativeModel {
           }
           $valueSql .= ", " . join(", ", array_map("mysql_number", $measures[$classId])); 
           $valuesSql[] = $valueSql;
-          if (DEBUGMODE > -1) {
+          if (intval(DEBUGMODE) > -1) {
             echo "    '$className', ($classId): " . PHP_EOL;
-            if ($trainData !== NULL && $testData !== NULL)
-              echo "    totN: " . ($trainData->numInstances()+$testData->numInstances()) . PHP_EOL;
+            if ($allData !== NULL)
+              echo "    totN: " . ($allData->numInstances()) . PHP_EOL;
+              echo "    classShare: " . ($allData->getClassShare($classId)) . PHP_EOL;
             if ($trainData !== NULL)
               echo "    trainN: {$trainData->numInstances()}" . PHP_EOL;
             if ($testData !== NULL)

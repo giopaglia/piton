@@ -294,8 +294,60 @@ class RuleStats {
     }
   }
 
+  // /**
+  //  * Stratify the given data into the given number of bags based on the class
+  //  * values. It differs from the <code>Instances.stratify(int fold)</code> that
+  //  * before stratification it sorts the instances according to the class order
+  //  * in the header file. It assumes no missing values in the class.
+  //  * 
+  //  * @param data the given data
+  //  * @param folds the given number of folds
+  //  * @return the stratified instances
+  //  */
+  // static function stratify(Instances &$data, int $numFolds) : Instances {
+  //   if (DEBUGMODE > 2) echo "RuleStats::stratify(&[data], numFolds=$numFolds)" . PHP_EOL;
+  //   // if (DEBUGMODE > 2) echo "data : " . $data->toString() . PHP_EOL;
+  //   if (!($data->getClassAttribute() instanceof DiscreteAttribute)) {
+  //     return $data;
+  //   }
+
+  //   $data_out = Instances::createEmpty($data);
+  //   $bagsByClasses = [];
+  //   for ($i = 0; $i < $data->numClasses(); $i++) {
+  //     $bagsByClasses[] = Instances::createEmpty($data);
+  //   }
+
+  //   // Sort by class
+  //   for ($j = 0; $j < $data->numInstances(); $j++) {
+  //     $bagsByClasses[$data->inst_classValue($j)]->pushInstance($data->getInstance($j));
+  //   }
+
+  //   // Randomize each class
+  //   // foreach ($bagsByClasses as &$bag) {
+  //   //   $bag->randomize();
+  //   // }
+
+  //   for ($k = 0; $k < $numFolds; $k++) {
+  //     $offset = $k;
+  //     $i_bag = 0;
+  //     while (true) {
+  //       while ($offset >= $bagsByClasses[$i_bag]->numInstances()) {
+  //         $offset -= $bagsByClasses[$i_bag]->numInstances();
+  //         if (++$i_bag >= count($bagsByClasses)) {
+  //           break 2;
+  //         }
+  //       }
+
+  //       $data_out->pushInstance($bagsByClasses[$i_bag]->getInstance($offset));
+  //       $offset += $numFolds;
+  //     }
+  //   }
+  //   // if (DEBUGMODE > 2) echo "data_out : " . $data_out->toString() . PHP_EOL;
+
+  //   return $data_out;
+  // }
   /**
-   * Stratify the given data into the given number of bags based on the class
+   * Stratify & partition the given data into two bags of the given ratio based on the class
    * values. It differs from the <code>Instances.stratify(int fold)</code> that
    * before stratification it sorts the instances according to the class order
    * in the header file. It assumes no missing values in the class.
@@ -304,14 +356,13 @@ class RuleStats {
    * @param folds the given number of folds
    * @return the stratified instances
    */
-  static function stratify(Instances &$data, int $numFolds) : Instances {
-    if (DEBUGMODE > 2) echo "RuleStats::stratify(&[data], numFolds=$numFolds)" . PHP_EOL;
+  static function stratifiedBinPartition(Instances &$data, int $numFolds) : array {
+    if (DEBUGMODE > 2) echo "RuleStats::stratifiedBinPartition(&[data], numFolds=$numFolds)" . PHP_EOL;
     // if (DEBUGMODE > 2) echo "data : " . $data->toString() . PHP_EOL;
     if (!($data->getClassAttribute() instanceof DiscreteAttribute)) {
-      return $data;
+      die_error("stratifiedBinPartition(): Class attribute has to be a DiscreteAttribute. Got " . $data->getClassAttribute());
     }
 
-    $data_out = Instances::createEmpty($data);
     $bagsByClasses = [];
     for ($i = 0; $i < $data->numClasses(); $i++) {
       $bagsByClasses[] = Instances::createEmpty($data);
@@ -323,28 +374,20 @@ class RuleStats {
     }
 
     // Randomize each class
-    foreach ($bagsByClasses as &$bag) {
-      $bag->randomize();
+    // foreach ($bagsByClasses as &$bag) {
+    //   $bag->randomize();
+    // }
+    $growData = Instances::createEmpty($data);
+    $pruneData = Instances::createEmpty($data);
+
+    foreach ($bagsByClasses as $bag) {
+      list($grow, $prune) = RuleStats::partition($bag, $numFolds);
+      
+      $growData->pushInstancesFrom($grow);
+      $pruneData->pushInstancesFrom($prune);
     }
 
-    for ($k = 0; $k < $numFolds; $k++) {
-      $offset = $k;
-      $i_bag = 0;
-      while (true) {
-        while ($offset >= $bagsByClasses[$i_bag]->numInstances()) {
-          $offset -= $bagsByClasses[$i_bag]->numInstances();
-          if (++$i_bag >= count($bagsByClasses)) {
-            break 2;
-          }
-        }
-
-        $data_out->pushInstance($bagsByClasses[$i_bag]->getInstance($offset));
-        $offset += $numFolds;
-      }
-    }
-    // if (DEBUGMODE > 2) echo "data_out : " . $data_out->toString() . PHP_EOL;
-
-    return $data_out;
+    return [$growData, $pruneData];
   }
 
   /**

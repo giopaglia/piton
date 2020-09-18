@@ -1,11 +1,8 @@
-	numOptimizations:        Number of runs of optimizations
-	numFolds:        The number of folds to split data into Grow and Prune for IREP (One fold is used as pruning set.)
-	minNo:        Minimal weights of instance weights within a split
-	checkErr:        Whether check the error rate >= 0.5 in stopping criteria
-	usePruning:        Whether use pruning, i.e. the data is clean or not
-
-
+- tickz
+- for ($j = 0; $j < $data->numInstances(); $j++) { che diventi un generatore di istanze
 - force non-null values check nel codice?
+- ignora regole nanr at predict time
+
 #####################################################
 DROP TABLE `phptest`.`models__index`
 CREATE VIEW `models__index_view` AS SELECT modelName, numRules, totN, trainN, testN, positives, negatives, TP, TN, FP, FN, accuracy, sensitivity, specificity, PPV, NPV  FROM `models__index` ORDER BY `tableName` ASC
@@ -23,6 +20,53 @@ TBS_COLONNA_APPLICABILE,
 TBS_COLONNA_PERCENTUALE,
 TBS_COLONNA_VALORE,
 IF(Diagnosi.TBS_COLONNA_APPLICABILE,0+IF(Diagnosi.TBS_COLONNA_PERCENTUALE, 0, TBS_COLONNA_VALORE),NULL)
+
+
+SELECT
+COUNT(*),
+IF(Diagnosi.FRAX_APPLICABILE,IF(ISNULL(Diagnosi.FRAX_PERCENTUALE),NULL,IF(Diagnosi.FRAX_PERCENTUALE OR Diagnosi.FRAX_FRATTURE_MAGGIORI < 0.1, 0, IF(Diagnosi.FRAX_FRATTURE_MAGGIORI = 0, 0, 'value'))),NULL)
+AS x
+FROM Referti LEFT JOIN Pazienti ON Pazienti.ID = Referti.ID_PAZIENTE LEFT JOIN Anamnesi ON Anamnesi.ID_REFERTO = Referti.ID LEFT JOIN Diagnosi ON Diagnosi.ID_REFERTO = Referti.ID LEFT JOIN Densitometrie ON Densitometrie.ID_REFERTO = Referti.ID
+WHERE Referti.DATA_REFERTO BETWEEN '2018-09-01' AND '2020-08-31' AND Anamnesi.BMI is NOT NULL AND Anamnesi.BMI != -1
+GROUP BY
+x
+
+0
+
+SELECT
+COUNT(*),
+IF(Diagnosi.FRAX_APPLICABILE,IF(ISNULL(Diagnosi.FRAX_COLLO_FEMORE_PERCENTUALE),NULL,IF(Diagnosi.FRAX_COLLO_FEMORE_PERCENTUALE OR Diagnosi.FRAX_COLLO_FEMORE < 0.1, 0, 
+IF(Diagnosi.FRAX_COLLO_FEMORE = 0, 0, 'value')
+)),NULL)
+AS x
+FROM Referti LEFT JOIN Pazienti ON Pazienti.ID = Referti.ID_PAZIENTE LEFT JOIN Anamnesi ON Anamnesi.ID_REFERTO = Referti.ID LEFT JOIN Diagnosi ON Diagnosi.ID_REFERTO = Referti.ID LEFT JOIN Densitometrie ON Densitometrie.ID_REFERTO = Referti.ID
+WHERE Referti.DATA_REFERTO BETWEEN '2018-09-01' AND '2020-08-31' AND Anamnesi.BMI is NOT NULL AND Anamnesi.BMI != -1
+GROUP BY
+x
+
+26
+
+
+SELECT
+COUNT(*),
+IF(Diagnosi.DEFRA_APPLICABILE,IF(ISNULL(Diagnosi.DEFRA_PERCENTUALE_01),NULL,IF((Diagnosi.DEFRA_PERCENTUALE_01 OR Diagnosi.DEFRA < 0.1) AND Diagnosi.DEFRA_PERCENTUALE_50 = 0, 0,IF(ISNULL(Diagnosi.DEFRA_PERCENTUALE_50),NULL,IF(Diagnosi.DEFRA_PERCENTUALE_50 OR Diagnosi.DEFRA > 50, 50, 
+if(Diagnosi.DEFRA = 0, 0, if(Diagnosi.DEFRA = 50, 50, 'value'))
+)))),NULL)
+AS x
+FROM Referti LEFT JOIN Pazienti ON Pazienti.ID = Referti.ID_PAZIENTE LEFT JOIN Anamnesi ON Anamnesi.ID_REFERTO = Referti.ID LEFT JOIN Diagnosi ON Diagnosi.ID_REFERTO = Referti.ID LEFT JOIN Densitometrie ON Densitometrie.ID_REFERTO = Referti.ID
+WHERE Referti.DATA_REFERTO BETWEEN '2018-09-01' AND '2020-08-31' AND Anamnesi.BMI is NOT NULL AND Anamnesi.BMI != -1
+GROUP BY
+x
+
+1
+124
+
+
+SELECT
+COUNT(*),
+PrincipiAttivi.NOME
+FROM Referti LEFT JOIN Pazienti ON Pazienti.ID = Referti.ID_PAZIENTE LEFT JOIN Anamnesi ON Anamnesi.ID_REFERTO = Referti.ID LEFT JOIN Diagnosi ON Diagnosi.ID_REFERTO = Referti.ID LEFT JOIN Densitometrie ON Densitometrie.ID_REFERTO = Referti.ID LEFT JOIN RaccomandazioniTerapeutiche ON RaccomandazioniTerapeutiche.ID_REFERTO = Referti.ID LEFT JOIN RaccomandazioniTerapeuticheUnitarie ON RaccomandazioniTerapeuticheUnitarie.ID_RACCOMANDAZIONE_TERAPEUTICA = RaccomandazioniTerapeutiche.ID AND RaccomandazioniTerapeuticheUnitarie.TIPO != 'Indagini approfondimento' AND !ISNULL(RaccomandazioniTerapeuticheUnitarie.TIPO) LEFT JOIN ElementiTerapici ON ElementiTerapici.ID_RACCOMANDAZIONE_TERAPEUTICA_UNITARIA = RaccomandazioniTerapeuticheUnitarie.ID LEFT JOIN PrincipiAttivi ON ElementiTerapici.ID_PRINCIPIO_ATTIVO = PrincipiAttivi.ID AND !ISNULL(CONCAT(PrincipiAttivi.NOME, IF(!STRCMP(PrincipiAttivi.QUANTITA, 'NULL') || ISNULL(PrincipiAttivi.QUANTITA), '', CONCAT(' ', PrincipiAttivi.QUANTITA)))) WHERE Referti.DATA_REFERTO BETWEEN '2018-09-01' AND '2020-08-31' AND Anamnesi.BMI is NOT NULL AND Anamnesi.BMI != -1 AND FIND_IN_SET(RaccomandazioniTerapeuticheUnitarie.TIPO, 'Terapie osteoprotettive,Terapie ormonali') > 0 AND RaccomandazioniTerapeuticheUnitarie.TIPO = 'Terapie osteoprotettive'
+GROUP BY PrincipiAttivi.NOME
 
 #####################################################
 

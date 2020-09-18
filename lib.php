@@ -98,6 +98,9 @@ function array_list(array $arr, $delimiter = ", ") {
   return $out_str;
 }
 
+# Source: https://stackoverflow.com/a/28033817/5646732
+function sub_array(array $haystack, array $needle) { return array_intersect_key($haystack, array_flip($needle));}
+
 function listify(&$v) { // TODO , $depth = 1
   if ($v === NULL) {
     $v = [];

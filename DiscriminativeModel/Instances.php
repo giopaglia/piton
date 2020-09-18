@@ -78,12 +78,24 @@ class Instances {
     
     $rt = [];
 
-    $rt[0] = Instances::createFromSlice($data, 0, $data->numInstances()*$firstRatio);
+    $offset = round($data->numInstances()*$firstRatio);
+    // var_dump($data->numInstances());
+    // var_dump($firstRatio);
+    // var_dump($offset);
+    $rt[0] = Instances::createFromSlice($data, 0, $offset);
     if (DEBUGMODE > 2) echo "rt[0] : " . $rt[0]->toString() . PHP_EOL;
-    $rt[1] = Instances::createFromSlice($data, $data->numInstances()*$firstRatio);
+    $rt[1] = Instances::createFromSlice($data, $offset);
     if (DEBUGMODE > 2) echo "rt[1] : " . $rt[1]->toString() . PHP_EOL;
 
     return $rt;
+  }
+
+
+  function pushInstancesFrom(Instances $insts) {
+    // TODO check if attrs are the same?
+    for ($x = 0; $x < $insts->numInstances(); $x++) {
+      $this->pushInstance($insts->getInstance($x));
+    }
   }
 
   /**
@@ -173,7 +185,10 @@ class Instances {
   }
   function getInstance(int $i) : array { return array_slice($this->data[$i], 0, -1); }
   function getInstances() : array {
-    return array_map([$this, "getInstance"], range(0, $this->numInstances()-1));
+    // var_dump(range(0, ($this->numInstances() > 0 ? $this->numInstances()-1 : 0)));
+    return array_map([$this, "getInstance"], 
+      ($this->numInstances() > 0 ? range(0, $this->numInstances()-1) : [])
+      );
   }
 
   function pushInstance(array $inst, int $weight = 1)
@@ -261,6 +276,12 @@ class Instances {
   {
     // Note: assuming the class attribute is the first
     return $includeClassAttr ? $this->attributes : array_slice($this->attributes, 1);
+  }
+
+  function _getAttributes(?array $attributesSubset = NULL) : array
+  {
+    // Note: assuming the class attribute is the first
+    return $attributesSubset === NULL ? $this->attributes : sub_array($this->attributes, $attributesSubset);
   }
   
   protected function setAttributes(array $attributes)
@@ -408,10 +429,7 @@ class Instances {
     if (DEBUGMODE > 2) echo get_arr_dump($this->getClassAttribute()->getDomain());
     $classes = $this->getClassAttribute()->getDomain();
 
-    $class_counts =  array_fill(0,count($classes),0);
-    for ($x = 0; $x < $this->numInstances(); $x++) {
-      $class_counts[$this->inst_classValue($x)]++;
-    }
+    $class_counts = $this->getClassCounts();
 
     // if (DEBUGMODE > 2) echo $this->toString();
 
@@ -451,6 +469,34 @@ class Instances {
       }
     }
     return count($valPresence);
+  }
+
+  /**
+   * TODO explain
+   */
+  function checkCutOff(float $cutOffValue) : bool {
+    $class_counts = $this->getClassCounts();
+    $total = array_sum($class_counts);
+    foreach ($class_counts as $class => $counts) {
+      if ((float) $counts/$total < $cutOffValue)
+        return false; // $counts/$total;
+    }
+    return true;
+  }
+  function getClassShare(int $classId) : float {
+    $class_counts = $this->getClassCounts();
+    $total = array_sum($class_counts);
+    return (float) $class_counts[$classId]/$total;
+  }
+
+  function getClassCounts() : array {
+    $classes = $this->getClassAttribute()->getDomain();
+    $class_counts = array_fill(0,count($classes),0);
+    for ($x = 0; $x < $this->numInstances(); $x++) {
+      $val = $this->inst_classValue($x);
+      $class_counts[$val]++;
+    }
+    return $class_counts;
   }
 
   /**
@@ -566,10 +612,11 @@ class Instances {
   function __toString() : string {
     return $this->toString();
   }
-  function toString(bool $short = false) : string {
+  function toString(bool $short = false, ?array $attributesSubset = NULL) : string {
+    $attributes = $this->_getAttributes($attributesSubset);
     $out_str = "";
     $atts_str = [];
-    foreach ($this->getAttributes() as $i => $att) {
+    foreach ($attributes as $i => $att) {
       // $atts_str[] = substr($att->toString(), 0, 7);
       $atts_str[] = "[$i]:" . $att->toString(false) . PHP_EOL;
     }
@@ -581,18 +628,21 @@ class Instances {
       $out_str .= "Instances{{$this->numInstances()} instances; "
         . ($this->numAttributes()-1) . "+1 attributes [" . PHP_EOL . join(";", $atts_str) . "]}";
       $out_str .= "\n";
-      $out_str .= str_repeat("======|=", $this->numAttributes()+1) . "|\n";
+      $out_str .= str_repeat("======|=", count($attributes)+1) . "|\n";
       $out_str .= "";
-      foreach ($this->getAttributes() as $i => $att) {
+      foreach ($attributes as $i => $att) {
         // $out_str .= substr($att->toString(), 0, 7) . "\t";
         $out_str .= str_pad("[$i]", 7, " ", STR_PAD_BOTH) . "\t";
       }
       $out_str .= "weight";
       $out_str .= "\n";
       // TODO reuse inst_toString
-      $out_str .= str_repeat("======|=", $this->numAttributes()+1) . "|\n";
+      $out_str .= str_repeat("======|=", count($attributes)+1) . "|\n";
       foreach ($this->data as $i => $inst) {
-        foreach ($this->getInstance($i) as $val) {
+        foreach ($this->getInstance($i) as $j => $val) {
+          if (!in_array($j, $attributesSubset)) {
+            continue;
+          }
           if ($val === NULL) {
             $x = "N/A";
           }
@@ -604,7 +654,7 @@ class Instances {
         $out_str .= "{" . $this->inst_weight($i) . "}";
         $out_str .= "\n";
       }
-      $out_str .= str_repeat("======|=", $this->numAttributes()+1) . "|\n";
+      $out_str .= str_repeat("======|=", count($attributes)+1) . "|\n";
     }
     return $out_str;
   }

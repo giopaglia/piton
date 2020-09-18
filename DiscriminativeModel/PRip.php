@@ -262,10 +262,11 @@ class PRip extends Learner {
       $oneRule = new RipperRule($classIndex);
       if ($this->usePruning) {
         /* Split data into Grow and Prune */
-        $newData = RuleStats::stratify($newData, $this->numFolds);
+        // echo PHP_EOL . "buil newData" . $newData->toString(false, [0,1,2,3]);
         // Alternative to stratifying: $newData->randomize();
-        list($growData, $pruneData) = RuleStats::partition($newData, $this->numFolds);
-
+        list($growData, $pruneData) = RuleStats::stratifiedBinPartition($newData, $this->numFolds);
+        // echo "buil growData" . PHP_EOL . $growData->toString(false, [0,1,2,3]);
+        // echo "buil pruneData" . PHP_EOL . $pruneData->toString(false, [0,1,2,3]);
         if ($this->debug) {
           echo "\nGrowing rule ...";
         }
@@ -372,9 +373,11 @@ class PRip extends Learner {
           $isResidual = ($i_ruleToOpt >= count($ruleset));
 
           /* Split data into Grow and Prune */
-          $newData = RuleStats::stratify($newData, $this->numFolds);
+          // echo PHP_EOL . "opt newData" . $newData->toString(false, [0,1,2,3]);
           // Alternative to stratifying: $newData->randomize();
-          list($growData, $pruneData) = RuleStats::partition($newData, $this->numFolds);
+          list($growData, $pruneData) = RuleStats::stratifiedBinPartition($newData, $this->numFolds);
+          // echo PHP_EOL . "opt growData" . $growData->toString(false, [0,1,2,3]);
+          // echo PHP_EOL . "opt pruneData" . $pruneData->toString(false, [0,1,2,3]);
           $finalRule = NULL;
 
           if ($this->debug) {
@@ -662,6 +665,28 @@ class PRip extends Learner {
   function setNumOptimizations($numOptimizations) : self
   {
     $this->numOptimizations = $numOptimizations;
+    return $this;
+  }
+
+  function getNumFolds()
+  {
+    return $this->numFolds;
+  }
+
+  function setNumFolds($numFolds) : self
+  {
+    $this->numFolds = $numFolds;
+    return $this;
+  }
+
+  function getMinNo()
+  {
+    return $this->minNo;
+  }
+
+  function setMinNo($minNo) : self
+  {
+    $this->minNo = $minNo;
     return $this;
   }
 

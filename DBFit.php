@@ -146,6 +146,11 @@ class DBFit {
   */
   private $trainingMode;
 
+  /*
+    TODO explain
+  */
+  private $cutOffValue;
+
   /* Default options, to be set via ->setDefaultOption() */
   private $defaultOptions = [
     /* Default training mode in use */
@@ -199,11 +204,12 @@ class DBFit {
     $this->models = [];
     $this->learner = NULL;
     $this->trainingMode = NULL;
+    $this->cutOffValue = NULL;
   }
 
   /** Given the path to a recursion node, read data from database, pre-process it,
        build instance objects. At each node, there is an output column which might generate different attributes, so there are k different problems, and this function computes k sets of instances, with same input attributes/values and different output ones. */
-  private function readData($idVal = NULL, array $recursionPath = []) : ?array {
+  private function readData($idVal = NULL, array $recursionPath = [], ?int &$numDataframes) : ?array {
 
     $recursionLevel = count($recursionPath);
     echo "DBFit->readData(ID: " . toString($idVal) . ", LEVEL $recursionLevel (path " . toString($recursionPath) . "))" . PHP_EOL;
@@ -283,7 +289,8 @@ class DBFit {
     $outputAttributes = $this->getColumnAttributes($outputColumn, $recursionPath);
 
     $rawDataframe = NULL;
-    
+    $numDataframes = 0;
+
     /* Check that some data is found and the output attributes were correctly computed */
     if (!is_array($outputAttributes)) {
       // warn("Couldn't derive output attributes for output column {$this->getColumnName($outputColumn)}!");
@@ -419,16 +426,10 @@ class DBFit {
         fclose($f);
       }
       $rawDataframe = [$final_attributes, $final_data, $outputAttributes];
+      $numDataframes = count($outputAttributes);
     }
 
     return $rawDataframe;
-  }
-
-  private function numDataframes(?array $rawDataframe) : int {
-    if ($rawDataframe === NULL) { return 0; }
-    list($final_attributes, $final_data, $outputAttributes) = $rawDataframe;
-    $numOutputAttributes = count($outputAttributes);
-    return $numOutputAttributes;
   }
 
   private function generateDataframes(array $rawDataframe) : Generator {
@@ -1084,8 +1085,7 @@ class DBFit {
     }
 
     /* Read the dataframes specific to this recursion path */
-    $rawDataframe = $this->readData(NULL, $recursionPath);
-    $numDataframes = $this->numDataframes($rawDataframe);
+    $rawDataframe = $this->readData(NULL, $recursionPath, $numDataframes);
     
     /* Check: if no data available stop recursion */
     if ($rawDataframe === NULL || !$numDataframes) {
@@ -1114,6 +1114,19 @@ class DBFit {
         }
         continue;
       }
+
+      /* If data is too unbalanced, skip training */
+      if ($this->getCutOffValue() !== NULL && 
+          !$data->checkCutOff($this->getCutOffValue())) {
+        echo "Skipping node due to unbalanced dataset found"
+          // . "("
+          // . $data->checkCutOff($this->getCutOffValue())
+          // . " > "
+          // . $this->getCutOffValue()
+          // . ")";
+          . "." . PHP_EOL;
+        continue;
+      }
       
       /* Obtain and train, test set */
       list($trainData, $testData) = $this->getDataSplit($data);
@@ -1128,8 +1141,8 @@ class DBFit {
       // $testData->save_CSV("datasets/" . $this->getModelName($recursionPath, $i_prob) . "-TEST.csv");
       
       if ($i_prob == 0) {
-        $trainData->save_CSV("datasets/" . $this->getModelName($recursionPath, NULL) . "-TRAIN.csv", false);
-        $testData->save_CSV("datasets/" . $this->getModelName($recursionPath, NULL) . "-TEST.csv", false);
+        $trainData->save_CSV("datasets/" . $this->getModelName($recursionPath, NULL) . "-TRAIN.csv"); // , false);
+        $testData->save_CSV("datasets/" . $this->getModelName($recursionPath, NULL) . "-TEST.csv"); // , false);
       }
 
       /* Train */
@@ -1157,7 +1170,6 @@ class DBFit {
 
       $this->models[$model_name] = clone $model;
       
-      
       /* Recursion base case */
       if ($recursionLevel+1 == count($this->outputColumns)) {
         echo "Train-time recursion stops here (recursionPath = " . toString($recursionPath)
@@ -1170,6 +1182,7 @@ class DBFit {
             . $numDataframes . ")) "
           . " with domain " . toString($outputAttribute->getDomain())
           . ". " . PHP_EOL;
+        ob_flush();
         foreach ($outputAttribute->getDomain() as $className) {
           // TODO right now I'm not recurring when a "NO_" outcome happens. This is not supersafe, there must be a nice generalization.
           if (!startsWith($className, "NO_")) {
@@ -1235,9 +1248,8 @@ class DBFit {
     $predictions = [];
     
     /* Read the dataframes specific to this recursion path */
-    $rawDataframe = $this->readData($idVal, $recursionPath);
-    $numDataframes = $this->numDataframes($rawDataframe);
-
+    $rawDataframe = $this->readData($idVal, $recursionPath, $numDataframes);
+    
     /* If no model was trained for the current node, stop the recursion */
     if ($rawDataframe === NULL) {
       echo "Prediction-time recursion stops here due to lack of a model (recursionPath = " . toString($recursionPath) . ":" . PHP_EOL;
@@ -1247,7 +1259,7 @@ class DBFit {
     // TODO avoid reading outputAttributes here, find an alternative solution
     // $outputAttributes = $this->getColumnAttributes($this->outputColumns[$recursionLevel], $recursionPath);
     //   /* Check if the models needed were trained */
-    //   // TODO: note that atm, unless this module is misused, either all models should be there, or none of them should
+    //   // TODO: note that atm, unless this module is misused, either all models should be there, or none of them should. Not true anymore due to cutoffs
     //   $atLeastOneModel = false;
     //   foreach ($outputAttributes as $i_prob => $outputAttribute) {
     //     $model_name = $this->getModelName($recursionPath, $i_prob);
@@ -1297,7 +1309,8 @@ class DBFit {
       /* Retrieve model */
       $model_name = $this->getModelName($recursionPath, $i_prob);
       if (!(isset($this->models[$model_name]))) {
-        die_error("Model '$model_name' is not initialized");
+        continue;
+        // die_error("Model '$model_name' is not initialized");
       }
       $model = $this->models[$model_name];
       if (!($model instanceof DiscriminativeModel)) {
@@ -1802,7 +1815,7 @@ class DBFit {
     if (startsWith($columnName, "CONCAT", false)) {
       $mysql_type = "varchar";
     }
-    else if (startsWith($columnName, "0+", false)) {
+    else if (startsWith($columnName, "0+", false) || startsWith($columnName, "DATEDIFF", false)) {
       $mysql_type = "float";
     }
     else {
@@ -2026,6 +2039,17 @@ class DBFit {
     return $this;
   }
 
+  function getCutOffValue() : float
+  {
+    return $this->cutOffValue;
+  }
+
+  function setCutOffValue(float $cutOffValue) : self
+  {
+    $this->cutOffValue = $cutOffValue;
+    return $this;
+  }
+
   function setTrainingSplit(array $trainingMode) : self
   {
     $this->setTrainingMode($trainingMode);
@@ -2056,7 +2080,10 @@ class DBFit {
       /* Train+test split */
       case is_array($this->trainingMode):
         $trRat = $this->trainingMode[0]/($this->trainingMode[0]+$this->trainingMode[1]);
-        $rt = Instances::partition($data, $trRat);
+        // $rt = Instances::partition($data, $trRat);
+        $numFolds = 1/(1-$trRat);
+        // echo $numFolds;
+        $rt = RuleStats::stratifiedBinPartition($data, $numFolds);
         
         break;
       
