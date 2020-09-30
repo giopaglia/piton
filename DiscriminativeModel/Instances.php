@@ -90,13 +90,6 @@ class Instances {
     return $rt;
   }
 
-  function pushInstancesFrom(Instances $insts) {
-    // TODO check if attrs are the same?
-    foreach ($insts->instsGenerator() as $inst) {
-      $this->pushInstance($inst);
-    }
-  }
-
   /**
    * Read data from file, (dense) ARFF/Weka format
    */
@@ -126,14 +119,6 @@ class Instances {
         return NULL;
       }
       $k = $attr->getKey($ARFFVal, true);
-      // $k = $attr->getKey($ARFFVal);
-      // echo ($k);
-      // if ($k === false) {
-      //   die_error("ARFF data wrongfully encoded. Couldn't find element \""
-      //     . get_var_dump($ARFFVal)
-      //     . "\" in domain of attribute {$attr->getName()} ("
-      //     . get_arr_dump($attr->getDomain()) . "). ");
-      // }
       return $k;
     };
 
@@ -172,6 +157,19 @@ class Instances {
    */
   function numAttributes() : int { return count($this->attributes); }
   function numInstances() : int { return count($this->data); }
+
+  function pushInstancesFrom(Instances $insts, $safety_check = false) {
+    if ($safety_check) {
+      if ($insts->sortAttrsAs($this->getAttributes(), true) == false) {
+      die_error("Couldn't pushInstancesFrom, since attribute sets do not match. "
+        . $insts->toString(true) . PHP_EOL . PHP_EOL
+        . $this->toString(true));
+      }
+    }
+    foreach ($insts->instsGenerator() as $inst) {
+      $this->pushInstance($inst);
+    }
+  }
 
   function instsGenerator() {
     foreach($this->data as $row) {
@@ -376,9 +374,11 @@ class Instances {
   /**
    * Resort attributes and data according to an extern attribute set 
    */
-  function sortAttrsAs(array $newAttributes, bool $allowDataLoss = false) {
+  function sortAttrsAs(array $newAttributes, bool $allowDataLoss = false) : bool {
     if (DEBUGMODE > 2) echo "Instances->sortAttrsAs([newAttributes], allowDataLoss=$allowDataLoss)" . PHP_EOL;
     if (DEBUGMODE > 2) echo $this;
+    $sameAttributes = true;
+
     $copyMap = [];
     $newData = [];
     // var_dump($this->attributes);
@@ -404,18 +404,23 @@ class Instances {
         die_error("Couldn't find attribute '{$newAttribute->getName()}' in the current attribute list " . get_arr_dump($this->attributes) . " in Instances->sortAttrsAs");
       }
 
-      if (!$newAttribute->isAtLeastAsExpressiveAs($oldAttribute) && !$allowDataLoss) {
-        // TODO a problem can arise when forcing categorical, for example on text data, using limit at train time. sometimes the full domain is not covered, then a new class may arise at test time. what to do then? In real life application, it shouldn't happen, at least for thec lass attribute, which field is empty
-        die_error("Found a target attribute that is not as expressive as the requested one. This may cause loss of data. "
-          . "\nnewAttribute: " . $newAttribute->toString(false)
-          . "\noldAttribute: " . $oldAttribute->toString(false));
+      if (!$newAttribute->isEqualTo($oldAttribute)) {
+        $sameAttributes = false;
+      }
+
+      if (!$newAttribute->isAtLeastAsExpressiveAs($oldAttribute)) {
+        if(!$allowDataLoss) {
+          // TODO a problem can arise when forcing categorical, for example on text data, using limit at train time. sometimes the full domain is not covered, then a new class may arise at test time. what to do then? In real life application, it shouldn't happen, at least for thec lass attribute, which field is empty
+          die_error("Found a target attribute that is not as expressive as the requested one. This may cause loss of data. "
+            . "\nnewAttribute: " . $newAttribute->toString(false)
+            . "\noldAttribute: " . $oldAttribute->toString(false));
+        }
       }
 
       $copyMap[] = [$oldAttribute, $newAttribute];
     }
 
     $newData = [];
-
     for ($x = 0; $x < $this->numInstances(); $x++) {
       $newRow = [];
       foreach ($copyMap as $oldAndNewAttr) {
@@ -435,6 +440,8 @@ class Instances {
     $this->data = $newData;
     $this->setAttributes($newAttributes);
     if (DEBUGMODE > 2) echo $this;
+
+    return $sameAttributes;
   }
   
   /**

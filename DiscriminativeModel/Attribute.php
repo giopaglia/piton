@@ -64,10 +64,13 @@ abstract class Attribute {
     return $attribute;
   }
 
-  // /** Whether two attributes are equal (completely interchangeable) */
-  // function isEqualTo(Attribute $otherAttr) : bool {
-  //   return $this->isEquivalentTo();
-  // }
+  /** Whether two attributes are equal (completely interchangeable) */
+  function isEqualTo(Attribute $otherAttr) : bool {
+    return (get_class($this) === get_class($otherAttr))
+        && ($this->name === $otherAttr->name)
+        && ($this->type === $otherAttr->type)
+        && ($this->index === $otherAttr->index);
+  }
 
   // * Whether there can be a bijective mapping between two attributes 
   // function isEquivalentTo(Attribute $otherAttr) : bool {
@@ -136,10 +139,10 @@ class DiscreteAttribute extends Attribute {
   private $domain;
 
   // /** Whether two attributes are equal (completely interchangeable) */
-  // function isEqualTo(Attribute $otherAttr) : bool {
-  //   return $this->getDomain() == $otherAttr->getDomain()
-  //      && parent::isEqualTo($otherAttr);
-  // }
+  function isEqualTo(Attribute $otherAttr) : bool {
+    return $this->getDomain() == $otherAttr->getDomain()
+       && parent::isEqualTo($otherAttr);
+  }
 
   // /** Whether there can be a mapping between two attributes */
   // function isEquivalentTo(Attribute $otherAttr) : bool {
@@ -150,7 +153,7 @@ class DiscreteAttribute extends Attribute {
   //      && parent::isEquivalentTo($otherAttr);
   // }
 
-  /** Whether there can be a mapping frmb one attribute to another */
+  /** Whether there can be a mapping from one attribute to another */
   function isAtLeastAsExpressiveAs(Attribute $otherAttr) {
     return get_class($this) == get_class($otherAttr)
         && $this->getName() == $otherAttr->getName()
@@ -242,7 +245,7 @@ class ContinuousAttribute extends Attribute {
       // parent::__construct($name, $type);
   // }
 
-  /** Whether there can be a mapping frmb one attribute to another */
+  /** Whether there can be a mapping from one attribute to another */
   function isAtLeastAsExpressiveAs(Attribute $otherAttr) {
     return get_class($this) == get_class($otherAttr)
         && $this->getName() == $otherAttr->getName()
