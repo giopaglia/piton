@@ -129,7 +129,7 @@ class PRip extends Learner {
     }
     
     /* Sort by classes frequency */
-    $orderedClassCounts = $data->resortClassesByCount();
+    $orderedClassCounts = $data->sortClassesByCount();
     if ($this->debug > -1) {
       echo "Sorted classes:\n";
       for ($x = 0; $x < $this->classAttr->numValues(); $x++) {

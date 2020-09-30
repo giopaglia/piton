@@ -171,6 +171,12 @@ class Instances {
     }
   }
 
+  function rowGenerator() {
+    foreach($this->data as $row) {
+      yield $row;
+    }
+  }
+
   function instsGenerator() {
     foreach($this->data as $row) {
       yield array_slice($row, 0, -1);
@@ -217,6 +223,9 @@ class Instances {
   function inst_weight(int $i) : int {
     return $this->data[$i][$this->numAttributes()];
   }
+  function getRowWeight(array $row) {
+    return $row[$this->numAttributes()];
+  }
   
   function inst_classValue(int $i) : int {
     // Note: assuming the class attribute is the first
@@ -231,6 +240,12 @@ class Instances {
   // protected function inst_val(int $i, int $j) {
   function inst_val(int $i, int $j) {
     return $this->data[$i][$j];
+  }
+  function getInstanceVal(array $inst, int $j) {
+    return $inst[$j];
+  }
+  function getRowVal(array $row, int $j) {
+    return $row[$j];
   }
 
   function pushInstance(array $inst, int $weight = 1)
@@ -253,21 +268,21 @@ class Instances {
     // return array_sum($this->getWeights());
   }
   function isWeighted() : bool {
-    // TODO explain that weights cannot be null
-    // $a = NULL;
-    // foreach ($insts->weightsGenerator() as $weight) {
-    //   if ($a === NULL) {
-    //     $a = $weight;
-    //   } else if ($a !== $weight) {
-    //     return true;
-    //   }
-    // }
     foreach ($this->weightsGenerator() as $weight) {
       if ($weight !== 1) {
         return true;
       }
     }
     return false;
+  }
+
+  function getClassAttribute() : Attribute {
+    // Note: assuming the class attribute is the first
+    return $this->getAttributes()[0];
+  }
+
+  function getClassValues() : array {
+    return array_map([$this, "inst_classValue"], range(0, $this->numInstances()-1));
   }
 
   /*
@@ -305,14 +320,6 @@ class Instances {
     foreach ($this->attributes as $k => &$attribute) {
       $attribute->setIndex($k);
     }
-  }
-  function getClassAttribute() : Attribute {
-    // Note: assuming the class attribute is the first
-    return $this->getAttributes()[0];
-  }
-
-  function getClassValues() : array {
-    return array_map([$this, "inst_classValue"], range(0, $this->numInstances()-1));
   }
 
   function numClasses() : int {
@@ -356,18 +363,6 @@ class Instances {
       if ($A === NULL) return 1;
       return ($A < $B) ? -1 : 1;
     });
-    // if (DEBUGMODE > 2) echo $this->toString();
-  }
-
-  /**
-   * Randomize the order of the instances
-   */
-  function randomize()
-  {
-    if (DEBUGMODE > 2) echo "[ Instances->randomize() ]" . PHP_EOL;
-
-    // if (DEBUGMODE > 2) echo $this->toString();
-    shuffle($this->data);
     // if (DEBUGMODE > 2) echo $this->toString();
   }
 
@@ -421,34 +416,50 @@ class Instances {
     }
 
     $newData = [];
-    for ($x = 0; $x < $this->numInstances(); $x++) {
+    foreach ($this->rowGenerator() as $row) {
       $newRow = [];
-      foreach ($copyMap as $oldAndNewAttr) {
-        $i = $oldAndNewAttr[0]->getIndex();
+      foreach ($copyMap as $i => $oldAndNewAttr) {
         $new_i = $oldAndNewAttr[1]->getIndex();
-        $oldVal = $this->inst_val($x, $i);
+        $oldVal = $this->getRowVal($row, $i);
         $newRow[$new_i] = $oldAndNewAttr[1]->reprValAs($oldAndNewAttr[0], $oldVal);
-        $newRow[] = $this->inst_weight($x);
       }
+      $newRow[] = $this->getRowWeight($row);
       $newData[] = $newRow;
     }
 
     if(count($attributes) && !$allowDataLoss) {
-      warn("Some attributes were not requested in the new attribute set in Instances->sortAttrsAs. If this is desired, please use the allowDataLoss flag. " . get_arr_dump($attributes));
+      warn("Some attributes were not requested in the new attribute set"
+         . " in Instances->sortAttrsAs. If this is desired, please use "
+         . " the allowDataLoss flag. " . get_arr_dump($attributes));
     }
 
     $this->data = $newData;
     $this->setAttributes($newAttributes);
-    if (DEBUGMODE > 2) echo $this;
+    if (DEBUGMODE > 2) {
+      echo $this;
+      $this->checkIntegrity();
+    }
 
     return $sameAttributes;
   }
-  
+
+  /**
+   * Randomize the order of the instances
+   */
+  function randomize()
+  {
+    if (DEBUGMODE > 2) echo "[ Instances->randomize() ]" . PHP_EOL;
+
+    // if (DEBUGMODE > 2) echo $this->toString();
+    shuffle($this->data);
+    // if (DEBUGMODE > 2) echo $this->toString();
+  }
+
   /**
    * Sort the classes of the attribute to predict by frequency
    */
-  function resortClassesByCount() {
-    if (DEBUGMODE > 2) echo "Instances->resortClassesByCount()" . PHP_EOL;
+  function sortClassesByCount() {
+    if (DEBUGMODE > 2) echo "Instances->sortClassesByCount()" . PHP_EOL;
     if (DEBUGMODE > 2) echo get_arr_dump($this->getClassAttribute()->getDomain());
     $classes = $this->getClassAttribute()->getDomain();
 
@@ -485,8 +496,8 @@ class Instances {
   function numDistinctValues(Attribute $attr) : int {
     $j = $attr->getIndex();
     $valPresence = [];
-    for ($x = 0; $x < $this->numInstances(); $x++) {
-      $val = $this->inst_val($x, $j);
+    foreach ($this->instsGenerator() as $inst) {
+      $val = $this->getInstanceVal($inst, $j);
       if (!isset($valPresence[$val])) {
         $valPresence[$val] = 1;
       }
@@ -520,6 +531,13 @@ class Instances {
       $class_counts[$val]++;
     }
     return $class_counts;
+  }
+
+  function checkIntegrity() : bool {
+    die_error("checkIntegrity TODO.");
+    foreach ($this->rowGenerator() as $i => $row) {
+
+    }
   }
 
   /**
