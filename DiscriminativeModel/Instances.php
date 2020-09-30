@@ -90,11 +90,10 @@ class Instances {
     return $rt;
   }
 
-
   function pushInstancesFrom(Instances $insts) {
     // TODO check if attrs are the same?
-    for ($x = 0; $x < $insts->numInstances(); $x++) {
-      $this->pushInstance($insts->getInstance($x));
+    foreach ($insts->instsGenerator() as $inst) {
+      $this->pushInstance($inst);
     }
   }
 
@@ -174,6 +173,18 @@ class Instances {
   function numAttributes() : int { return count($this->attributes); }
   function numInstances() : int { return count($this->data); }
 
+  function instsGenerator() {
+    foreach($this->data as $row) {
+      yield array_slice($row, 0, -1);
+    }
+  }
+  function weightsGenerator() {
+    $numAttrs = $this->numAttributes();
+    foreach($this->data as $row) {
+      yield $row[$numAttrs];
+    }
+  }
+
   function _getInstance(int $i, bool $includeClassAttr) : array
   {
     if ($includeClassAttr) {
@@ -189,6 +200,39 @@ class Instances {
     return array_map([$this, "getInstance"], 
       ($this->numInstances() > 0 ? range(0, $this->numInstances()-1) : [])
       );
+  }
+
+
+  /**
+   * Functions for the single data instance
+   */
+  
+  function inst_valueOfAttr(int $i, Attribute $attr) {
+    $j = $attr->getIndex();
+    return $this->inst_val($i, $j);
+  }
+
+  // function inst_isMissing(int $i, Attribute $attr) : bool {
+  //   return ($this->inst_valueOfAttr($i, $attr) === NULL);
+  // }
+  
+  function inst_weight(int $i) : int {
+    return $this->data[$i][$this->numAttributes()];
+  }
+  
+  function inst_classValue(int $i) : int {
+    // Note: assuming the class attribute is the first
+    return (int) $this->inst_val($i, 0);
+  }
+
+  function inst_setClassValue(int $i, int $cl) {
+    // Note: assuming the class attribute is the first
+    $this->data[$i][0] = $cl;
+  }
+
+  // protected function inst_val(int $i, int $j) {
+  function inst_val(int $i, int $j) {
+    return $this->data[$i][$j];
   }
 
   function pushInstance(array $inst, int $weight = 1)
@@ -211,12 +255,17 @@ class Instances {
     // return array_sum($this->getWeights());
   }
   function isWeighted() : bool {
-    $a = NULL;
-    for ($x = $this->numInstances() - 1; $x >= 0; $x--) {
-      // TODO explain that weights cannot be null
-      if ($a === NULL) {
-        $a = $this->inst_weight($x);
-      } else if ($a !== $this->inst_weight($x)) {
+    // TODO explain that weights cannot be null
+    // $a = NULL;
+    // foreach ($insts->weightsGenerator() as $weight) {
+    //   if ($a === NULL) {
+    //     $a = $weight;
+    //   } else if ($a !== $weight) {
+    //     return true;
+    //   }
+    // }
+    foreach ($this->weightsGenerator() as $weight) {
+      if ($weight !== 1) {
         return true;
       }
     }
@@ -288,39 +337,6 @@ class Instances {
   {
     $this->attributes = $attributes;
     $this->reindexAttributes();
-  }
-  
-
-  /**
-   * Functions for the single data instance
-   */
-  
-  function inst_valueOfAttr(int $i, Attribute $attr) {
-    $j = $attr->getIndex();
-    return $this->inst_val($i, $j);
-  }
-
-  // function inst_isMissing(int $i, Attribute $attr) : bool {
-  //   return ($this->inst_valueOfAttr($i, $attr) === NULL);
-  // }
-  
-  function inst_weight(int $i) : int {
-    return $this->data[$i][$this->numAttributes()];
-  }
-  
-  function inst_classValue(int $i) : int {
-    // Note: assuming the class attribute is the first
-    return (int) $this->inst_val($i, 0);
-  }
-
-  function inst_setClassValue(int $i, int $cl) {
-    // Note: assuming the class attribute is the first
-    $this->data[$i][0] = $cl;
-  }
-
-  // protected function inst_val(int $i, int $j) {
-  function inst_val(int $i, int $j) {
-    return $this->data[$i][$j];
   }
 
   /**

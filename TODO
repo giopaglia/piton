@@ -1,8 +1,6 @@
-2) Vedo che neanche io non riesco piu' a leggere correttamente il file che ti ho mandato, curiosa questa cosa. Ti riscrivo le tabelle.
-- tickz
-
 - for ($j = 0; $j < $data->numInstances(); $j++) { che diventi un generatore di istanze
-- force non-null values check nel codice?
+- move processing from SQL to PHP? force non-null values check nel codice?
+- print min-max-mean-std in Instances->save
 - ignora regole nanr at predict time
 
 #####################################################

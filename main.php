@@ -89,6 +89,7 @@ function testMed3($lr) {
       //, "Pazienti.SESSO = 'F'"
     , "Anamnesi.BMI is NOT NULL"
     , "Anamnesi.BMI != -1"
+    , "FIND_IN_SET(Referti.ID, '1395,1393,1297,2125,150,148') <= 0"
     ],
     [],
     [

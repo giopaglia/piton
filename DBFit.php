@@ -466,7 +466,7 @@ class DBFit {
       //   // echo $dataframe->toString(false);
       // }
       
-      // echo $dataframe->toString(false, [0,1,2,3,4]);
+      echo $dataframe->toString(false, [0,1,2,3,4]);
 
       yield $dataframe;
     }
@@ -2040,7 +2040,7 @@ class DBFit {
     return $this;
   }
 
-  function getCutOffValue() : float
+  function getCutOffValue() : ?float
   {
     return $this->cutOffValue;
   }
