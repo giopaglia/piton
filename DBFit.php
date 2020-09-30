@@ -347,7 +347,7 @@ class DBFit {
       /* Finally obtain data */
       // $silentSQL = (count($recursionPath) && $recursionPath[count($recursionPath)-1][0] != 0);
       $silentSQL = false;
-      $silentExcelOutput = false;
+      // $silentExcelOutput = false;
 
       if (!$silentSQL) {
         echo "Example query for LEVEL " . $recursionLevel . ", " . toString($recursionPath) . PHP_EOL;
@@ -396,35 +396,6 @@ class DBFit {
         }
       }
       
-      if (DEBUGMODE || !$silentExcelOutput) {
-        // $dataframe->save_ARFF("datasets/" . $this->getModelName($recursionPath, NULL) . ".arff");
-        if ($idVal === NULL) {
-          $path = "datasets/" . toString($recursionPath) . ".csv";
-        } else {
-          $path = "datasets/" . toString($recursionPath) . "-$idVal.csv";
-        }
-        $f = fopen($path, "w");
-
-        /* Attributes */
-        $attrs_str = [];
-        foreach ($final_attributes as $attr) {
-          $attrs_str[] = $attr->getName();
-        }
-        fputcsv($f, $attrs_str);
-
-        /* Print the CSV representation of a value of the attribute */
-        $getCSVRepr = function ($val, Attribute $attr)
-        {
-          return $val === NULL ? "" : $attr->reprVal($val);
-        };
-        
-        /* Data */
-        foreach ($final_data as $k => $inst) {
-          fputcsv($f, array_map($getCSVRepr, $inst, $final_attributes));
-        }
-
-        fclose($f);
-      }
       $rawDataframe = [$final_attributes, $final_data, $outputAttributes];
       $numDataframes = count($outputAttributes);
     }
@@ -453,12 +424,14 @@ class DBFit {
       $dataframe = new Instances($attrs, $data);
       
       // if (DEBUGMODE || !$silentExcelOutput) {
-      //   // $dataframe->save_ARFF("datasets/" . $this->getModelName($recursionPath, $i_prob) . ".arff");
-      //   if ($idVal === NULL) {
-      //     $dataframe->save_CSV("datasets/" . $this->getModelName($recursionPath, $i_prob) . ".csv");
-      //   } else {
-      //     // $dataframe->save_CSV("datasets/" . $this->getModelName($recursionPath, $i_prob) . "-$idVal.csv");
-      //   }
+      // if (DEBUGMODE) {
+      // $dataframe->save_ARFF("datasets/" . $this->getModelName($recursionPath, $i_prob) . ".arff");
+      // if ($idVal === NULL) {
+      //   $path = "datasets/" . toString($recursionPath) . ".csv";
+      // } else {
+      //   $path = "datasets/" . toString($recursionPath) . "-$idVal.csv";
+      // }
+      // $dataframe->save_CSV($path);
       // }
 
       // if (DEBUGMODE && $idVal === NULL) {
@@ -1102,13 +1075,13 @@ class DBFit {
     // $outputAttributes = $this->getColumnAttributes($this->outputColumns[$recursionLevel], $recursionPath);
     
     /* For each attribute, train subtree */
-    foreach ($this->generateDataframes($rawDataframe) as $i_prob => $data) {
+    foreach ($this->generateDataframes($rawDataframe) as $i_prob => $dataframe) {
       echo "Problem $i_prob/" . $numDataframes . PHP_EOL;
       // $outputAttribute = $outputAttributes[$i_prob];
-      $outputAttribute = $data->getClassAttribute();
+      $outputAttribute = $dataframe->getClassAttribute();
 
       /* If no data available, skip training */
-      if (!$data->numInstances()) {
+      if (!$dataframe->numInstances()) {
         echo "Skipping node due to lack of data." . PHP_EOL;
         if ($recursionLevel == 0) {
           die_error("Training failed! No data instance found.");
@@ -1118,19 +1091,21 @@ class DBFit {
 
       /* If data is too unbalanced, skip training */
       if ($this->getCutOffValue() !== NULL && 
-          !$data->checkCutOff($this->getCutOffValue())) {
+          !$dataframe->checkCutOff($this->getCutOffValue())) {
         echo "Skipping node due to unbalanced dataset found"
           // . "("
-          // . $data->checkCutOff($this->getCutOffValue())
+          // . $dataframe->checkCutOff($this->getCutOffValue())
           // . " > "
           // . $this->getCutOffValue()
           // . ")";
           . "." . PHP_EOL;
         continue;
       }
-      
+
+      $dataframe->save_CSV("datasets/" . $this->getModelName($recursionPath, NULL) . ".csv");
+
       /* Obtain and train, test set */
-      list($trainData, $testData) = $this->getDataSplit($data);
+      list($trainData, $testData) = $this->getDataSplit($dataframe);
       
       // echo "TRAIN" . PHP_EOL . $trainData->toString(DEBUGMODE <= 0) . PHP_EOL;
       // echo "TEST" . PHP_EOL . $testData->toString(DEBUGMODE <= 0) . PHP_EOL;
@@ -1291,22 +1266,24 @@ class DBFit {
     }
 
     /* For each attribute, predict subtree */
-    foreach ($this->generateDataframes($rawDataframe) as $i_prob => $data) {
+    foreach ($this->generateDataframes($rawDataframe) as $i_prob => $dataframe) {
       echo "Problem $i_prob/" . $numDataframes . PHP_EOL;
-      // echo "Data: " . $data->toString(true) . PHP_EOL;
+      // echo "Data: " . $dataframe->toString(true) . PHP_EOL;
 
       /* If no data available, skip training */
-      if (!$data->numInstances()) {
+      if (!$dataframe->numInstances()) {
         die_error("No data instance found at prediction time. "
           . "Path: " . toString($recursionPath));
         continue;
       }
 
       /* Check that a unique data instance is retrieved */
-      if ($data->numInstances() !== 1) {
+      if ($dataframe->numInstances() !== 1) {
         die_error("Found more than one instance at predict time. Is this wanted? ID: {$this->identifierColumnName} = $idVal");
       }
 
+      $dataframe->save_CSV("datasets/" . $this->getModelName($recursionPath, NULL) . "-$idVal.csv");
+      
       /* Retrieve model */
       $model_name = $this->getModelName($recursionPath, $i_prob);
       if (!(isset($this->models[$model_name]))) {
@@ -1321,19 +1298,19 @@ class DBFit {
       // echo "Using model '$model_name' for prediction." . PHP_EOL;
       // echo $model . PHP_EOL;
 
-      // var_dump($data->getAttributes());
+      // var_dump($dataframe->getAttributes());
       // var_dump($model->getAttributes());
       
       /* Perform local prediction */
-      $predictedVal = $model->predict($data, true);
+      $predictedVal = $model->predict($dataframe, true);
       $predictedVal = $predictedVal[0];
-      $className = $data->getClassAttribute()->reprVal($predictedVal);
+      $className = $dataframe->getClassAttribute()->reprVal($predictedVal);
       echo "Prediction: [$predictedVal] '$className' (using model '$model_name')" . PHP_EOL;
 
       /* Recursive step: recurse and predict the subtree of this predicted value */
       // TODO right now I'm not recurring when a "NO_" outcome happens. This is not supersafe, there must be a nice generalization.
       if (!startsWith($className, "NO_")) {
-        $predictions[] = [[$data->getClassAttribute()->getName(), $predictedVal], $this->predictByIdentifier($idVal,
+        $predictions[] = [[$dataframe->getClassAttribute()->getName(), $predictedVal], $this->predictByIdentifier($idVal,
           array_merge($recursionPath, [[$i_prob, $className]]))];
         echo PHP_EOL;
       }

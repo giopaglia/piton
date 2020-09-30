@@ -72,10 +72,7 @@ function testMed3($lr) {
 
   $db_fit->setInputTables([
     "Referti"
-  , ["Pazienti", [
-        "Pazienti.ID = Referti.ID_PAZIENTE"
-      , "Pazienti.SESSO = 'F'"
-      ], "LEFT JOIN"]
+  , ["Pazienti", "Pazienti.ID = Referti.ID_PAZIENTE", "LEFT JOIN"]
   , ["Anamnesi", "Anamnesi.ID_REFERTO = Referti.ID", "LEFT JOIN"]
   , ["Diagnosi", "Diagnosi.ID_REFERTO = Referti.ID", "LEFT JOIN"]
   , ["Densitometrie", "Densitometrie.ID_REFERTO = Referti.ID", "LEFT JOIN"]
@@ -89,6 +86,7 @@ function testMed3($lr) {
   $db_fit->setWhereClauses([
     [
       "Referti.DATA_REFERTO BETWEEN '2018-09-01' AND '2020-08-31'"
+    , "Pazienti.SESSO = 'F'"
     , "Anamnesi.BMI is NOT NULL"
     , "Anamnesi.BMI != -1"
     , "FIND_IN_SET(Referti.ID, '1395,1393,1297,2125,150,148') <= 0"

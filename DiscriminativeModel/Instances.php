@@ -112,8 +112,7 @@ class Instances {
     array_unshift($attributes, $classAttr);
 
     /* Print the internal representation given the ARFF value read */
-    $getVal = function ($ARFFVal, Attribute $attr)
-    {
+    $getVal = function ($ARFFVal, Attribute $attr) {
       $ARFFVal = trim($ARFFVal);
       if ($ARFFVal === "?") {
         return NULL;
@@ -220,6 +219,16 @@ class Instances {
   //   return ($this->inst_valueOfAttr($i, $attr) === NULL);
   // }
   
+  function getRowInstance(array $row, bool $includeClassAttr) : array
+  {
+    if ($includeClassAttr) {
+      return array_slice($row, 0, -1);
+    }
+    else {
+      return array_slice($row, 1, -1);
+    }
+  }
+
   function inst_weight(int $i) : int {
     return $this->data[$i][$this->numAttributes()];
   }
@@ -290,8 +299,8 @@ class Instances {
    function dropAttr(int $j) {
     array_splice($this->attributes, $j, 1);
     $this->reindexAttributes();
-    foreach ($this->data as &$inst) {
-      array_splice($inst, $j, 1);
+    foreach ($this->data as &$row) {
+      array_splice($row, $j, 1);
     }
   }
 
@@ -559,14 +568,13 @@ class Instances {
     }
     
     /* Print the ARFF representation of a value of the attribute */
-    $getARFFRepr = function ($val, Attribute $attr)
-    {
+    $getARFFRepr = function ($val, Attribute $attr) {
       return $val === NULL ? "?" : $attr->reprVal($val);
     };
     
     /* Data */
     fwrite($f, "\n@DATA\n");
-    foreach ($this->data as $k => $inst) {
+    foreach ($this->data as $k => $row) {
       fwrite($f, join(",", array_map($getARFFRepr, $this->getInstance($k), $this->getAttributes())) . ", {" . $this->inst_weight($k) . "}\n");
     }
 
@@ -583,35 +591,137 @@ class Instances {
 
     /* Attributes */
     $attributes = $this->getAttributes($includeClassAttr);
-    $attrs_str = [];
+    $header_row = ["ID"];
     foreach ($attributes as $attr) {
-      $attrs_str[] = $attr->getName();
+      $header_row[] = $attr->getName();
     }
     if($this->isWeighted()) {
-      $attrs_str[] = "WEIGHT";
+      $header_row[] = "WEIGHT";
     }
-    fputcsv($f, $attrs_str);
+    fputcsv($f, $header_row);
 
     /* Print the CSV representation of a value of the attribute */
-    $getCSVRepr = function ($val, Attribute $attr)
-    {
+    $getCSVAttrRepr = function ($val, Attribute $attr) {
       return $val === NULL ? "" : $attr->reprVal($val);
+    };
+
+    $getCSVRepr = function ($val, Attribute $attr) {
+      return $val === NULL ? "" : $val;
     };
     
     /* Data */
     
     if(!$this->isWeighted()) {
-      foreach ($this->data as $k => $inst) {
-        fputcsv($f, array_map($getCSVRepr, $this->_getInstance($k, $includeClassAttr), $attributes));
+      foreach ($this->data as $k => $row) {
+        fputcsv($f, array_merge([$k], array_map($getCSVAttrRepr, $this->getRowInstance($row, $includeClassAttr), $attributes)));
       }
     }
     else {
-      foreach ($this->data as $k => $inst) {
-        fputcsv($f, array_merge(array_map($getCSVRepr, $this->_getInstance($k, $includeClassAttr), $attributes), [$this->inst_weight($k)]));
+      foreach ($this->data as $k => $row) {
+        fputcsv($f, array_merge([$k], array_map($getCSVAttrRepr, $this->getRowInstance($row, $includeClassAttr), $attributes), [$this->getRowWeight($row)]));
+      }
+    }
+
+    /* Stats */
+
+    if(!$this->isWeighted()) {
+      foreach ($this->computeStats() as $statName => $statRow) {
+        fputcsv($f, array_merge([$statName], array_map($getCSVRepr, $this->getRowInstance($statRow, $includeClassAttr), $attributes)));
+      }
+    }
+    else {
+      foreach ($this->computeStats() as $statName => $statRow) {
+        fputcsv($f, array_merge([$statName], array_map($getCSVRepr, $this->getRowInstance($statRow, $includeClassAttr), $attributes), [$this->getRowWeight($row)]));
       }
     }
 
     fclose($f);
+  }
+
+  /**
+   * Compute statistical indicators such as min, max, average and standard deviation
+   *  for numerical attributes.
+   */
+  function computeStats() : array {
+    // TODO ignore discrete attributes when computing stats
+    $attrs = $this->getAttributes();
+
+    $fillNonNumWithNull = function (&$arr) use($attrs) {
+      foreach ($attrs as $i => $attr) {
+        if(!($attr instanceof ContinuousAttribute)) {
+          $arr[$i] = NULL;
+        }
+      }
+    };
+
+    $row_min = [];
+    $row_max = [];
+    $fillNonNumWithNull($row_min);
+    $fillNonNumWithNull($row_max);
+    $row_sum = array_fill(0,count($attrs)+1,0);
+    $fillNonNumWithNull($row_sum);
+    $row_count = array_fill(0,count($attrs)+1,0);;
+    $row_weight = array_fill(0,count($attrs)+1,0);;
+    foreach ($this->rowGenerator() as $row) {
+      $weight = $this->getRowWeight($row);
+      foreach ($row as $i => $val) {
+        if ($val !== NULL) {
+
+          if($row_sum[$i] !== NULL) {
+            if (!isset($row_min[$i])) {
+              $row_min[$i] = $val;
+            } else {
+              $row_min[$i] = min($row_min[$i], $val);
+            }
+
+            if (!isset($row_max[$i])) {
+              $row_max[$i] = $val;
+            } else {
+              $row_max[$i] = max($row_max[$i], $val);
+            }
+
+            $row_sum[$i] += $weight * $val;
+          }
+          
+          $row_count[$i]++;
+          $row_weight[$i] += $weight;
+        }
+      }
+    }
+
+    ksort($row_min);
+    ksort($row_max);
+
+    $row_avg = array_fill(0,count($attrs)+1,0);
+    $fillNonNumWithNull($row_avg);
+    foreach ($row_sum as $i => $val) {
+      if ($row_sum[$i] !== NULL) {
+        $row_avg[$i] = safe_div($val, $row_weight[$i]);
+      }
+    }
+
+    $row_stdev = array_fill(0,count($attrs)+1,0);
+    $fillNonNumWithNull($row_stdev);
+    foreach ($this->rowGenerator() as $row) {
+      foreach ($row as $i => $val) {
+        if ($row_sum[$i] !== NULL && $row_avg[$i] !== NULL && $row_avg[$i] !== NAN && $val !== NULL) {
+          $row_stdev[$i] += pow(($row_avg[$i] - $val), 2);
+        }
+      }
+    }
+
+    foreach ($row_stdev as $i => $val) {
+      if ($row_sum[$i] !== NULL) {
+        $row_stdev[$i] = sqrt(safe_div($val, $row_weight[$i]));
+      }
+    }
+
+    return ["MIN" => $row_min,
+            "MAX" => $row_max,
+            "AVG" => $row_avg,
+            "STDEV" => $row_stdev,
+            "COUNT" => $row_count,
+            "WCOUNT" => $row_weight];
   }
 
   /**
@@ -679,7 +789,7 @@ class Instances {
       $out_str .= "\n";
       // TODO reuse inst_toString
       $out_str .= str_repeat("======|=", count($attributes)+1) . "|\n";
-      foreach ($this->data as $i => $inst) {
+      foreach ($this->data as $i => $row) {
         foreach ($this->getInstance($i) as $j => $val) {
           if (!in_array($j, $attributesSubset)) {
             continue;
