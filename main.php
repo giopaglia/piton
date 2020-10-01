@@ -87,9 +87,13 @@ function testMed3($lr) {
     [
       "Referti.DATA_REFERTO BETWEEN '2018-09-01' AND '2020-08-31'"
     , "Pazienti.SESSO = 'F'"
+    , "!ISNULL(Anamnesi.STATO_MENOPAUSALE)"
+    // END structural constraints
+    // END begin constraints for manual cleaning
     , "Anamnesi.BMI is NOT NULL"
     , "Anamnesi.BMI != -1"
-    , "FIND_IN_SET(Referti.ID, '1395,1393,1297,2125,150,148') <= 0"
+    , "FIND_IN_SET(Referti.ID, '1297,1393,1395,2125') <= 0"
+    , "FIND_IN_SET(Referti.ID, '150,148') <= 0"
     ],
     [],
     [
