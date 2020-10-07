@@ -21,6 +21,9 @@ class DBFit {
   /* Database access (Object-Oriented MySQL style) */
   private $db;
 
+  /* TODO explain */
+  private $dataTable;
+
   /*
     The database tables where the input columns are (array of table-terms, one for each table)
     
@@ -345,18 +348,24 @@ class DBFit {
       }
       
       /* Finally obtain data */
-      // $silentSQL = (count($recursionPath) && $recursionPath[count($recursionPath)-1][0] != 0);
-      $silentSQL = false;
-      // $silentExcelOutput = false;
+      if (!count($recursionPath)) {
+        // $silentSQL = (count($recursionPath) && $recursionPath[count($recursionPath)-1][0] != 0);
+        $silentSQL = false;
+        // $silentExcelOutput = false;
 
-      if (!$silentSQL) {
-        echo "Example query for LEVEL " . $recursionLevel . ", " . toString($recursionPath) . PHP_EOL;
+        if (!$silentSQL) {
+          echo "Example query for LEVEL " . $recursionLevel . ", " . toString($recursionPath) . PHP_EOL;
+        }
+        $raw_data = $this->SQLSelectColumns($this->inputColumns, $idVal, $recursionPath, $outputColumn,
+          $silentSQL);
+        $this->dataTable = $raw_data;
       }
-      $res = $this->SQLSelectColumns($this->inputColumns, $idVal, $recursionPath, $outputColumn,
-        $silentSQL);
-      $data = $this->readRawData($res, $attributes, $columns);
+      else {
+        $raw_data = ...;
+      }
+
+      $data = $this->readRawData($raw_data, $attributes, $columns);
       /* Deflate attribute and data arrays (breaking the symmetry with columns) */
-      
       $final_data = [];
       foreach ($data as $attr_vals) {
         $row = [];
@@ -450,7 +459,7 @@ class DBFit {
       For each mysql data row, derive a new data row.
       The identifier column is used to determine which rows to merge.
    */
-  function &readRawData(object &$res, array &$attributes, array &$columns) : array {
+  function &readRawData(object &$raw_data, array &$attributes, array &$columns) : array {
     // var_dump($attributes);
     // var_dump("attributes");
     // var_dump($attributes[1][0]);
@@ -459,7 +468,7 @@ class DBFit {
     $data = [];
 
     /** For each data row... */
-    foreach ($res as $raw_row) {
+    foreach ($raw_data as $raw_row) {
       // echo get_var_dump($raw_row) . PHP_EOL;
       
       /* Pre-process row values according to the corresponding attribute */
@@ -682,7 +691,7 @@ class DBFit {
           // 
         }
       }
-    } // foreach ($res as $raw_row)
+    } // foreach ($raw_data as $raw_row)
 
     return $data;
   }
@@ -773,8 +782,8 @@ class DBFit {
     }
 
     /* Query database */
-    $res = mysql_select($this->db, $sql, $silent);
-    return $res;
+    $raw_data = mysql_select($this->db, $sql, $silent);
+    return $raw_data;
   }
 
   /* Need a nickname for every column when using table.column format,
@@ -851,15 +860,15 @@ class DBFit {
 
         /* Find unique values */
         $classes = [];
-        $res = $this->SQLSelectColumns([$column], NULL, $recursionPath, NULL, true, true);
+        $raw_data = $this->SQLSelectColumns([$column], NULL, $recursionPath, NULL, true, true);
         $transformer = $this->getColumnTreatmentArg($column, 1);
         if ($transformer === NULL) {
-          foreach ($res as $raw_row) {
+          foreach ($raw_data as $raw_row) {
             $classes[] = $raw_row[$this->getColumnNickname($column)];
           }
         } else {
           // $transformer = function ($x) { return [$x]; };
-          foreach ($res as $raw_row) {
+          foreach ($raw_data as $raw_row) {
             $values = $transformer($raw_row[$this->getColumnNickname($column)]);
             if($values !== NULL) {
               $classes = array_merge($classes, $values);
@@ -913,10 +922,10 @@ class DBFit {
 
         /* Find unique values */
         $classes = [];
-        $res = $this->SQLSelectColumns([$column], NULL, $recursionPath, NULL, true, true);
+        $raw_data = $this->SQLSelectColumns([$column], NULL, $recursionPath, NULL, true, true);
         $transformer = $this->getColumnTreatmentArg($column, 0);
         if ($transformer === NULL) {
-          foreach ($res as $raw_row) {
+          foreach ($raw_data as $raw_row) {
             $classes[] = $raw_row[$this->getColumnNickname($column)];
           }
         } else {
@@ -967,7 +976,7 @@ class DBFit {
 
               /* Find $k most frequent words */
               $word_counts = [];
-              $res = $this->SQLSelectColumns([$column], NULL, $recursionPath, NULL, true);
+              $raw_data = $this->SQLSelectColumns([$column], NULL, $recursionPath, NULL, true);
               
               $lang = $this->defaultOptions["textLanguage"];
               if (!isset($this->stop_words)) {
@@ -976,7 +985,7 @@ class DBFit {
               if (!isset($this->stop_words[$lang])) {
                 $this->stop_words[$lang] = explode("\n", file_get_contents($lang . "-stopwords.txt"));
               }
-              foreach ($res as $raw_row) {
+              foreach ($raw_data as $raw_row) {
                 $text = $raw_row[$this->getColumnNickname($column)];
                 
                 if ($text !== NULL) {
@@ -1575,10 +1584,10 @@ class DBFit {
       /* Obtain column names from database */
       $sql = "SELECT * FROM `information_schema`.`columns` WHERE `table_name` IN "
             . mysql_set(array_map([$this, "getTableName"], $this->inputTables)) . " ";
-      $res = mysql_select($this->db, $sql, true);
+      $raw_data = mysql_select($this->db, $sql, true);
 
       $colsNames = [];
-      foreach ($res as $raw_col) {
+      foreach ($raw_data as $raw_col) {
         $colsNames[] = $raw_col["TABLE_NAME"].".".$raw_col["COLUMN_NAME"];
       }
       return $this->setInputColumns($colsNames);
@@ -1804,8 +1813,8 @@ class DBFit {
             . " AND (COLUMN_NAME = '" . $this->getColumnName($column) . "'"
             . " OR CONCAT(TABLE_NAME,'.',COLUMN_NAME) = '" . $this->getColumnName($column)
              . "')";
-      $res = mysql_select($this->db, $sql, true);
-      foreach ($res as $col) {
+      $raw_data = mysql_select($this->db, $sql, true);
+      foreach ($raw_data as $col) {
         if (in_array($columnName,
             [$col["TABLE_NAME"].".".$col["COLUMN_NAME"], $col["COLUMN_NAME"]])) {
           $mysql_type = $col["COLUMN_TYPE"];
