@@ -88,6 +88,7 @@ function testMed3($lr) {
       "Referti.DATA_REFERTO BETWEEN '2018-09-01' AND '2020-08-31'"
     , "Pazienti.SESSO = 'F'"
     , "!ISNULL(Anamnesi.STATO_MENOPAUSALE)"
+    , "DATEDIFF(Referti.DATA_REFERTO,Pazienti.DATA_NASCITA) / 365 >= 40"
     // END structural constraints
     // END begin constraints for manual cleaning
     , "Anamnesi.BMI is NOT NULL"
