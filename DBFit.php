@@ -439,7 +439,7 @@ class DBFit {
       //   // echo $dataframe->toString(false);
       // }
       
-      // echo $dataframe->toString(false, [0,1,2,3,4]);
+      // echo $dataframe->toString(false, [0,1,2,3,4,5,6,7,8,9,10,11,12]);
 
       yield $dataframe;
     }
@@ -694,7 +694,34 @@ class DBFit {
     , array $recursionPath = []
     , array $outputColumn = NULL
     , bool $silent = !DEBUGMODE
-    , bool $distinct = false) : object {
+    , bool $distinct = false
+    , ?int $forceRecursionLevel = NULL
+    , ?array $forceWhereClausesArr = NULL
+    , bool $forceOrderByClause = true
+    , bool $returnQuery = false) {
+    // echo "SQLSelectColumns(\n"
+    //   . ", \$columns = "               . toString($columns) . "\n"
+    //   . ", \$idVal = "                 . toString($idVal) . "\n"
+    //   . ", \$recursionPath = "         . toString($recursionPath) . "\n"
+    //   . ", \$outputColumn = "          . toString($outputColumn) . "\n"
+    //   . ", \$silent = "                . toString($silent) . "\n"
+    //   . ", \$distinct = "              . toString($distinct) . "\n"
+    //   . ", \$forceRecursionLevel = "   . toString($forceRecursionLevel) . "\n"
+    //   . ", \$forceWhereClausesArr = "  . toString($forceWhereClausesArr) . "\n"
+    //   . ", \$forceOrderByClause = "    . toString($forceOrderByClause) . "\n"
+    //   . ", \$returnQuery = "           . toString($returnQuery) . "\n";
+
+    // forceRecursionLevel
+    $recursionLevel = $forceRecursionLevel;
+    if ($forceRecursionLevel == NULL) {
+      $recursionLevel = count($recursionPath);
+    }
+
+    // forceWhereClausesArr
+    $whereClauses = $forceWhereClausesArr;
+    if ($forceWhereClausesArr == NULL) {
+      $whereClauses = $this->getSQLWhereClauses($idVal, $recursionPath);
+    }
 
     /* Build SQL query string */
     $sql = "";
@@ -702,7 +729,7 @@ class DBFit {
     /* SELECT ... FROM */
     $cols_str = [];
 
-    if ($outputColumn != NULL) {
+    if ($outputColumn != NULL && !$distinct) {
       if ($idVal !== NULL) {
         $cols_str[] = "NULL AS " . $this->getColumnNickname($outputColumn);
       }
@@ -725,7 +752,8 @@ class DBFit {
     /* Join all input tables AND the output tables needed, depending on the recursion depth */
     $tables = $this->inputTables;
     if ($idVal === NULL) {
-      $tables = array_merge($tables, $this->getColumnTables($this->outputColumns[count($recursionPath)]));
+      // echo "recursionLevel" . $recursionLevel;
+      $tables = array_merge($tables, $this->getColumnTables($this->outputColumns[$recursionLevel]));
     }
 
     // echo "tables" . PHP_EOL . get_var_dump($tables);
@@ -748,21 +776,58 @@ class DBFit {
     }
 
     /* WHERE */
-    $whereClauses = $this->getSQLWhereClauses($idVal, $recursionPath);
 
     if ($distinct) {
-      if (count($columns) > 1) {
-        die_error("Unexpected case: are you sure you want to ask for distinct rows with more than one field?" . PHP_EOL . $sql);
+      if (count($cols_str) > 1) {
+        die_error("Unexpected case: are you sure you want to ask for distinct rows with more than one field?" . PHP_EOL . $sql . PHP_EOL . get_arr_dump($cols_str));
       }
       $whereClauses[] = "!ISNULL(" . $this->getColumnName($columns[0]) . ")";
     }
 
     if (count($whereClauses)) {
-      $sql .= " WHERE " . join(" AND ", $whereClauses);
+      $arr_whereClauses = [];
+      foreach ($whereClauses as $whereClause) {
+        if (is_string($whereClause)) {
+          $str_whereClause = $whereClause;
+        } else if (is_array($whereClause)) {
+          $str_whereClause = $whereClause[0] . " " . $whereClause[1] . " ";
+          if ($whereClause[2][0] == "reuse_current_query") {
+            // Regenerate query until the previous constraint (ignoring the order clause)
+            $str_whereClause .= "(\n" . $this->SQLSelectColumns(
+                    [$this->readColumn($whereClause[0])]
+                  , NULL // Note: Here I loose the value for the ID column. Is this right?
+                  , $recursionPath
+                  , $outputColumn
+                  , $silent
+                  , true
+                  , array_merge($arr_whereClauses,$whereClause[2][1])
+                  , false
+                  , true)
+                   . ")\n";
+          }
+          if ($whereClause[2][0] == "reuse_current_query_until_level") {
+            // Regenerate query until the previous constraint (ignoring the order clause)
+            $str_whereClause .= "(\n" . $this->SQLSelectColumns(
+                    [$this->readColumn($whereClause[0])]
+                  , NULL // Note: Here I loose the value for the ID column. Is this right?
+                  , $recursionPath
+                  , $outputColumn
+                  , $silent
+                  , true
+                  , $whereClause[2][1]
+                  , array_merge($arr_whereClauses,$whereClause[2][2])
+                  , false
+                  , true)
+                   . ")\n";
+          }
+        }
+        $arr_whereClauses[] = $str_whereClause;
+      }
+      $sql .= " WHERE " . join(" AND ", $arr_whereClauses);
     }
 
     /* ORDER BY */
-    if (!$distinct && count($this->orderByClauses)) {
+    if ($forceOrderByClause && !$distinct && count($this->orderByClauses)) {
       $sql .= " ORDER BY "
            . join(", ", array_map(function ($clause) { return (is_string($clause) ? $clause : $clause[0] . " " . $clause[1]); }, $this->orderByClauses));
     }
@@ -771,10 +836,14 @@ class DBFit {
     if ($idVal === NULL && $this->limit !== NULL) {
       $sql .= " LIMIT {$this->limit}";
     }
-
-    /* Query database */
-    $raw_data = mysql_select($this->db, $sql, $silent);
-    return $raw_data;
+    if ($returnQuery) {
+      return $sql;
+    } else {
+      /* Query database */
+      // echo $sql . PHP_EOL;
+      $raw_data = mysql_select($this->db, $sql, $silent);
+      return $raw_data;
+    }
   }
 
   /* Need a nickname for every column when using table.column format,
@@ -795,6 +864,9 @@ class DBFit {
     foreach ($this->inputTables as $table) {
       $constraints = array_merge($constraints, $this->getTableJoinClauses($table));
     }
+    // Filter any constraint that is not a string TODO maybe this function is
+    // only used in readData and it doesn't need to be a separate part of it
+    $constraints = array_values(array_filter($constraints, "is_string"));
     // TODO add those for the outputColumns, same as in getSQL... ?
     return $constraints;
   }
@@ -819,11 +891,11 @@ class DBFit {
     }
     else {
       // Append where clauses for the current hierarchy level
-        // var_dump("yeah" . strval(1+count($recursionPath)));
-      if (isset($this->whereClauses[1+count($recursionPath)])) {
-        $whereClauses = array_merge($whereClauses, $this->whereClauses[1+count($recursionPath)]);
-        // var_dump($whereClauses);
-      }
+      // TODO is this useful?
+      // if (isset($this->whereClauses[1+count($recursionPath)])) {
+      //   $whereClauses = array_merge($whereClauses, $this->whereClauses[1+count($recursionPath)]);
+      //   // var_dump($whereClauses);
+      // }
       $outAttrs = $this->getOutputColumnNames();
       foreach ($recursionPath as $recursionLevel => $node) {
         // $this->getOutputColumnAttributes()[$recursionLevel][$node[0]]->getName();
@@ -1950,8 +2022,10 @@ class DBFit {
     foreach ($whereClauses as $whereClausesSet) {
       foreach ($whereClausesSet as $i => $jc) {
         if (!is_string($jc)) {
-          die_error("Non-string value encountered in whereClauses at $i-th level: "
-          . get_var_dump($jc));
+          if (!(is_array($jc) && count($jc) > 2 && is_string($jc[0]) && is_string($jc[1]) && in_array(strtoupper($jc[1]), ["NOT IN", "IN"]))) {
+            die_error("Invalid whereClause at $i-th level: "
+            . get_var_dump($jc));
+          }
         }
       }
     }
