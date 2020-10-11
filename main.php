@@ -68,7 +68,7 @@ function testMed3($lr) {
   $db_fit = new DBFit($db);
   $db_fit->setTrainingMode([.8, .2]);
   
-  // $db_fit->setCutOffValue(0.10);
+  $db_fit->setCutOffValue(0.10);
 
   $db_fit->setInputTables([
     "Referti"
@@ -119,8 +119,7 @@ function testMed3($lr) {
 
   // TODO remove
   // $db_fit->addInputColumn(["Referti.ID"]);
-  // $db_fit->addInputColumn(["Referti.DATA_REFERTO", "DaysSince"]);
-  
+    
   // gender
   $db_fit->addInputColumn(["Pazienti.SESSO", "ForceCategorical", "gender"]);
   // menopause state (if relevant)
@@ -231,11 +230,6 @@ function testMed3($lr) {
   // TBS
   // $db_fit->addInputColumn(["IF(Diagnosi.TBS_COLONNA_APPLICABILE,0+IF(Diagnosi.TBS_COLONNA_PERCENTUALE, 0, TBS_COLONNA_VALORE),NULL)", NULL, "Diagnosi.ALG_TBS"]);
 
-  // $db_fit->addInputColumn("Densitometrie.SPINE_CHECKBOX");
-  // $db_fit->addInputColumn("Densitometrie.HIP_R_CHECKBOX");
-  // $db_fit->addInputColumn("Densitometrie.HIP_L_CHECKBOX");
-
-
 
   // clinical information (20 fields)
   $db_fit->addInputColumn(["CONCAT('', COALESCE(Anamnesi.PATOLOGIE_UTERINE_CHECKBOX,0))", "ForceCategorical", "endometrial pathologies"]);
@@ -277,6 +271,7 @@ function testMed3($lr) {
   // checkbox+value("Diagnosi.SITUAZIONE_COLONNA_CHECKBOX" "Diagnosi.SITUAZIONE_COLONNA")
   // $db_fit->addInputColumn(["CONCAT('', IF(Diagnosi.SITUAZIONE_COLONNA_CHECKBOX, Diagnosi.SITUAZIONE_COLONNA, 'Normale'))", "ForceCategorical", "Diagnosi.N_SITUAZIONE_COLONNA"]);
   $db_fit->addInputColumn(["Diagnosi.SITUAZIONE_COLONNA", "ForceCategorical", "spine status"]);
+  
   // current DXA spine total Z score
   $db_fit->addInputColumn(["Densitometrie.TOT_Z_SCORE", NULL, "spine Z-score"]);
   // current DXA spine total T score
@@ -291,7 +286,6 @@ function testMed3($lr) {
       [
         ["RaccomandazioniTerapeuticheUnitarie", ["RaccomandazioniTerapeuticheUnitarie.ID_RACCOMANDAZIONE_TERAPEUTICA = RaccomandazioniTerapeutiche.ID"
         , "RaccomandazioniTerapeuticheUnitarie.TIPO != 'Indagini approfondimento'"], "LEFT JOIN"]
-        // , "RaccomandazioniTerapeuticheUnitarie.TIPO = 'Vitamina D Supplementazione'"], "LEFT JOIN"]
       ],
       "ForceCategoricalBinary"],
     [
