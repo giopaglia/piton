@@ -109,6 +109,8 @@ function listify(&$v) { // TODO , $depth = 1
   }
 }
 
+function toList($v) { listify($v); return $v; }
+
 function is_array_of_strings($arr) {
   if (!is_array($arr)) return false;
   foreach ($arr as $v)

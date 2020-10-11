@@ -93,10 +93,14 @@ function testMed3($lr) {
     // END begin constraints for manual cleaning
     , "Anamnesi.BMI is NOT NULL"
     , "Anamnesi.BMI != -1"
-    // , "FIND_IN_SET(Referti.ID, '495,1479,1481,2210') <= 0"
+
     // Referti.ID NOT IN (SELECT ...)
-    , ["Referti.ID", "NOT IN", ["reuse_current_query_until_level", 1, ["!ISNULL(RaccomandazioniTerapeuticheUnitarie.TIPO)", "ISNULL(PrincipiAttivi.NOME)"]]]
-    , "FIND_IN_SET(Referti.ID, '153,155') <= 0"
+    // , "FIND_IN_SET(Referti.ID, '495,1479,1481,2210') <= 0"
+    , ["Referti.ID", "NOT IN", ["reuse_current_query", 1, ["!ISNULL(RaccomandazioniTerapeuticheUnitarie.TIPO)", "ISNULL(PrincipiAttivi.NOME)"]]]
+    
+    // Referti.ID NOT IN (SELECT ...)
+    // , "FIND_IN_SET(Referti.ID, '153,155') <= 0"
+    , ["Referti.ID", "NOT IN", ["reuse_current_query", 1, [], ["GROUP BY" => ["RaccomandazioniTerapeuticheUnitarie.TIPO", "PrincipiAttivi.NOME", "Referti.ID"], "HAVING" => "COUNT(*) > 1"]]]
     ],
     // [],
     // [
@@ -167,8 +171,11 @@ function testMed3($lr) {
     // "Malattia cronica epatica come cirrosi/epatite cronica" => "chronic liver diseases",
     "Menopausa prematura" => "early menopause",
     "Malnutrizione cronica" => "chronic malnutrition",
+    "Osteogenesi imperfecta in età adulta" => "adult osteogenesis imperfecta",
+    "Ipertiroidismo non trattato per lungo tempo" => "untreated chronic hyperthyroidism",
   ];
-  $db_fit->addInputColumn(["CONCAT('', IF(ISNULL(Anamnesi.CAUSE_OSTEOPOROSI_SECONDARIA),NULL,Anamnesi.CAUSE_OSTEOPOROSI_SECONDARIA))", ["ForceCategoricalBinary", function ($input) use ($val_map) {
+  $ignore_vals = ["Malattia cronica epatica come cirrosi/epatite cronica", "M.I.C.I."];
+  $db_fit->addInputColumn(["Anamnesi.CAUSE_OSTEOPOROSI_SECONDARIA", ["ForceCategoricalBinary", function ($input) use ($val_map, $ignore_vals) {
       if ($input === NULL) {
         return NULL;
       }
@@ -181,6 +188,8 @@ function testMed3($lr) {
       foreach($rawValues as $value) {
         if (isset($val_map[$value])) {
           $values[] = $val_map[$value];
+        } else if (!in_array($value, $ignore_vals)) {
+          die_error("Unexpected value for Anamnesi.CAUSE_OSTEOPOROSI_SECONDARIA: \"$value\"");
         }
       }
       return $values;

@@ -698,7 +698,8 @@ class DBFit {
     , ?int $forceRecursionLevel = NULL
     , ?array $forceWhereClausesArr = NULL
     , bool $forceOrderByClause = true
-    , bool $returnQuery = false) {
+    , bool $returnQuery = false
+    , array $otherClauses = []) {
     // echo "SQLSelectColumns(\n"
     //   . ", \$columns = "               . toString($columns) . "\n"
     //   . ", \$idVal = "                 . toString($idVal) . "\n"
@@ -791,21 +792,7 @@ class DBFit {
           $str_whereClause = $whereClause;
         } else if (is_array($whereClause)) {
           $str_whereClause = $whereClause[0] . " " . $whereClause[1] . " ";
-          if ($whereClause[2][0] == "reuse_current_query") {
-            // Regenerate query until the previous constraint (ignoring the order clause)
-            $str_whereClause .= "(\n" . $this->SQLSelectColumns(
-                    [$this->readColumn($whereClause[0])]
-                  , NULL // Note: Here I loose the value for the ID column. Is this right?
-                  , $recursionPath
-                  , $outputColumn
-                  , $silent
-                  , true
-                  , array_merge($arr_whereClauses,$whereClause[2][1])
-                  , false
-                  , true)
-                   . ")\n";
-          }
-          if ($whereClause[2][0] == "reuse_current_query_until_level") {
+            if ($whereClause[2][0] == "reuse_current_query") {
             // Regenerate query until the previous constraint (ignoring the order clause)
             $str_whereClause .= "(\n" . $this->SQLSelectColumns(
                     [$this->readColumn($whereClause[0])]
@@ -817,13 +804,24 @@ class DBFit {
                   , $whereClause[2][1]
                   , array_merge($arr_whereClauses,$whereClause[2][2])
                   , false
-                  , true)
-                   . ")\n";
+                  , true
+                  , (isset($whereClause[2][3]) ? $whereClause[2][3] : [])
+                ) . ")\n"; 
           }
         }
         $arr_whereClauses[] = $str_whereClause;
       }
       $sql .= " WHERE " . join(" AND ", $arr_whereClauses);
+    }
+
+    /* GROUP BY */
+    if (isset($otherClauses["GROUP BY"])) {
+      $sql .= " GROUP BY " . join(", ", toList($otherClauses["GROUP BY"]));
+    }
+
+    /* HAVING */
+    if (isset($otherClauses["HAVING"])) {
+      $sql .= " HAVING " . join(", ", toList($otherClauses["HAVING"]));
     }
 
     /* ORDER BY */
@@ -841,6 +839,7 @@ class DBFit {
     } else {
       /* Query database */
       // echo $sql . PHP_EOL;
+      // die();
       $raw_data = mysql_select($this->db, $sql, $silent);
       return $raw_data;
     }
