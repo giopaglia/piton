@@ -305,6 +305,16 @@ function prefixisify(&$string, $prefix) {
     $string = $prefix . $string;
   }
 }
+function depostfixify(&$string, $postfix) {
+  if (endsWith($string, $postfix)) {
+    $string = substr($string, 0, strlen($string)-strlen($postfix));
+  }
+}
+function deprefixify(&$string, $prefix) {
+  if (startsWith($string, $prefix)) {
+    $string = substr($string, -strlen($prefix));
+  }
+}
 function startsWith($haystack, $needle, $caseSensitive = true) { return $needle === "" ||  ($caseSensitive ? (strrpos($haystack, $needle, -strlen($haystack)) !== false) : (strripos($haystack, $needle, -strlen($haystack)) !== false)); }
 function endsWith($haystack, $needle, $caseSensitive = true)   { return $needle === "" || (($temp = strlen($haystack) - strlen($needle)) >= 0 && ($caseSensitive ? (strpos($haystack, $needle, $temp) !== false) : (stripos($haystack, $needle, $temp) !== false))); }
 function safePrefix($haystack, $needle) { return (startsWith($haystack, $needle) ? $haystack : $needle . $haystack); }
