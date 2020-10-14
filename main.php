@@ -118,9 +118,15 @@ function testMed3($lr) {
   
   $db_fit->setIdentifierColumnName("Referti.ID");
 
+  // echo $db_fit->showAvailableColumns(); die();
+  
   // TODO remove
   // $db_fit->addInputColumn(["Referti.ID"]);
     
+  // gender
+  // $db_fit->addInputColumn(["Densitometrie.NECK_BMD", NULL, "NECK_BMD"]);
+  // $db_fit->addInputColumn(["Densitometrie.TOT_BMD", NULL, "TOT_BMD"]);
+
   // gender
   $db_fit->addInputColumn(["Pazienti.SESSO", "ForceCategorical", "gender"]);
   // menopause state (if relevant)
@@ -129,11 +135,11 @@ function testMed3($lr) {
   // age at last menopause (if relevant)
   $db_fit->addInputColumn(["Anamnesi.ETA_MENOPAUSA", NULL, "age at last menopause"]);
   $db_fit->addInputColumn(["CONCAT('', COALESCE(Anamnesi.TERAPIA_STATO,'Mai'))", "ForceCategorical", "therapy status"]);
-  $db_fit->addInputColumn(["Anamnesi.TERAPIA_ANNI_SOSPENSIONE", NULL, "years of suspension"]);
-  $db_fit->addInputColumn(["CONCAT('', COALESCE(Anamnesi.TERAPIA_OSTEOPROTETTIVA_ORMONALE,0))", "ForceCategorical", "hormonal osteoprotective therapy"]);
-  $db_fit->addInputColumn(["CONCAT('', COALESCE(Anamnesi.TERAPIA_OSTEOPROTETTIVA_SPECIFICA,'0'))", "ForceCategorical", "specific osteoprotective therapy"]);
-  $db_fit->addInputColumn(["Anamnesi.VITAMINA_D_TERAPIA_OSTEOPROTETTIVA", NULL, "vitamin D based osteoprotective therapy"]);
-  $db_fit->addInputColumn(["CONCAT('', COALESCE(Anamnesi.TERAPIA_ALTRO_CHECKBOX,0))", "ForceCategorical", "other osteoprotective therapy"]);
+  // $db_fit->addInputColumn(["Anamnesi.TERAPIA_ANNI_SOSPENSIONE", NULL, "years of suspension"]);
+  $db_fit->addInputColumn(["CONCAT('', COALESCE(IF(Anamnesi.TERAPIA_COMPLIANCE,Anamnesi.TERAPIA_OSTEOPROTETTIVA_ORMONALE,'0'),'0'))", "ForceCategorical", "hormonal osteoprotective therapy"]);
+  $db_fit->addInputColumn(["CONCAT('', COALESCE(IF(Anamnesi.TERAPIA_COMPLIANCE,Anamnesi.TERAPIA_OSTEOPROTETTIVA_SPECIFICA,'0'),'0'))", "ForceCategorical", "specific osteoprotective therapy"]);
+  $db_fit->addInputColumn(["CONCAT('', COALESCE(IF(Anamnesi.TERAPIA_COMPLIANCE,Anamnesi.VITAMINA_D_TERAPIA_OSTEOPROTETTIVA,'0'),'0'))", "ForceCategorical", "vitamin D based osteoprotective therapy"]);
+  $db_fit->addInputColumn(["CONCAT('', COALESCE(IF(Anamnesi.TERAPIA_COMPLIANCE,Anamnesi.TERAPIA_ALTRO_CHECKBOX,'0'),'0'))", "ForceCategorical", "other osteoprotective therapy"]);
   // bmi
   $db_fit->addInputColumn(["0+IF(ISNULL(Anamnesi.BMI) OR Anamnesi.BMI = -1, NULL, Anamnesi.BMI)", NULL, "body mass index"]);
   // fragility fractures in spine (one or more)
@@ -147,7 +153,7 @@ function testMed3($lr) {
   // fragility fractures in other sites (one or more)
   $db_fit->addInputColumn(["CONCAT('', COALESCE(Anamnesi.FRATTURA_SITI_DIVERSI,0))", "ForceCategorical", "fractures in other sites"]);
   // familiarity
-  $db_fit->addInputColumn(["CONCAT('', COALESCE(Anamnesi.FRATTURA_FAMILIARITA,0))", NULL, "fracture familiarity"]);
+  $db_fit->addInputColumn(["CONCAT('', COALESCE(Anamnesi.FRATTURA_FAMILIARITA,0))", "ForceCategorical", "fracture familiarity"]);
   // current smoker
   // checkbox+value("Anamnesi.ABUSO_FUMO_CHECKBOX" "Anamnesi.ABUSO_FUMO")
   $db_fit->addInputColumn(["CONCAT('', IF(ISNULL(Anamnesi.ABUSO_FUMO_CHECKBOX),'No',IF(Anamnesi.ABUSO_FUMO_CHECKBOX, Anamnesi.ABUSO_FUMO, 'No')))", "ForceCategorical", "smoking habits"]);
@@ -163,6 +169,7 @@ function testMed3($lr) {
   $db_fit->addInputColumn(["CONCAT('', COALESCE(Anamnesi.MALATTIE_ATTUALI_ARTRITE_PSOR,0))", "ForceCategorical", "psoriatic arthritis"]);
   $db_fit->addInputColumn(["CONCAT('', COALESCE(Anamnesi.MALATTIE_ATTUALI_LUPUS,0))", "ForceCategorical", "systemic lupus"]);
   $db_fit->addInputColumn(["CONCAT('', COALESCE(Anamnesi.MALATTIE_ATTUALI_SCLERODERMIA,0))", "ForceCategorical", "scleroderma"]);
+  $db_fit->addInputColumn(["CONCAT('', COALESCE(Anamnesi.MALATTIE_ATTUALI_ALTRE_CONNETTIVITI,0))", "ForceCategorical", "other connective tissue diseases"]);
 
   // secondary causes
   $val_map = [
@@ -250,8 +257,8 @@ function testMed3($lr) {
   $db_fit->addInputColumn(["CONCAT('', COALESCE(Anamnesi.GASTRO_RESEZIONE,0))", "ForceCategorical", "gastrectomy"]);
   $db_fit->addInputColumn(["CONCAT('', COALESCE(Anamnesi.RESEZIONE_INTESTINALE,0))", "ForceCategorical", "bowel resection"]);
   $db_fit->addInputColumn(["CONCAT('', COALESCE(Anamnesi.ALTRE_PATOLOGIE_CHECKBOX,0))", "ForceCategorical", "other diseases"]);
-  $db_fit->addInputColumn(["0+COALESCE(Anamnesi.VITAMINA_D,0)", NULL, "vitamin D-25OH"]);
-  // $db_fit->addInputColumn(["Anamnesi.VITAMINA_D", NULL, "vitamin D-25OH"]);
+  // $db_fit->addInputColumn(["0+COALESCE(Anamnesi.VITAMINA_D,0)", NULL, "vitamin D-25OH"]);
+  $db_fit->addInputColumn(["Anamnesi.VITAMINA_D", NULL, "vitamin D-25OH"]);
   // previous DXA spine total Z score
   $db_fit->addInputColumn(["Anamnesi.COLONNA_Z_SCORE", NULL, "previous spine Z-score"]);
   // previous DXA spine total T score

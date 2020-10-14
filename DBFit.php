@@ -1643,16 +1643,9 @@ class DBFit {
   function setInputColumns($columns) : self
   {
     if ($columns === "*") {
-      /* Obtain column names from database */
-      $sql = "SELECT * FROM `information_schema`.`columns` WHERE `table_name` IN "
-            . mysql_set(array_map([$this, "getTableName"], $this->inputTables)) . " ";
-      $raw_data = mysql_select($this->db, $sql, true);
-
-      $colsNames = [];
-      foreach ($raw_data as $raw_col) {
-        $colsNames[] = $raw_col["TABLE_NAME"].".".$raw_col["COLUMN_NAME"];
-      }
-      return $this->setInputColumns($colsNames);
+      /* Use all available columns */
+      warn("Warning! Using all available columns. Please double check that this is the desired choice.");
+      return $this->setInputColumns($this->getAvailableColumns());
     } else {
       listify($columns);
       $this->inputColumns = [];
@@ -1977,6 +1970,24 @@ class DBFit {
     return array_keys($this->models);
   }
 
+  function showAvailableColumns() {
+    echo "Available columns:" . array_reduce($this->getAvailableColumns(),
+       function ($carry, $a) { return $carry . PHP_EOL . "- " . $a; });
+  }
+  
+  function getAvailableColumns() {
+    /* Obtain column names from database */
+    $sql = "SELECT * FROM `information_schema`.`columns` WHERE `table_name` IN "
+          . mysql_set(array_map([$this, "getTableName"], $this->inputTables)) . " ";
+    $raw_data = mysql_select($this->db, $sql, true);
+
+    $colsNames = [];
+    foreach ($raw_data as $raw_col) {
+      $colsNames[] = $raw_col["TABLE_NAME"].".".$raw_col["COLUMN_NAME"];
+    }
+    return $colsNames;
+  }
+  
   function setOutputColumnName(?string $outputColumnName, $treatment = "ForceCategorical") : self
   {
     if(func_num_args()>count(get_defined_vars())) trigger_error(__FUNCTION__ . " was supplied more arguments than it needed. Got the following arguments:" . PHP_EOL . toString(func_get_args()), E_USER_WARNING);
