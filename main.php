@@ -124,8 +124,8 @@ function testMed3($lr) {
   // $db_fit->addInputColumn(["Referti.ID"]);
     
   // gender
-  // $db_fit->addInputColumn(["Densitometrie.NECK_BMD", NULL, "NECK_BMD"]);
-  // $db_fit->addInputColumn(["Densitometrie.TOT_BMD", NULL, "TOT_BMD"]);
+  // $db_fit->addInputColumn(["Densitometrie.NECK_BMD", NULL, "total neck BMD"]);
+  // $db_fit->addInputColumn(["Densitometrie.TOT_BMD", NULL, "total spine BMD"]);
 
   // gender
   $db_fit->addInputColumn(["Pazienti.SESSO", "ForceCategorical", "gender"]);
@@ -259,14 +259,14 @@ function testMed3($lr) {
   $db_fit->addInputColumn(["CONCAT('', COALESCE(Anamnesi.ALTRE_PATOLOGIE_CHECKBOX,0))", "ForceCategorical", "other diseases"]);
   // $db_fit->addInputColumn(["0+COALESCE(Anamnesi.VITAMINA_D,0)", NULL, "vitamin D-25OH"]);
   $db_fit->addInputColumn(["Anamnesi.VITAMINA_D", NULL, "vitamin D-25OH"]);
-  // previous DXA spine total Z score
-  $db_fit->addInputColumn(["Anamnesi.COLONNA_Z_SCORE", NULL, "previous spine Z-score"]);
   // previous DXA spine total T score
   $db_fit->addInputColumn(["Anamnesi.COLONNA_T_SCORE", NULL, "previous spine T-score"]);
-  // previous DXA hip total Z score
-  $db_fit->addInputColumn(["Anamnesi.FEMORE_Z_SCORE", NULL, "previous femur Z-score"]);
+  // previous DXA spine total Z score
+  $db_fit->addInputColumn(["Anamnesi.COLONNA_Z_SCORE", NULL, "previous spine Z-score"]);
   // previous DXA hip total T score
-  $db_fit->addInputColumn(["Anamnesi.FEMORE_T_SCORE", NULL, "previous femur Z-score"]);
+  $db_fit->addInputColumn(["Anamnesi.FEMORE_T_SCORE", NULL, "previous neck T-score"]);
+  // previous DXA hip total Z score
+  $db_fit->addInputColumn(["Anamnesi.FEMORE_Z_SCORE", NULL, "previous neck Z-score"]);
 
 
 
@@ -281,14 +281,14 @@ function testMed3($lr) {
   // $db_fit->addInputColumn(["CONCAT('', IF(Diagnosi.SITUAZIONE_COLONNA_CHECKBOX, Diagnosi.SITUAZIONE_COLONNA, 'Normale'))", "ForceCategorical", "Diagnosi.N_SITUAZIONE_COLONNA"]);
   $db_fit->addInputColumn(["Diagnosi.SITUAZIONE_COLONNA", "ForceCategorical", "spine status"]);
   
-  // current DXA spine total Z score
-  $db_fit->addInputColumn(["Densitometrie.TOT_Z_SCORE", NULL, "spine Z-score"]);
   // current DXA spine total T score
   $db_fit->addInputColumn(["Densitometrie.TOT_T_SCORE", NULL, "spine T-score"]);
-  // current DXA hip total Z score
-  $db_fit->addInputColumn(["Densitometrie.NECK_Z_SCORE", NULL, "femur Z-score"]);
+  // current DXA spine total Z score
+  $db_fit->addInputColumn(["Densitometrie.TOT_Z_SCORE", NULL, "spine Z-score"]);
   // current DXA hip total T score
-  $db_fit->addInputColumn(["Densitometrie.NECK_T_SCORE", NULL, "femur T-score"]);
+  $db_fit->addInputColumn(["Densitometrie.NECK_T_SCORE", NULL, "neck T-score"]);
+  // current DXA hip total Z score
+  $db_fit->addInputColumn(["Densitometrie.NECK_Z_SCORE", NULL, "neck Z-score"]);
 
   $db_fit->setOutputColumns([
     ["RaccomandazioniTerapeuticheUnitarie.TIPO",
