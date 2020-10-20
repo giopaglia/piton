@@ -50,6 +50,7 @@ function &mysql_select(object &$db, string $sql, bool $silent = false) : object 
 }
 
 function mysql_number(float $x) : string { return (is_nan($x) ? "NULL" : strval($x)); }
+function mysql_string(object $db, $x) : string { return ($x === NULL ? "NULL" : "'" . $db->real_escape_string(strval($x)) . "'"); }
 
 function noop($str) { return $str; }
 

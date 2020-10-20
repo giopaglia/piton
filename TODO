@@ -1,6 +1,6 @@
 - for ($j = 0; $j < $data->numInstances(); $j++) { che diventi un generatore di istanze
 - move processing from SQL to PHP? force non-null values check nel codice?
-- ignora regole nanr at predict time
+- ignora regole nanr at predict time ?
 
 #####################################################
 DROP TABLE `phptest`.`models__index`

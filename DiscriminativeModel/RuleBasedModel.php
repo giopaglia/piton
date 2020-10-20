@@ -311,10 +311,22 @@ class RuleBasedModel extends DiscriminativeModel {
   }
 
   /* Save model to database */
-  function saveToDB(object &$db, string $modelName, string $tableName, ?Instances &$testData = NULL, ?Instances &$trainData = NULL, $rulesAffRilThesholds = [0.2, 0.7]) {
-    if (DEBUGMODE)
-      echo "RuleBasedModel->saveToDB('$modelName', '$tableName', ...)" . PHP_EOL;
+  function saveToDB(object &$db, $modelName, string $tableName, ?Instances &$testData = NULL, ?Instances &$trainData = NULL, $rulesAffRilThesholds = NULL) {
     
+    if ($rulesAffRilThesholds === NULL) {
+      $rulesAffRilThesholds = [0.2, 0.7];
+    }
+
+    if (DEBUGMODE)
+      echo "RuleBasedModel->saveToDB(" . toString($modelName)
+        . ", " . toString($tableName) . ", ...)" . PHP_EOL;
+    
+    $batch_id = NULL;
+    if (is_array($modelName)) {
+      $batch_id = $modelName[0];
+      $modelName = $modelName[1];
+    }
+
     if ($testData !== NULL) {
       $testData = clone $testData;
       $testData->sortAttrsAs($this->attributes);
@@ -338,7 +350,14 @@ class RuleBasedModel extends DiscriminativeModel {
     $stmt->close();
 
     $sql = "CREATE TABLE `$tableName`";
-    $sql .= " (ID INT AUTO_INCREMENT PRIMARY KEY, class VARCHAR(256) NOT NULL, rule TEXT NOT NULL, support DECIMAL(10,2) DEFAULT NULL, confidence DECIMAL(10,2) DEFAULT NULL, lift DECIMAL(10,2) DEFAULT NULL, conviction DECIMAL(10,2) DEFAULT NULL)";
+    $sql .= " (ID INT AUTO_INCREMENT PRIMARY KEY";
+    $sql .= ", class VARCHAR(256) NOT NULL";
+    $sql .= ", rule TEXT NOT NULL";
+    $sql .= ", support DECIMAL(10,2) DEFAULT NULL";
+    $sql .= ", confidence DECIMAL(10,2) DEFAULT NULL";
+    $sql .= ", lift DECIMAL(10,2) DEFAULT NULL";
+    $sql .= ", conviction DECIMAL(10,2) DEFAULT NULL";
+    $sql .= ")";
     // $sql .= "(class VARCHAR(256) PRIMARY KEY, regola TEXT)"; TODO why primary
 
     $stmt = $db->prepare($sql);
@@ -431,7 +450,14 @@ class RuleBasedModel extends DiscriminativeModel {
     // $stmt->close();
 
     $sql = "CREATE TABLE IF NOT EXISTS `" . self::$indexTableName . "`";
-    $sql .= " (ID INT AUTO_INCREMENT PRIMARY KEY, date DATETIME NOT NULL, modelName TEXT NOT NULL, tableName TEXT NOT NULL, classId INT NOT NULL, className TEXT NOT NULL";
+    $sql .= " (ID INT AUTO_INCREMENT PRIMARY KEY";
+    $sql .= ", batch_id VARCHAR(256)";
+    $sql .= ", date DATETIME NOT NULL";
+    $sql .= ", modelName TEXT NOT NULL";
+    $sql .= ", tableName TEXT NOT NULL";
+    $sql .= ", classId INT NOT NULL";
+    $sql .= ", className TEXT NOT NULL";
+
     $sql .= ", numRulesRA INT DEFAULT NULL";
     $sql .= ", numRulesRNA INT DEFAULT NULL";
     $sql .= ", numRulesNRA INT DEFAULT NULL";
@@ -467,14 +493,80 @@ class RuleBasedModel extends DiscriminativeModel {
       die_error("Query failed: $sql");
     $stmt->close();
 
-    // IF NOT EXISTS
-    // $sql = "CREATE VIEW `" . self::$indexTableName . "_view` AS SELECT modelName, numRules, totN, trainN, testN, positives, negatives, TP, TN, FP, FN, accuracy, sensitivity, specificity, PPV, NPV  FROM `" . self::$indexTableName . "` ORDER BY `tableName` ASC";
-    // $stmt = $db->prepare($sql);
-    // if (!$stmt)
-    //   die_error("Incorrect SQL query: $sql");
-    // if (!$stmt->execute())
-    //   die_error("Query failed: $sql");
-    // $stmt->close();
+    // TODO IF NOT EXISTS
+    $view_name = self::$indexTableName . "_view";
+
+    $sql = "SELECT * FROM INFORMATION_SCHEMA.VIEWS WHERE TABLE_NAME = N'$view_name' AND TABLE_SCHEMA = database()";
+    $stmt = $db->prepare($sql);
+    if (!$stmt)
+      die_error("Incorrect SQL query: $sql");
+    if (!$stmt->execute())
+      die_error("Query failed: $sql");
+    $res = $stmt->get_result();
+    if (!($res !== false))
+      die_error("SQL query failed: $sql");
+    $create_view = ($res->num_rows == 0);
+    $stmt->close();
+
+    $sql = "VIEW `{$view_name}` AS SELECT ";
+    $sql .= "batch_id";
+    $sql .= ", modelName";
+    $sql .= ", className AS `className (0)`";
+    $sql .= ", TP";
+    $sql .= ", TN";
+    $sql .= ", FP";
+    $sql .= ", FN";
+    $sql .= ", totPositives AS totPos";
+    $sql .= ", totNegatives AS totNeg";
+    $sql .= ", totN AS `totN (0)`";
+    $sql .= ", testN";
+    $sql .= ", trainN";
+    $sql .= ", NULL";
+    $sql .= ", className";
+    $sql .= ", totN";
+    $sql .= ", totPositives";
+    $sql .= ", totNumRules";
+    $sql .= ", numRulesRA";
+    $sql .= ", numRulesRNA";
+    $sql .= ", numRulesNRA";
+    $sql .= ", numRulesNRNA";
+    $sql .= ", accuracy";
+    $sql .= ", sensitivity";
+    $sql .= ", specificity";
+    $sql .= ", PPV";
+    $sql .= ", NPV";
+    // $sql .= " FROM `" . self::$indexTableName . "` ORDER BY `batch_id` ASC, `tableName` ASC";
+    // TODO generalize
+    $sql .= " FROM `" . self::$indexTableName . "` ORDER BY batch_id DESC,
+case
+    when `modelName` = '_RaccomandazioniTerapeuticheUnitarie.TIPO.Terapie osteoprotettive' then 1
+    when `modelName` = '_RaccomandazioniTerapeuticheUnitarie.TIPO.Vitamina D Supplementazione' then 2
+    when `modelName` = '_RaccomandazioniTerapeuticheUnitarie.TIPO.Calcio supplementazione' then 3
+    when `modelName` = 'RaccomandazioniTerapeuticheUnitarie>TIPO.Terapie osteoprotettive=Terapie osteoprotettive_PrincipioAttivo.Alendronato' then 4
+    when `modelName` = 'RaccomandazioniTerapeuticheUnitarie>TIPO.Terapie osteoprotettive=Terapie osteoprotettive_PrincipioAttivo.Denosumab' then 5
+    when `modelName` = 'RaccomandazioniTerapeuticheUnitarie>TIPO.Terapie osteoprotettive=Terapie osteoprotettive_PrincipioAttivo.Risedronato' then 6
+    when `modelName` = 'RaccomandazioniTerapeuticheUnitarie>TIPO.Vitamina D Supplementazione=Vitamina D Supplementazione_PrincipioAttivo.Calcifediolo' then 7
+    when `modelName` = 'RaccomandazioniTerapeuticheUnitarie>TIPO.Vitamina D Supplementazione=Vitamina D Supplementazione_PrincipioAttivo.Colecalciferolo' then 8
+    when `modelName` = 'RaccomandazioniTerapeuticheUnitarie>TIPO.Calcio supplementazione=Calcio supplementazione_PrincipioAttivo.Calcio citrato' then 9
+    when `modelName` = 'RaccomandazioniTerapeuticheUnitarie>TIPO.Calcio supplementazione=Calcio supplementazione_PrincipioAttivo.Calcio carbonato' then 10
+    else 1000
+end";
+    
+    // if($create_view) {
+    //   $sql = "CREATE " . $sql;
+    // } else {
+    //   $sql = "ALTER " . $sql;
+    // }
+
+    if($create_view) {
+      $sql = "CREATE " . $sql;
+      $stmt = $db->prepare($sql);
+      if (!$stmt)
+        die_error("Incorrect SQL query: $sql");
+      if (!$stmt->execute())
+        die_error("Query failed: $sql");
+      $stmt->close();
+    }
 
     // $globalIndicatorsStr = "";
     // $globalIndicatorsStr .= 
@@ -491,7 +583,11 @@ class RuleBasedModel extends DiscriminativeModel {
     // 
 
     $sql = "INSERT INTO `" . self::$indexTableName . "`";
-    $sql .= " (date, modelName, tableName, classId, className";
+    $sql .= " (";
+    if ($batch_id !== NULL) {
+      $sql .= "batch_id, ";
+    }
+    $sql .= "date, modelName, tableName, classId, className";
     $sql .= ", numRulesRA, numRulesRNA, numRulesNRA, numRulesNRNA";
     if ($allData !== NULL) {
       $sql .= ", totPositives, totNegatives";
@@ -513,7 +609,11 @@ class RuleBasedModel extends DiscriminativeModel {
     foreach ($totMeasures as $classId => $totMeasures_) {
       $className = $classAttr->reprVal($classId);
 
-      $valueSql = "'" . date('Y-m-d H:i:s') . "', '$modelName', '$tableName', $classId, '$className'";
+      $valueSql = "";
+      if ($batch_id !== NULL) {
+        $valueSql .= "" . mysql_string($db, $batch_id) . ", '";
+      }
+      $valueSql .= date('Y-m-d H:i:s') . "', '$modelName', '$tableName', $classId, '$className'";
       // TODO rule numbers should refer to the model, not the className. Mmm
       $valueSql .= ", " . strval($numRulesRA);
       $valueSql .= ", " . strval($numRulesRNA);
@@ -573,10 +673,11 @@ class RuleBasedModel extends DiscriminativeModel {
     if (!$stmt->execute())
       die_error("Query failed: $sql");
     $stmt->close();
+    // TODO maybe we can make use of mysql comments!
     // For reference, to read the comment:
     // SELECT table_comment 
     // FROM INFORMATION_SCHEMA.TABLES 
-    // WHERE table_schema='my_cool_database' 
+    // WHERE table_schema='database()' 
     //     AND table_name='$tableName';
 
   }

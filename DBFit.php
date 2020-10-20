@@ -151,6 +151,11 @@ class DBFit {
   */
   private $cutOffValue;
 
+  /*
+    TODO explain
+  */
+  private $experimentID;
+
   /* Default options, to be set via ->setDefaultOption() */
   private $defaultOptions = [
     /* Default training mode in use */
@@ -1125,6 +1130,10 @@ class DBFit {
     
     $recursionLevel = count($recursionPath);
 
+    if($recursionLevel === 0) {
+      $this->experimentID = date('Y-m-d H:i:s');
+    }
+    
     if (!($this->learner instanceof Learner)) {
       die_error("Learner is not initialized. Please, use ->setLearner() or ->setLearningMethod()");
     }
@@ -1211,7 +1220,7 @@ class DBFit {
       $model->save(join_paths(MODELS_FOLDER, $model_name));
       // $model->save(join_paths(MODELS_FOLDER, date("Y-m-d_H:i:s") . $model_name));
 
-      $model->saveToDB($this->db, $model_name, $model_id, $testData, $trainData);
+      $model->saveToDB($this->db, [$this->experimentID, $model_name], $model_id, $testData, $trainData);
       $model->dumpToDB($this->db, $model_id);
         // . "_" . join("", array_map([$this, "getColumnName"], ...).);
 
@@ -2109,6 +2118,17 @@ class DBFit {
   function setCutOffValue(float $cutOffValue) : self
   {
     $this->cutOffValue = $cutOffValue;
+    return $this;
+  }
+
+  function getExperimentID() : ?string
+  {
+    return $this->experimentID;
+  }
+
+  function setExperimentID(string $experimentID) : self
+  {
+    $this->experimentID = $experimentID;
     return $this;
   }
 
