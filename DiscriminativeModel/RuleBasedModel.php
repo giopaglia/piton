@@ -373,6 +373,8 @@ class RuleBasedModel extends DiscriminativeModel {
         echo "  LOCAL EVALUATION:" . PHP_EOL;
     }
 
+    $modelStr = "";
+
     $numRulesRA = 0;
     $numRulesRNA = 0;
     $numRulesNRA = 0;
@@ -380,16 +382,22 @@ class RuleBasedModel extends DiscriminativeModel {
 
     $arr_vals = [];
     foreach ($this->rules as $rule) {
+      $classAttr = $this->getClassAttribute();
       if (DEBUGMODE > -1)
-        echo "    " . $rule->toString($this->getClassAttribute()) . PHP_EOL;
+        echo "    " . $rule->toString($classAttr) . PHP_EOL;
 
       $antds = [];
       foreach ($rule->getAntecedents() as $antd) {
-        $antds[] = $antd->serialize();
+        $antds[] = "("  . $antd->serialize() . ")";
       }
+      $antecedentStr = join(" and ", $antds);
+      $consequentStr = strval($classAttr->reprVal($rule->getConsequent()));
+
+      $modelStr .= $antecedentStr . " => " . $consequentStr . "\n";
+
       $str = "\"" .
-           strval($this->getClassAttribute()->reprVal($rule->getConsequent()))
-            . "\", \"" . join(" AND ", $antds) . "\"";
+              addcslashes($consequentStr, "\"")
+            . "\", \"" . addcslashes($antecedentStr, "\"") . "\"";
 
       if ($testData !== NULL) {
         $ruleMeasures = $rule->computeMeasures($testData);
@@ -418,6 +426,10 @@ class RuleBasedModel extends DiscriminativeModel {
 
       }
       $arr_vals[] = $str;
+    }
+
+    if (DEBUGMODE > -1) {
+      echo $modelStr;
     }
 
     $sql = "INSERT INTO `$tableName`";
@@ -600,7 +612,6 @@ end";
     $sql .= ") VALUES (";
 
     $valuesSql = [];
-    $classAttr = $this->getClassAttribute();
     
     if (DEBUGMODE > -1)
       if ($testData !== NULL)

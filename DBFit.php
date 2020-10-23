@@ -1182,7 +1182,9 @@ class DBFit {
         continue;
       }
 
-      $dataframe->save_CSV("datasets/" . $this->getModelName($recursionPath, NULL) . ".csv");
+      $dataframe->save_CSV("datasets/data-" . $this->getModelName($recursionPath, NULL) . ".csv");
+      $dataframe->save_ARFF("datasets/arff/data-" . $this->getModelName($recursionPath, NULL) . ".arff");
+      // die_error();
 
       /* Obtain and train, test set */
       list($trainData, $testData) = $this->getDataSplit($dataframe);
@@ -1193,12 +1195,14 @@ class DBFit {
       echo "TRAIN: " . $trainData->numInstances() . " instances" . PHP_EOL;
       echo "TEST: " . $testData->numInstances() . " instances" . PHP_EOL;
       
-      // $trainData->save_CSV("datasets/" . $this->getModelName($recursionPath, $i_prob) . "-TRAIN.csv");
-      // $testData->save_CSV("datasets/" . $this->getModelName($recursionPath, $i_prob) . "-TEST.csv");
+      // $trainData->save_CSV("datasets/data-" . $this->getModelName($recursionPath, $i_prob) . "-TRAIN.csv");
+      // $testData->save_CSV("datasets/data-" . $this->getModelName($recursionPath, $i_prob) . "-TEST.csv");
       
       if ($i_prob == 0) {
-        $trainData->save_CSV("datasets/" . $this->getModelName($recursionPath, NULL) . "-TRAIN.csv"); // , false);
-        $testData->save_CSV("datasets/" . $this->getModelName($recursionPath, NULL) . "-TEST.csv"); // , false);
+        $trainData->save_CSV("datasets/data-" . $this->getModelName($recursionPath, NULL) . "-TRAIN.csv"); // , false);
+        $testData->save_CSV("datasets/data-" . $this->getModelName($recursionPath, NULL) . "-TEST.csv"); // , false);
+        $trainData->save_ARFF("datasets/arff/data-" . $this->getModelName($recursionPath, NULL) . "-TRAIN.arff");
+        $testData->save_ARFF("datasets/arff/data-" . $this->getModelName($recursionPath, NULL) . "-TEST.arff");
       }
 
       /* Train */

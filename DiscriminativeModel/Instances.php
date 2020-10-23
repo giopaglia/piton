@@ -555,21 +555,23 @@ class Instances {
   function save_ARFF(string $path) {
     if (DEBUGMODE > 2) echo "Instances->save_ARFF($path)" . PHP_EOL;
     postfixisify($path, ".arff");
-    die_error("TODO: save_ARFF is experimental and has to be tested.");
+    $relName = $path;
+    depostfixify($relName, ".arff");
+    // die_error("TODO: save_ARFF is experimental and has to be tested.");
     $f = fopen($path, "w");
     fwrite($f, "% Generated with \"" . PACKAGE_NAME . "\"\n");
     fwrite($f, "\n");
-    fwrite($f, "@RELATION " . basename($path) . "\n\n");
+    fwrite($f, "@RELATION " . basename($relName) . "\n\n");
 
     /* Attributes */
     foreach ($this->getAttributes() as $attr) {
-      fwrite($f, "@ATTRIBUTE {$attr->getName()} {$attr->getARFFType()}");
+      fwrite($f, "@ATTRIBUTE \"" . addcslashes($attr->getName(), "\"") . "\" {$attr->getARFFType()}");
       fwrite($f, "\n");
     }
     
     /* Print the ARFF representation of a value of the attribute */
     $getARFFRepr = function ($val, Attribute $attr) {
-      return $val === NULL ? "?" : $attr->reprVal($val);
+      return $val === NULL ? "?" : ($attr instanceof DiscreteAttribute ? "\"" . addcslashes($attr->reprVal($val), "\"") . "\"" : $attr->reprVal($val));
     };
     
     /* Data */

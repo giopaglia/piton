@@ -195,7 +195,7 @@ class DiscreteAttribute extends Attribute {
 
   /** The type of the attribute (ARFF/Weka style)  */
   function getARFFType() : string {
-    return "{" . join(",", $this->domain) . "}";
+    return "{" . join(",", array_map(function ($val) { return "\"" . addcslashes($val, "\"") . "\""; }, $this->domain)) . "}";
   }
   
   /** Print a textual representation of the attribute */
