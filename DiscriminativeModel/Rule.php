@@ -254,7 +254,10 @@ class RipperRule extends _Rule {
       /* Build one condition based on all attributes not used yet */
       foreach ($growData->getAttributes(false) as $attr) {
 
-        if (DEBUGMODE > 2) echo "\nAttribute '{$attr->toString()}'. (total weight = " . $growData->getSumOfWeights() . ")" . PHP_EOL;
+        // if (DEBUGMODE | DEBUGMODE_ALG) echo "\nAttribute '{$attr->toString()}'. (total weight = " . $growData->getSumOfWeights() . ")" . PHP_EOL;
+        if (DEBUGMODE | DEBUGMODE_ALG) {
+          echo "\nOne condition: size = " . $growData->getSumOfWeights() . PHP_EOL;
+        }
 
         $antd = _Antecedent::createFromAttribute($attr);
 
@@ -273,12 +276,18 @@ class RipperRule extends _Rule {
               $maxCoverData = $coverData;
               $maxInfoGain  = $infoGain;
             }
-            if (DEBUGMODE > 2) {
-              echo "Test of {" . $antd->toString()
-                . "}:\n\tinfoGain = " . $infoGain . " | Accuracy = "
-                . $antd->getAccuRate()*100 . "% = " . $antd->getAccu() . "/"
-                . $antd->getCover() . " | def. accuracy: $defAcRt"
-                . "\n\tmaxInfoGain = " . $maxInfoGain . PHP_EOL;
+            // if (DEBUGMODE | DEBUGMODE_ALG) {
+            //   echo "Test of {" . $antd->toString()
+            //     . "}:\n\tinfoGain = " . $infoGain . " | Accuracy = "
+            //     . $antd->getAccuRate()*100 . "% = " . $antd->getAccu() . "/"
+            //     . $antd->getCover() . " | def. accuracy: $defAcRt"
+            //     . "\n\tmaxInfoGain = " . $maxInfoGain . PHP_EOL;
+            // }
+            if (DEBUGMODE | DEBUGMODE_ALG) {
+              "Test of \'" . $antd->toString(true)
+                  . "\': infoGain = " . $infoGain . " | Accuracy = "
+                  . $antd->getAccuRate() . "=" . $antd->getAccu() . "/"
+                  . $antd->getCover() . " def. accuracy: " + $defAcRt;
             }
           }
         }
@@ -316,7 +325,7 @@ class RipperRule extends _Rule {
   function prune(Instances &$pruneData, bool $useWhole) {
     if (DEBUGMODE > 2) echo "RipperRule->grow(&[growData])" . PHP_EOL;
     if (DEBUGMODE > 2) echo "Rule: " . $this->toString() . PHP_EOL;
-    if (DEBUGMODE > 2) echo "Data: " . $pruneData->toString() . PHP_EOL;
+    if (DEBUGMODE & DEBUGMODE_DATA) echo "Data: " . $pruneData->toString() . PHP_EOL;
     
     $sumOfWeights = $pruneData->getSumOfWeights();
     if (!($sumOfWeights > 0.0)) {
@@ -406,7 +415,7 @@ class RipperRule extends _Rule {
   function cleanUp(Instances &$data) {
     if (DEBUGMODE > 2) echo "RipperRule->cleanUp(&[data])" . PHP_EOL;
     if (DEBUGMODE > 2) echo "Rule: " . $this->toString() . PHP_EOL;
-    if (DEBUGMODE > 2) echo "Data: " . $data->toString() . PHP_EOL;
+    if (DEBUGMODE & DEBUGMODE_DATA) echo "Data: " . $data->toString() . PHP_EOL;
 
     $mins = array_fill(0,$data->numAttributes(),INF);
     $maxs = array_fill(0,$data->numAttributes(),-INF);
@@ -451,10 +460,10 @@ class RipperRule extends _Rule {
     }
 
     if ($classAttr === NULL) {
-      $out_str = "( " . join($ants, " and ") . " ) => [{$this->consequent}]";
+      $out_str = join($ants, " and ") . " => [{$this->consequent}]";
     }
     else {
-      $out_str = "( " . join($ants, " and ") . " ) => " . $classAttr->getName() . "=" . $classAttr->reprVal($this->consequent);
+      $out_str = join($ants, " and ") . " => " . $classAttr->getName() . "=" . $classAttr->reprVal($this->consequent);
     }
 
     return $out_str;

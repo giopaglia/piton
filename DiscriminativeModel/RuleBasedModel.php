@@ -153,7 +153,8 @@ class RuleBasedModel extends DiscriminativeModel {
     }
     if (DEBUGMODE > 1) echo "testing:\n";
     for ($x = 0; $x < $testData->numInstances(); $x++) {
-      if (DEBUGMODE > 1) echo "[$x] : " . $testData->inst_toString($x);
+      if (DEBUGMODE > 1) echo "[$x] : ";
+      if (DEBUGMODE & DEBUGMODE_DATA) echo $testData->inst_toString($x);
       foreach ($this->rules as $r => $rule) {
         if ($rule->covers($testData, $x)) {
           if (DEBUGMODE > 1) echo $r;

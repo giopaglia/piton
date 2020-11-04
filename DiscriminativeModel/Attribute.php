@@ -43,19 +43,30 @@ abstract class Attribute {
 
   static function createFromARFF(string $line) : Attribute {
     if (DEBUGMODE > 2) echo "$line" . PHP_EOL;
-    preg_match("/@attribute\s+(\S+)\s+(.*)/", $line, $matches);
+    
+    $wordChars = "\wA-Za-zÀ-ÖØ-öø-ÿ’";
+    if (preg_match("/@attribute\s+'/", $line)) {
+      $regExp =  "/@attribute\s+'([\s$wordChars]+)'\s+(.*)/";
+    } else if (preg_match("/@attribute\s+\"/", $line)) {
+      $regExp =  "/@attribute\s+\"([\s$wordChars]+)\"\s+(.*)/";
+    } else {
+      $regExp =  "/@attribute\s+([$wordChars]+)\s+(.*)/";
+    }
+
+    preg_match($regExp, $line, $matches);
+    # preg_match("/@attribute\s+([\S_]+|)\s+(.*)/", $line, $matches);
     $name = $matches[1];
     $type = $matches[2];
     if (DEBUGMODE > 2) echo "$name" . PHP_EOL;
     if (DEBUGMODE > 2) echo "$type" . PHP_EOL;
     switch (true) {
-      case preg_match("/\{(.*)\}/", $type, $domain_str):
-        $domain_arr = array_map("trim",  array_map("trim", explode(",", $domain_str[1])));
+      case preg_match("/\{\s*(.*)\s*\}/", $type, $domain_str):
+        $domain_arr = array_map("trim",  array_map("trim", str_getcsv($domain_str[1], ",", "'")));
         $attribute = new DiscreteAttribute($name, "enum", $domain_arr);
         break;
       case isset(self::$ARFFtype2type[$type])
        && in_array(self::$ARFFtype2type[$type], ["float", "int"]):
-        $attribute = new ContinuousAttribute($name, $type);
+        $attribute = new ContinuousAttribute($name, self::$ARFFtype2type[$type]);
         break;
       default:
         die_error("Unknown ARFF type encountered: " . $type);

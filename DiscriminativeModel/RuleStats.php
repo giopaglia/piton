@@ -306,7 +306,7 @@ class RuleStats {
   //  */
   // static function stratify(Instances &$data, int $numFolds) : Instances {
   //   if (DEBUGMODE > 2) echo "RuleStats::stratify(&[data], numFolds=$numFolds)" . PHP_EOL;
-  //   // if (DEBUGMODE > 2) echo "data : " . $data->toString() . PHP_EOL;
+  //   // if (DEBUGMODE & DEBUGMODE_DATA) echo "data : " . $data->toString() . PHP_EOL;
   //   if (!($data->getClassAttribute() instanceof DiscreteAttribute)) {
   //     return $data;
   //   }
@@ -342,7 +342,7 @@ class RuleStats {
   //       $offset += $numFolds;
   //     }
   //   }
-  //   // if (DEBUGMODE > 2) echo "data_out : " . $data_out->toString() . PHP_EOL;
+  //   // if (DEBUGMODE & DEBUGMODE_DATA) echo "data_out : " . $data_out->toString() . PHP_EOL;
 
   //   return $data_out;
   // }
@@ -358,7 +358,7 @@ class RuleStats {
    */
   static function stratifiedBinPartition(Instances &$data, int $numFolds) : array {
     if (DEBUGMODE > 2) echo "RuleStats::stratifiedBinPartition(&[data], numFolds=$numFolds)" . PHP_EOL;
-    // if (DEBUGMODE > 2) echo "data : " . $data->toString() . PHP_EOL;
+    // if (DEBUGMODE & DEBUGMODE_DATA) echo "data : " . $data->toString() . PHP_EOL;
     if (!($data->getClassAttribute() instanceof DiscreteAttribute)) {
       die_error("stratifiedBinPartition(): Class attribute has to be a DiscreteAttribute. Got " . $data->getClassAttribute());
     }

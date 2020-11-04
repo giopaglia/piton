@@ -1184,7 +1184,6 @@ class DBFit {
 
       $dataframe->save_CSV("datasets/data-" . $this->getModelName($recursionPath, NULL) . ".csv");
       $dataframe->save_ARFF("datasets/arff/data-" . $this->getModelName($recursionPath, NULL) . ".arff");
-      // die_error();
 
       /* Obtain and train, test set */
       list($trainData, $testData) = $this->getDataSplit($dataframe);
@@ -1213,6 +1212,8 @@ class DBFit {
       $model->fit($trainData, $this->learner);
       
       echo "Trained model '$model_name'." . PHP_EOL;
+
+      // die_error(strval(DEBUGMODE) . strval(DEBUGMODE_DATA) . strval(DEBUGMODE & DEBUGMODE_DATA));
 
       /* Test */
       $model->test($testData);

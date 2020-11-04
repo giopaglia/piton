@@ -74,7 +74,7 @@ class Instances {
 
   static function &partition(Instances &$data, float $firstRatio) : array {
     if (DEBUGMODE > 2) echo "Instances::partition(&[data], $firstRatio)" . PHP_EOL;
-    if (DEBUGMODE > 2) echo "data : " . $data->toString() . PHP_EOL;
+    if (DEBUGMODE & DEBUGMODE_DATA) echo "data : " . $data->toString() . PHP_EOL;
     
     $rt = [];
 
@@ -83,9 +83,9 @@ class Instances {
     // var_dump($firstRatio);
     // var_dump($offset);
     $rt[0] = Instances::createFromSlice($data, 0, $offset);
-    if (DEBUGMODE > 2) echo "rt[0] : " . $rt[0]->toString() . PHP_EOL;
+    if (DEBUGMODE & DEBUGMODE_DATA) echo "rt[0] : " . $rt[0]->toString() . PHP_EOL;
     $rt[1] = Instances::createFromSlice($data, $offset);
-    if (DEBUGMODE > 2) echo "rt[1] : " . $rt[1]->toString() . PHP_EOL;
+    if (DEBUGMODE & DEBUGMODE_DATA) echo "rt[1] : " . $rt[1]->toString() . PHP_EOL;
 
     return $rt;
   }
@@ -93,7 +93,7 @@ class Instances {
   /**
    * Read data from file, (dense) ARFF/Weka format
    */
-  function createFromARFF(string $path) {
+  static function createFromARFF(string $path) {
     if (DEBUGMODE > 2) echo "Instances::createFromARFF($path)" . PHP_EOL;
     $f = fopen($path, "r");
     
@@ -111,6 +111,7 @@ class Instances {
     $classAttr = array_pop($attributes);
     array_unshift($attributes, $classAttr);
 
+    // echo get_var_dump($classAttr);
     /* Print the internal representation given the ARFF value read */
     $getVal = function ($ARFFVal, Attribute $attr) {
       $ARFFVal = trim($ARFFVal);
@@ -124,15 +125,18 @@ class Instances {
     /* Data */
     $data = [];
     $weights = [];
+    $i = 0;
     while(!feof($f) && $line = strtolower(fgets($f)))  {
+      // echo $i;
       // TODO fix cuz dis not safe for text fields
-      $row = explode(",", $line);
-      if (count($row) == count($attributes) + 1) {
-        preg_match("/\{(.*)\}/", $row[array_key_last($row)], $w);
+      $row = str_getcsv($line, ",", "'");
+
+      if (count($row) == count($attributes) + 1) {  
+        preg_match("/\{\s*(.*)\s*\}/", $row[array_key_last($row)], $w);
         $weights[] = $w;
         array_splice($row, array_key_last($row), 1);
       } else if (count($row) != count($attributes)) {
-        die_error("ARFF data wrongfully encoded. Found data row with " . 
+        die_error("ARFF data wrongfully encoded. Found data row [$i] with " . 
           count($row) . " values when there are " . count($attributes) .
           " attributes.");
       }
@@ -140,6 +144,7 @@ class Instances {
       $classVal = array_pop($row);
       array_unshift($row, $classVal);
       $data[] = array_map($getVal, $row, $attributes);
+      $i++;
     }
 
     if (!count($weights)) {
@@ -563,8 +568,11 @@ class Instances {
     fwrite($f, "\n");
     fwrite($f, "@RELATION " . basename($relName) . "\n\n");
 
+    // Move output attribute from first to last position
+    $attributes = array_push($numbers, array_shift($this->getAttributes()));
+
     /* Attributes */
-    foreach ($this->getAttributes() as $attr) {
+    foreach ($attributes as $attr) {
       fwrite($f, "@ATTRIBUTE \"" . addcslashes($attr->getName(), "\"") . "\" {$attr->getARFFType()}");
       fwrite($f, "\n");
     }
@@ -577,7 +585,7 @@ class Instances {
     /* Data */
     fwrite($f, "\n@DATA\n");
     foreach ($this->data as $k => $row) {
-      fwrite($f, join(",", array_map($getARFFRepr, $this->getInstance($k), $this->getAttributes())) . ", {" . $this->inst_weight($k) . "}\n");
+      fwrite($f, join(",", array_map($getARFFRepr, $this->getInstance($k), $attributes)) . ", {" . $this->inst_weight($k) . "}\n");
     }
 
     fclose($f);
@@ -793,7 +801,7 @@ class Instances {
       $out_str .= str_repeat("======|=", count($attributes)+1) . "|\n";
       foreach ($this->data as $i => $row) {
         foreach ($this->getInstance($i) as $j => $val) {
-          if (!in_array($j, $attributesSubset)) {
+          if ($attributesSubset !== NULL && !in_array($j, $attributesSubset)) {
             continue;
           }
           if ($val === NULL) {

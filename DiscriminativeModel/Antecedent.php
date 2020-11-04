@@ -148,7 +148,9 @@ class DiscreteAntecedent extends _Antecedent {
   function splitData(Instances &$data, float $defAcRt, int $cla) : ?array {
     if (DEBUGMODE > 2) {
       echo "DiscreteAntecedent->splitData(&[data], defAcRt=$defAcRt, cla=$cla)" . PHP_EOL;
-      echo $data->toString() . PHP_EOL;
+      if (DEBUGMODE & DEBUGMODE_DATA) {
+        echo $data->toString() . PHP_EOL;
+      }
     }
     $bag = $this->attribute->numValues();
 
@@ -190,7 +192,7 @@ class DiscreteAntecedent extends _Antecedent {
       }
     }
 
-    if (DEBUGMODE > 2) {
+    if (DEBUGMODE & DEBUGMODE_DATA) {
       foreach ($splitData as $k => $s) {
         echo "splitData[$k] : \n" . $splitData[$k]->toString() . PHP_EOL;
       }
@@ -222,7 +224,7 @@ class DiscreteAntecedent extends _Antecedent {
    */
   function toString(bool $short = false) : string {
     if ($short) {
-      return "{$this->attribute->getName()} == \"{$this->attribute->reprVal($this->value)}\"";
+      return "{$this->attribute->getName()} = {$this->attribute->reprVal($this->value)}";
     }
     else {
       return "DiscreteAntecedent: ({$this->attribute->getName()} == \"{$this->attribute->reprVal($this->value)}\") (maxInfoGain={$this->maxInfoGain}, accuRate={$this->accuRate}, cover={$this->cover}, accu={$this->accu})";
@@ -271,7 +273,9 @@ class ContinuousAntecedent extends _Antecedent {
   function splitData(Instances &$data, float $defAcRt, int $cla) : ?array {
     if (DEBUGMODE > 2) {
       echo "ContinuousAntecedent->splitData(&[data], defAcRt=$defAcRt, cla=$cla)" . PHP_EOL;
-      echo $data->toString() . PHP_EOL;
+      if (DEBUGMODE & DEBUGMODE_DATA) {
+        echo $data->toString() . PHP_EOL;
+      }
     }
     
     $split = 1; // Current split position
@@ -394,7 +398,7 @@ class ContinuousAntecedent extends _Antecedent {
     $splitData[] = Instances::createFromSlice($data, 0, $finalSplit);
     $splitData[] = Instances::createFromSlice($data, $finalSplit, $total - $finalSplit);
 
-    if (DEBUGMODE > 2) {
+    if (DEBUGMODE & DEBUGMODE_DATA) {
       foreach ($splitData as $k => $s) {
         echo "splitData[$k] : \n" . $splitData[$k]->toString() . PHP_EOL;
       }

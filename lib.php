@@ -2,8 +2,13 @@
 
 define("PACKAGE_NAME", "DBFit");
 define("MODELS_FOLDER", "models");
+
+define("DEBUGMODE_ALG",   bindec('10'));
+define("DEBUGMODE_DATA", bindec('100'));
+
 define("DEBUGMODE", false);
-// define("DEBUGMODE", 1);
+// define("DEBUGMODE", DEBUGMODE_ALG);
+// define("DEBUGMODE", DEBUGMODE_DATA & DEBUGMODE_ALG);
 
 /* Library of generic utils */
 

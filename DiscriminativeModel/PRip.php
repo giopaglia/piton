@@ -80,7 +80,7 @@ class PRip extends Learner {
       $random_seed = make_seed();
     }
 
-    $this->debug = DEBUGMODE;
+    $this->debug = (DEBUGMODE | DEBUGMODE_ALG);
     $this->numOptimizations = 2;
     $this->seed = $random_seed;
     $this->numFolds = 3;
@@ -116,7 +116,7 @@ class PRip extends Learner {
 
     /* Remove instances with missing class */
     $data->removeUselessInsts();
-    if (DEBUGMODE > 1) echo $data->toString() . PHP_EOL;
+    // if (DEBUGMODE > 1) echo $data->toString() . PHP_EOL;
 
     /* Initialize ruleset */
     $this->ruleset = [];
@@ -142,10 +142,10 @@ class PRip extends Learner {
     for ($classIndex = 0; $classIndex < $data->numClasses() - 1; $classIndex++) {
       
       if ($this->debug) {
-        echo "\n\n===========================================================\n"
+        echo "\n\n"
           . "Class \"" . $this->classAttr->reprVal($classIndex) . "\" [" . $classIndex . "]: "
           . $orderedClassCounts[$classIndex] . " instances\n"
-          . "===========================================================\n";
+          . "=====================================\n";
       }
 
       /* Ignore classes with no members. */
@@ -169,13 +169,6 @@ class PRip extends Learner {
         }
       }
 
-      if ($this->debug) {
-        echo "\$all: $all\n";
-        echo "\$expFPRate: $expFPRate\n";
-        echo "\$classWeights: $classWeights\n";
-        echo "\$totalWeights: $totalWeights\n";
-      }
-
       /* DL of default rule, no theory DL, only data DL */
       $defDL = 0.0;
       if ($classWeights > 0) {
@@ -190,6 +183,13 @@ class PRip extends Learner {
       }
       if ($this->debug) {
         echo "The default DL = $defDL" . PHP_EOL;
+      }
+
+      if ($this->debug) {
+        echo "\$all: $all, ";
+        echo "\$expFPRate: $expFPRate, ";
+        echo "\$classWeights: $classWeights, ";
+        echo "\$totalWeights: $totalWeights" . PHP_EOL;
       }
 
       $data = $this->rulesetForOneClass($data, $expFPRate, $classIndex, $defDL);
@@ -254,7 +254,7 @@ class PRip extends Learner {
 
     /********************** Building stage ***********************/
     if ($this->debug) {
-      echo "\n*** Building stage ***\n";
+      echo "\n*** Building stage ***" . PHP_EOL;
     }
 
     /* Generate new rules until stopping criteria is met */
@@ -268,7 +268,7 @@ class PRip extends Learner {
         // echo "buil growData" . PHP_EOL . $growData->toString(false, [0,1,2,3]);
         // echo "buil pruneData" . PHP_EOL . $pruneData->toString(false, [0,1,2,3]);
         if ($this->debug) {
-          echo "\nGrowing rule ...";
+          echo "Growing a rule ..." . PHP_EOL;
         }
         $oneRule->grow($growData, $this->minNo); // Build the rule
         if ($this->debug) {
