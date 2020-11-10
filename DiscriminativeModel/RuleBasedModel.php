@@ -750,21 +750,33 @@ end";
     return $this->setRules([]);
   }
 
+  // TODO: here I'm asssumning a classification rule
+  static function fromString(string $str) : RuleBasedModel {
+    $rules_str_arr = preg_split("/[\n\r]/", $str);
+    $rules = array_map(function ($str) {
+      return ClassificationRule::fromString($str);
+      }, $rules_str_arr);
+    $model = new RuleBasedModel();
+    $model->setRules($rules);
+    return $model;
+  }
+
   /* Print a textual representation of the rule */
   function __toString () : string {
     $rules = $this->getRules();
-    $attrs = $this->getAttributes();
+    $attrs = $this->attributes;
     $out_str = "    ";
     $out_str .= "RuleBasedModel with "
-              . count($rules) . " rules & "
-              . count($attrs) . " attributes: " . PHP_EOL . "    ";
+              . count($rules) . " rules"
+              . ($attrs === NULL ? "" : " & " . count($attrs) . " attributes")
+              . ": " . PHP_EOL . "    ";
     foreach ($rules as $x => $rule) {
       $out_str .= "R" . $x . ": " . $rule->toString() . PHP_EOL . "    ";
     }
     // foreach ($this->getAttributes() as $x => $attr) {
     //   $out_str .= $x . ": " . $attr->toString() . PHP_EOL . "    ";
     // }
-    if (count($attrs)) {
+    if ($attrs !== NULL && count($attrs)) {
     $x = 0;               $out_str .= "A" . $x . ": " . $attrs[$x]->toString(false) . PHP_EOL . "    ";
       if (count($attrs)>2) {
     $x = 1;               $out_str .= "A" . $x . ": " . $attrs[$x]->toString(false) . PHP_EOL . "    ";

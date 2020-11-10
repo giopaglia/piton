@@ -9,7 +9,7 @@ include "Instances.php";
 abstract class _Antecedent {
   /** The attribute of the antecedent */
   protected $attribute;
-  protected $attributeIndex;
+  // protected $attributeIndex;
   
   /**
   * The attribute value of the antecedent. For numeric attribute, it represents the operator (<= or >=)
@@ -36,14 +36,13 @@ abstract class _Antecedent {
    */
   function __construct(Attribute $attribute) {
     $this->attribute   = $attribute;
-    $this->attributeIndex   = $attribute->getIndex();
+    // $this->attributeIndex   = $attribute->getIndex();
     $this->value       = NAN;
     $this->maxInfoGain = 0;
     $this->accuRate    = NAN;
     $this->cover       = NAN;
     $this->accu        = NAN;
   }
-
 
   static function createFromAttribute(Attribute $attribute) : _Antecedent {
     switch (true) {
@@ -60,13 +59,30 @@ abstract class _Antecedent {
     return $antecedent;
   }
 
+  static function fromString(string $str) : _Antecedent {
+    switch (true) {
+      case preg_match("/^\s*(.*(?:\S))\s+=\s+(.*(?:\S))\s*$/", $str):
+        $antecedent = DiscreteAntecedent::fromString($str);
+        break;
+      case preg_match("/^\s*(.*(?:\S))\s*(>=|<=)\s*(.*(?:\S))\s*$/", $str):
+        $antecedent = ContinuousAntecedent::fromString($str);
+        break;
+      default:
+        die_error("Invalid antecedent string encountered! " . PHP_EOL . $str);
+        break;
+    }
+    return $antecedent;
+  }
+
   /**
    * Functions for the single data instance
    */
   
-  function inst_valueOfAttr(Instances $data, int $i) {
-    return $data->inst_val($i, $this->attributeIndex);
-  }
+  // function inst_valueOfAttr(Instances $data, int $i) {
+  //   // return $data->inst_val($i, $this->attributeIndex);
+  //   // TODO find a solution to this!
+  //   return $data->inst_val($i, $this->attribute->getIndex());
+  // }
 
   /* The abstract members for inheritance */
   abstract function splitData(Instances &$data, float $defAcRt, int $cla) : ?array;
@@ -161,9 +177,12 @@ class DiscreteAntecedent extends _Antecedent {
     $accurate  = array_fill(0,$bag,0);
     $coverage  = array_fill(0,$bag,0);
 
+    $index = $this->attribute->getIndex();
+
     /* Split data */
     for ($x = 0; $x < $data->numInstances(); $x++) {
-      $val = $this->inst_valueOfAttr($data, $x);
+      // $val = $this->inst_valueOfAttr($data, $x);
+      $val = $data->inst_val($x, $index);
       if ($val !== NULL) {
         $splitData[$val]->pushInstance($data->getInstance($x));
         $w = $data->inst_weight($x);
@@ -210,13 +229,40 @@ class DiscreteAntecedent extends _Antecedent {
    */
   function covers(Instances &$data, int $i) : bool {
     $isCover = false;
-    $val = $this->inst_valueOfAttr($data, $i);
+
+    // $val = $this->inst_valueOfAttr($data, $i);
+    $index = $this->attribute->getIndex();
+    $val = $data->inst_val($i, $index);
+
     if ($val !== NULL) {
       if ($val == $this->value) {
         $isCover = true;
       }
     }
     return $isCover;
+  }
+
+  static function fromString(string $str) : DiscreteAntecedent {
+    // if (DEBUGMODE > 2)
+      echo "DiscreteAntecedent->fromString($str)" . PHP_EOL;
+    
+    if (!preg_match("/^\s*(.*(?:\S))\s+=\s+(.*(?:\S))\s*$/", $str, $w)) {
+      die_error("Couldn't parse DiscreteAntecedent string \"$str\".");
+    }
+    echo "w: " . get_var_dump($w) . PHP_EOL;
+
+    $name = $w[1];
+    $reprvalue = $w[2];
+    
+    // if (DEBUGMODE > 2)
+      echo "name: " . get_var_dump($name) . PHP_EOL;
+    // if (DEBUGMODE > 2)
+      echo "reprvalue: " . get_var_dump($reprvalue) . PHP_EOL;
+    
+    $ant = _Antecedent::createFromAttribute(new DiscreteAttribute($name, "parsed", [$reprvalue]));
+    $ant->value = 0;
+    echo $ant->toString(true);
+    return $ant;
   }
 
   /**
@@ -293,9 +339,12 @@ class ContinuousAntecedent extends _Antecedent {
 
     // Total number of instances without missing value for att
     $total = $data->numInstances();
+    $index = $this->attribute->getIndex();
+    
     // Find the last instance without missing value
     for ($x = 0; $x < $data->numInstances(); $x++) {
-      if ($this->inst_valueOfAttr($data, $x) === NULL) {
+      // if ($this->inst_valueOfAttr($data, $x) === NULL) {
+      if ($data->inst_val($x, $index) === NULL) {
         $total = $x;
         break;
       }
@@ -310,15 +359,19 @@ class ContinuousAntecedent extends _Antecedent {
     if ($total == 0) {
       return NULL; // Data all missing for the attribute
     }
-    $this->splitPoint = $this->inst_valueOfAttr($data, $total - 1);
-    
+    // $this->splitPoint = $this->inst_valueOfAttr($data, $total - 1);
+    $this->splitPoint = $data->inst_val($total-1, $index);
+
     // echo "splitPoint: " . $this->splitPoint . PHP_EOL;
     // echo "total: " . $total . PHP_EOL;
 
     for (; $split <= $total; $split++) {
       if (($split == $total) ||
-          ($this->inst_valueOfAttr($data, $split) > // Can't split within
-           $this->inst_valueOfAttr($data, $prev))) { // same value
+        // Can't split within same value
+          // ($this->inst_valueOfAttr($data, $split) >
+          //  $this->inst_valueOfAttr($data, $prev))) {
+          ($data->inst_val($split, $index) >
+           $data->inst_val($prev, $index))) {
 
         for ($y = $prev; $y < $split; $y++) {
           $w = $data->inst_weight($y);
@@ -370,7 +423,8 @@ class ContinuousAntecedent extends _Antecedent {
           $this->accuRate = $accRate;
           $this->cover = $coverage;
           $this->accu = $accurate;
-          $this->splitPoint = $this->inst_valueOfAttr($data, $prev);
+          // $this->splitPoint = $this->inst_valueOfAttr($data, $prev);
+          $this->splitPoint = $data->inst_val($prev, $index);
           $finalSplit = ($isFirst) ? $split : $prev;
         }
 
@@ -416,7 +470,8 @@ class ContinuousAntecedent extends _Antecedent {
    */
   function covers(Instances &$data, int $i) : bool {
     $isCover = true;
-    $val = $this->inst_valueOfAttr($data, $i);
+    $val = $data->inst_val($i, $index);
+    // $val = $this->inst_valueOfAttr($data, $i);
     // echo "covers" . PHP_EOL;
     // echo "[$i]" . $data->inst_toString($i) . PHP_EOL;
     // echo "VAL " . toString($val) . PHP_EOL;
@@ -439,6 +494,31 @@ class ContinuousAntecedent extends _Antecedent {
         
     
     return $isCover;
+  }
+
+  static function fromString(string $str) : ContinuousAntecedent {
+    // if (DEBUGMODE > 2)
+      echo "ContinuousAntecedent->fromString($str)" . PHP_EOL;
+    
+    if (!preg_match("/^\s*(.*(?:\S))\s*(>=|<=)\s*(.*(?:\S))\s*$/", $str, $w)) {
+      die_error("Couldn't parse ContinuousAntecedent string \"$str\".");
+    }
+    $name = $w[1];
+    $sign = $w[2];
+    $reprvalue = $w[3];
+    
+    // if (DEBUGMODE > 2)
+      echo "name: " . get_var_dump($name) . PHP_EOL;
+    // if (DEBUGMODE > 2)
+      echo "sign: " . get_var_dump($sign) . PHP_EOL;
+    // if (DEBUGMODE > 2)
+      echo "reprvalue: " . get_var_dump($reprvalue) . PHP_EOL;
+    
+    $ant = _Antecedent::createFromAttribute(new ContinuousAttribute($name, "parsed"));
+    $ant->value = ($sign == "<=" ? 0 : 1);
+    $ant->splitPoint = $reprvalue;
+    echo $ant->toString(true);
+    return $ant;
   }
 
   /**

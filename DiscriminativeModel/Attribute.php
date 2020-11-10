@@ -116,7 +116,7 @@ abstract class Attribute {
   function getIndex() : int
   {
     if(!($this->index !== NULL))
-      die_error("Attribute with un-initialized index");
+      die_error("Attribute with uninitialized index");
     return $this->index;
   }
 

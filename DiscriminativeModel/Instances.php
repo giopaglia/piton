@@ -128,7 +128,6 @@ class Instances {
     $i = 0;
     while(!feof($f) && $line = strtolower(fgets($f)))  {
       // echo $i;
-      // TODO fix cuz dis not safe for text fields
       $row = str_getcsv($line, ",", "'");
 
       if (count($row) == count($attributes) + 1) {  
@@ -593,6 +592,7 @@ class Instances {
 
   /**
    * Save data to file, CSV format
+   * TODO: createFromCSV(...) but note that a csv doesn't tell the data types.
    */
   function save_CSV(string $path, bool $includeClassAttr = true) {
     if (DEBUGMODE > 2) echo "Instances->save_CSV($path)" . PHP_EOL;

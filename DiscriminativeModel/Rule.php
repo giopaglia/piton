@@ -1,13 +1,12 @@
 <?php
 
 /**
- * A single rule that predicts specified class.
+ * A single rule that predicts a specified value.
  * 
- * A rule consists of antecedents "AND"-ed together and the consequent (class
- * value) for the classification.
+ * A rule consists of antecedents "AND"-ed together and the consequent value
  */
 abstract class _Rule {
-  /** The internal representation of the class label to be predicted */
+  /** The internal representation of the value to be predicted */
   protected $consequent;
 
   /** The vector of antecedents of this rule */
@@ -19,12 +18,12 @@ abstract class _Rule {
     $this->antecedents = $antecedents;
   }
 
-  public function getConsequent() : int
+  public function getConsequent()
   {
     return $this->consequent;
   }
 
-  public function setConsequent(int $consequent) : self
+  public function setConsequent($consequent) : self
   {
     $this->consequent = $consequent;
     return $this;
@@ -40,25 +39,7 @@ abstract class _Rule {
     $this->antecedents = $antecedents;
     return $this;
   }
-}
-
-/**
- * Rule class for RIPPER algorithm
- * 
- * In this class, the Information Gain
- * (p*[log(p/t) - log(P/T)]) is used to select an antecedent and Reduced Error
- * Prunning (REP) with the metric of accuracy rate p/(p+n) or (TP+TN)/(P+N) is
- * used to prune the rule.
- *
- */
-class RipperRule extends _Rule {
-
-  /** Constructor */
-  function __construct(int $consequent) {
-    if(!($consequent >= 0))
-      die_error("Negative consequent ($consequent) found when building RipperRule");
-    parent::__construct($consequent);
-  }
+  
 
   /**
    * Whether the instance is covered by this rule.
@@ -96,15 +77,131 @@ class RipperRule extends _Rule {
     return ($this->antecedents !== NULL && $this->getSize() > 0);
   }
 
-  function hasConsequent() : bool {
-    return ($this->consequent !== NULL && $this->consequent !== -1);
-  }
-
   /**
    * the number of antecedents of the rule
    */
   function getSize() : int {
     return count($this->antecedents);
+  }
+
+  function __clone()
+  {
+    $this->antecedents = array_map("clone_object", $this->antecedents);
+  }
+
+  /* Print a textual representation of the rule */
+  function __toString() : string {
+    return $this->toString();
+  }
+
+  abstract function toString(Attribute $classAttr = NULL) : string;
+  abstract static function fromString(string $str) : _Rule;
+}
+
+
+/**
+ * A single classification rule that predicts a specified class value.
+ * 
+ * A rule consists of antecedents "AND"-ed together and the consequent (class
+ * value) for the classification.
+ */
+class ClassificationRule extends _Rule {
+  
+  /** Constructor */
+  function __construct(int $consequent) {
+    if(!($consequent >= 0))
+      die_error("Negative consequent ($consequent) found when building ClassificationRule");
+    parent::__construct($consequent);
+  }
+
+  public function setConsequent($consequent) : self
+  {
+    if(!(is_int($consequent) && $consequent >= 0))
+      die_error("Invalid consequent ($consequent) found when building ClassificationRule");
+    $this->consequent = $consequent;
+    return $this;
+  }
+
+  function hasConsequent() : bool {
+    return ($this->consequent !== NULL && $this->consequent !== -1);
+  }
+
+  function toString(Attribute $classAttr = NULL) : string {
+    $ants = [];
+    if ($this->hasAntecedents()) {
+      for ($j = 0; $j < $this->getSize(); $j++) {
+        $ants[] = "(" . $this->antecedents[$j]->toString(true) . ")";
+      }
+    }
+
+    if ($classAttr === NULL) {
+      $out_str = join($ants, " and ") . " => [{$this->consequent}]";
+    }
+    else {
+      $out_str = join($ants, " and ") . " => " . $classAttr->getName() . "=" . $classAttr->reprVal($this->consequent);
+    }
+
+    return $out_str;
+  }
+
+  static function fromString(string $str) : ClassificationRule {
+    // if (DEBUGMODE > 2)
+      echo "ClassificationRule->fromString($str)" . PHP_EOL;
+    
+    if (!preg_match("/^\s*()\s*=>\s*\[(.*)\]\s*$/", $str, $w) &&
+        !preg_match("/^\s*()\(\s*\)\s*=>\s*\[(.*)\]\s*$/", $str, $w) &&
+        !preg_match("/^\s*\(\s*(.*(?:\S))\s*\)\s*=>\s*\[(.*)\]\s*$/", $str, $w)) {
+      die_error("Couldn't parse ClassificationRule string \"$str\".");
+    }
+    
+    // if (DEBUGMODE > 2)
+      echo "w:" . get_var_dump($w) . PHP_EOL;
+    
+    $antecedents_str = $w[1];
+    $consequent_str = $w[2];
+
+    // if (DEBUGMODE > 2)
+      echo "antecedents_str: " . get_var_dump($antecedents_str) . PHP_EOL;
+    // if (DEBUGMODE > 2)
+      echo "consequent_str: " . get_var_dump($consequent_str) . PHP_EOL;
+
+    $ants_str_arr = [];
+    if ($antecedents_str != "") {
+      $ants_str_arr = preg_split("/\)?\s*and\s*\(?/", $antecedents_str);
+    }
+    echo "ants_str_arr: " . get_var_dump($ants_str_arr) . PHP_EOL;
+
+    $antecedents = array_map(function ($str) {
+      return _Antecedent::fromString($str);
+      }, $ants_str_arr);
+    $consequent = intval($consequent_str);
+    
+    // if (DEBUGMODE > 2)
+      echo "consequent: " . $consequent . PHP_EOL;
+    // if (DEBUGMODE > 2)
+      echo "antecedents: " . toString($antecedents) . PHP_EOL;
+
+    $rule = new ClassificationRule($consequent);
+    $rule->setAntecedents($antecedents);
+    echo "ClassificationRule " . $rule . PHP_EOL;
+    return $rule;
+  }
+}
+
+/**
+ * Rule class for RIPPER algorithm
+ * 
+ * In this class, the Information Gain
+ * (p*[log(p/t) - log(P/T)]) is used to select an antecedent and Reduced Error
+ * Prunning (REP) with the metric of accuracy rate p/(p+n) or (TP+TN)/(P+N) is
+ * used to prune the rule.
+ *
+ */
+class RipperRule extends ClassificationRule {
+
+  /** Constructor */
+  function __construct(int $consequent) {
+    parent::__construct($consequent);
   }
 
   /**
@@ -440,33 +537,6 @@ class RipperRule extends _Rule {
         }
       }
     }
-  }
-  
-  function __clone()
-  {
-    $this->antecedents = array_map("clone_object", $this->antecedents);
-  }
-
-  /* Print a textual representation of the rule */
-  function __toString() : string {
-    return $this->toString();
-  }
-  function toString(Attribute $classAttr = NULL) : string {
-    $ants = [];
-    if ($this->hasAntecedents()) {
-      for ($j = 0; $j < $this->getSize(); $j++) {
-        $ants[] = "(" . $this->antecedents[$j]->toString(true) . ")";
-      }
-    }
-
-    if ($classAttr === NULL) {
-      $out_str = join($ants, " and ") . " => [{$this->consequent}]";
-    }
-    else {
-      $out_str = join($ants, " and ") . " => " . $classAttr->getName() . "=" . $classAttr->reprVal($this->consequent);
-    }
-
-    return $out_str;
   }
 }
 
