@@ -95,7 +95,7 @@ abstract class _Rule {
   }
 
   abstract function toString(Attribute $classAttr = NULL) : string;
-  abstract static function fromString(string $str) : _Rule;
+  abstract static function fromString(string $str); // : _Rule;
 }
 
 
@@ -144,37 +144,48 @@ class ClassificationRule extends _Rule {
     return $out_str;
   }
 
-  static function fromString(string $str) : ClassificationRule {
+  static function fromString(string $str, ?array $outputMap = NULL) {
     // if (DEBUGMODE > 2)
       echo "ClassificationRule->fromString($str)" . PHP_EOL;
     
-    if (!preg_match("/^\s*()\s*=>\s*\[(.*)\]\s*$/", $str, $w) &&
-        !preg_match("/^\s*()\(\s*\)\s*=>\s*\[(.*)\]\s*$/", $str, $w) &&
-        !preg_match("/^\s*\(\s*(.*(?:\S))\s*\)\s*=>\s*\[(.*)\]\s*$/", $str, $w)) {
+    if (!preg_match("/^\s*()\s*=>\s*(.*(?:\S))\s*$/", $str, $w) &&
+        !preg_match("/^\s*()\(\s*\)\s*=>\s*(.*(?:\S))\s*$/", $str, $w) &&
+        !preg_match("/^\s*\(\s*(.*(?:\S))\s*\)\s*=>\s*(.*(?:\S))\s*$/", $str, $w)) {
       die_error("Couldn't parse ClassificationRule string \"$str\".");
     }
     
-    // if (DEBUGMODE > 2)
+    if (DEBUGMODE > 2)
       echo "w:" . get_var_dump($w) . PHP_EOL;
     
     $antecedents_str = $w[1];
-    $consequent_str = $w[2];
+    if (preg_match("/^\s*\[(.*(?:\S))\]\s*$/", $w[2], $w2)) {
+      $consequent_str = $w2[1];
+      // if (DEBUGMODE > 2)
+        echo "consequent_str: " . get_var_dump($consequent_str) . PHP_EOL;
+      $consequent = intval($consequent_str);
+    } else if (preg_match("/^\s*(.*)=(.*(?:\S))\s*\([\d\.]+\/[\d\.]+\)\s*$/", $w[2], $w2)) {
+      $consequent = $outputMap[$w2[2]];
+    } else if (preg_match("/^\s*(.*(?:\S))(\s*\([\d\.]+(\/[\d\.]+)?\))?\s*$/", $w[2], $w2)) {
+      $consequent = $outputMap[$w2[1]];
+    } else {
+      die_error("Couldn't parse ClassificationRule conseguent string \"$str\".");
+    }
+    // if (DEBUGMODE > 2)
+      echo "w2:" . get_var_dump($w2) . PHP_EOL;
+    
 
     // if (DEBUGMODE > 2)
       echo "antecedents_str: " . get_var_dump($antecedents_str) . PHP_EOL;
-    // if (DEBUGMODE > 2)
-      echo "consequent_str: " . get_var_dump($consequent_str) . PHP_EOL;
 
     $ants_str_arr = [];
     if ($antecedents_str != "") {
-      $ants_str_arr = preg_split("/\)?\s*and\s*\(?/", $antecedents_str);
+      $ants_str_arr = preg_split("/\)?\s*and\s*\(?/i", $antecedents_str);
     }
     echo "ants_str_arr: " . get_var_dump($ants_str_arr) . PHP_EOL;
 
     $antecedents = array_map(function ($str) {
       return _Antecedent::fromString($str);
       }, $ants_str_arr);
-    $consequent = intval($consequent_str);
     
     // if (DEBUGMODE > 2)
       echo "consequent: " . $consequent . PHP_EOL;
@@ -184,7 +195,11 @@ class ClassificationRule extends _Rule {
     $rule = new ClassificationRule($consequent);
     $rule->setAntecedents($antecedents);
     echo "ClassificationRule " . $rule . PHP_EOL;
-    return $rule;
+    $ruleAttributes = [];
+    foreach ($antecedents as $a) {
+      $ruleAttributes[] = $a->getAttribute();
+    }
+    return [$rule, $ruleAttributes];
   }
 }
 

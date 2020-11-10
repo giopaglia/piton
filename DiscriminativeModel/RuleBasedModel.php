@@ -128,7 +128,7 @@ class RuleBasedModel extends DiscriminativeModel {
   }
 
   /* Perform prediction onto some data. */
-  function predict(Instances $testData, bool $returnClassIndices = false) : array {
+  function predict(Instances $testData, bool $useClassIndices = false) : array {
     if (DEBUGMODE > 2) echo "RuleBasedModel->predict(" . $testData->toString(true) . ")" . PHP_EOL;
 
     if (!(is_array($this->rules)))
@@ -139,37 +139,45 @@ class RuleBasedModel extends DiscriminativeModel {
 
     /* Extract the data in the same form that was seen during training */
     $testData = clone $testData;
-    $testData->sortAttrsAs($this->attributes);
+    if ($this->attributes !== NULL) {
+      // $testData->sortAttrsAs($this->attributes);
+      $testData->sortAttrsAs($this->attributes, true);
 
-    /* Predict */
-    $classAttr = $testData->getClassAttribute();
-    $predictions = [];
-    if (DEBUGMODE > 1) {
-      echo "rules:\n";
-      foreach ($this->rules as $r => $rule) {
-        echo $rule->toString();
-        echo "\n";
-      }
-    }
-    if (DEBUGMODE > 1) echo "testing:\n";
-    for ($x = 0; $x < $testData->numInstances(); $x++) {
-      if (DEBUGMODE > 1) echo "[$x] : ";
-      if (DEBUGMODE & DEBUGMODE_DATA) echo $testData->inst_toString($x);
-      foreach ($this->rules as $r => $rule) {
-        if ($rule->covers($testData, $x)) {
-          if (DEBUGMODE > 1) echo $r;
-          $idx = $rule->getConsequent();
-          $predictions[] = ($returnClassIndices ? $idx : $classAttr->reprVal($idx));
-          break;
+      /* Predict */
+      $classAttr = $testData->getClassAttribute();
+      $predictions = [];
+      if (DEBUGMODE > 1) {
+        echo "rules:\n";
+        foreach ($this->rules as $r => $rule) {
+          echo $rule->toString();
+          echo "\n";
         }
       }
-      if (DEBUGMODE > 1) echo "\n";
+      if (DEBUGMODE > 1) echo "testing:\n";
+      for ($x = 0; $x < $testData->numInstances(); $x++) {
+        if (DEBUGMODE > 1) echo "[$x] : ";
+        if (DEBUGMODE & DEBUGMODE_DATA) echo $testData->inst_toString($x);
+        foreach ($this->rules as $r => $rule) {
+          if ($rule->covers($testData, $x)) {
+            if (DEBUGMODE > 1) echo " R$r";
+            $idx = $rule->getConsequent();
+            if (DEBUGMODE > 1) echo " -> $idx";
+            $predictions[] = ($useClassIndices ? $idx : $classAttr->reprVal($idx));
+            break;
+          }
+        }
+        if (DEBUGMODE > 1) echo "\n";
+      }
+    }
+    else {
+      die_error("RuleBasedModel needs attributesSet for predict().");
     }
 
-    if (count($predictions) != $testData->numInstances())
+    if (count($predictions) != $testData->numInstances()) {
       die_error("Couldn't perform predictions for some instances (" .
         count($predictions) . "/" . $testData->numInstances() . " performed)");
-
+    }
+    
     return $predictions;
   }
 
@@ -216,27 +224,29 @@ class RuleBasedModel extends DiscriminativeModel {
     if (DEBUGMODE)
       echo "RuleBasedModel->test(" . $testData->toString(true) . ")" . PHP_EOL;
 
+    $classAttr = $testData->getClassAttribute();
+    $domain = $classAttr->getDomain();
+
     $ground_truths = [];
     
     for ($x = 0; $x < $testData->numInstances(); $x++) {
-      $ground_truths[] = $testData->inst_classValue($x);
+      // $ground_truths[] = $testData->inst_classValue($x);
+      $ground_truths[] = $domain[$testData->inst_classValue($x)];
     }
 
     // $testData->dropOutputAttr();
-    $predictions = $this->predict($testData, true);
+    // $predictions = $this->predict($testData, true);
+    $predictions = $this->predict($testData, false);
     
     // echo "\$ground_truths : " . get_var_dump($ground_truths) . PHP_EOL;
     // echo "\$predictions : " . get_var_dump($predictions) . PHP_EOL;
     if (DEBUGMODE > 1) {
       echo "ground_truths,predictions:" . PHP_EOL;
       foreach ($ground_truths as $i => $val) {
-        echo "[" . $val . "," . $predictions[$i] . "]";
+        echo "[" . $val . "," . $predictions[$i] . "]" . PHP_EOL;
       }
     }
 
-    $classAttr = $testData->getClassAttribute();
-
-    $domain = $classAttr->getDomain();
     // For the binary case, one measure for YES class is enough
     if (count($domain) == 2) {
       // TODO:
@@ -729,6 +739,12 @@ end";
     return $this;
   }
 
+  function reindexAttributes() {
+    foreach ($this->attributes as $k => &$attribute) {
+      $attribute->setIndex($k);
+    }
+  }
+
   function getClassAttribute() : Attribute {
     // Note: assuming the class attribute is the first
     return $this->getAttributes()[0];
@@ -751,13 +767,23 @@ end";
   }
 
   // TODO: here I'm asssumning a classification rule
-  static function fromString(string $str) : RuleBasedModel {
-    $rules_str_arr = preg_split("/[\n\r]/", $str);
-    $rules = array_map(function ($str) {
-      return ClassificationRule::fromString($str);
-      }, $rules_str_arr);
+  static function fromString(string $str, ?DiscreteAttribute $classAttr = NULL) : RuleBasedModel {
+    $rules_str_arr = preg_split("/[\n\r]/", trim($str));
+    $rules = [];
+    if ($classAttr === NULL) {
+      $classAttr = new DiscreteAttribute("outputAttr", "parsedOutputAttr", []);
+    }
+    $outputMap = array_flip($classAttr->getDomain());
+    $attributes = [$classAttr];
+    foreach ($rules_str_arr as $rule_str) {
+      list($rule, $ruleAttributes) = ClassificationRule::fromString($rule_str, $outputMap);
+      $rules[] = $rule;
+      $attributes = array_merge($attributes, $ruleAttributes);
+    }
     $model = new RuleBasedModel();
     $model->setRules($rules);
+    $model->setAttributes($attributes);
+    $model->reindexAttributes();
     return $model;
   }
 

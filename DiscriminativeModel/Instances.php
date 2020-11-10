@@ -100,7 +100,7 @@ class Instances {
     /* Attributes */
     $attributes = [];
     while(!feof($f))  {
-      $line = strtolower(fgets($f));
+      $line = /* mb_strtolower */ (fgets($f));
       if (startsWith($line, "@attribute")) {
         $attributes[] = Attribute::createFromARFF($line);
       }
@@ -126,7 +126,7 @@ class Instances {
     $data = [];
     $weights = [];
     $i = 0;
-    while(!feof($f) && $line = strtolower(fgets($f)))  {
+    while(!feof($f) && $line = /* mb_strtolower */ (fgets($f)))  {
       // echo $i;
       $row = str_getcsv($line, ",", "'");
 
@@ -259,6 +259,15 @@ class Instances {
   }
   function getRowVal(array $row, int $j) {
     return $row[$j];
+  }
+
+  function pushColumn(array $column, Attribute $attribute)
+  {
+    foreach ($this->data as $i => &$inst) { 
+      array_splice($inst, 1, 0, [$column[$i]]);
+    }
+    array_splice($this->attributes, 1, 0, [$attribute]);
+    $this->reindexAttributes();
   }
 
   function pushInstance(array $inst, int $weight = 1)
@@ -399,12 +408,12 @@ class Instances {
     foreach ($newAttributes as $i_attr => $newAttribute) {
       /* Look for the correspondent attribute */
       $oldAttribute = NULL;
-      $i_oldAttribute = NULL;
+      // $i_oldAttribute = NULL;
       foreach ($attributes as $i => $attr) {
         if ($newAttribute->getName() == $attr->getName()) {
           $oldAttribute = $attr;
-          $i_oldAttribute = $i;
-          unset($attributes[$i]);
+          // $i_oldAttribute = $i;
+          // unset($attributes[$i]);
           break;
         }
       }
@@ -428,29 +437,42 @@ class Instances {
       $copyMap[] = [$oldAttribute, $newAttribute];
     }
 
+    if (DEBUGMODE > 2) echo "copyMap" . PHP_EOL . get_var_dump($copyMap);
+
     $newData = [];
     foreach ($this->rowGenerator() as $row) {
       $newRow = [];
       foreach ($copyMap as $i => $oldAndNewAttr) {
-        $new_i = $oldAndNewAttr[1]->getIndex();
-        $oldVal = $this->getRowVal($row, $i);
-        $newRow[$new_i] = $oldAndNewAttr[1]->reprValAs($oldAndNewAttr[0], $oldVal);
+        $oldAttr = $oldAndNewAttr[0];
+        $newAttr = $oldAndNewAttr[1];
+        // echo $oldAttr->getIndex() . "->" . $newAttr->getIndex() . PHP_EOL;
+        // echo $oldAttr . PHP_EOL;
+        // echo $newAttr . PHP_EOL . PHP_EOL;
+        $new_i = $newAttr->getIndex();
+        $oldVal = $this->getRowVal($row, $oldAttr->getIndex());
+        // $oldVal = $this->getRowVal($row, $i);
+        if ($allowDataLoss) {
+          $newRow[$new_i] = $newAttr->reprValAs($oldAttr, $oldVal, true);
+        }
+        else {
+          $newRow[$new_i] = $newAttr->reprValAs($oldAttr, $oldVal);
+        }
       }
       $newRow[] = $this->getRowWeight($row);
       $newData[] = $newRow;
     }
 
-    if(count($attributes) && !$allowDataLoss) {
-      warn("Some attributes were not requested in the new attribute set"
-         . " in Instances->sortAttrsAs. If this is desired, please use "
-         . " the allowDataLoss flag. " . get_arr_dump($attributes));
-    }
+    // if(count($attributes) && !$allowDataLoss) { doesn't work without that unset
+    //   warn("Some attributes were not requested in the new attribute set"
+    //      . " in Instances->sortAttrsAs. If this is desired, please use "
+    //      . " the allowDataLoss flag. " . get_arr_dump($attributes));
+    // }
 
     $this->data = $newData;
     $this->setAttributes($newAttributes);
     if (DEBUGMODE > 2) {
       echo $this;
-      $this->checkIntegrity();
+      // $this->checkIntegrity();
     }
 
     return $sameAttributes;
@@ -553,6 +575,15 @@ class Instances {
     }
   }
 
+  /* Perform prediction onto some data. */
+  function appendPredictions(DiscriminativeModel $model) {
+    $new_col = $model->predict($this, true);
+    $newAttr = clone $this->getClassAttribute();
+    $newAttr->setName($newAttr->getName() . "_" // . $model->getName()
+     . "predictions");
+    $this->pushColumn($new_col, $newAttr);
+  }
+  
   /**
    * Save data to file, (dense) ARFF/Weka format
    */

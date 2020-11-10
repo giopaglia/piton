@@ -12,26 +12,6 @@ include "local-lib.php";
 include "DBFit.php";
 
 echo "<pre>";
-// ClassificationRule::fromString(" => [2]");
-// // ClassificationRule::fromString(" => [-1]");
-// ClassificationRule::fromString("()   => [0]");
-// ClassificationRule::fromString("(Ciao = 2) => [1]");
-// ClassificationRule::fromString("(Ciao >= 2)  => [1]");
-// // ClassificationRule::fromString("(Ciao != 2)  => [1]");
-// // ClassificationRule::fromString("(Ciao == 2 and Ciao2 <= 1)    => [1]");
-// // ClassificationRule::fromString("(Ciao == 2     and    Ciao2 <= 1)    => [1]");
-// ClassificationRule::fromString("(Ciao = 2 and Ciao2 <= 1)    => [1]");
-// ClassificationRule::fromString("(Ciao = 2     and    Ciao2 <= 1)    => [1]");
-
-echo RuleBasedModel::fromString("(Ciao = 2     and    Ciao2 <= 1)    => [1]
-(Ciao2 = 2     and    Ciao6 <= 1)    => [1]
-(Ciao3 = 2     and    Ciao <= 1)    => [1]
-(Ciao5 = 2     and    Ciao2 <= 1)    => [0]
-(Ciao5 = 2     and    Ciao2 <= 1    and    Ciao2 <= 1)    => [4]
-(Ciao5 = 2)    => [0]
-  => [3]");
-
-echo "</pre>";
 // $data = Instances::createFromARFF("query_processato_femmine_Tscore_COLLO_bilanciato.arff");
 // $data->save_CSV("query_processato_femmine_Tscore_COLLO_bilanciato.arff.csv");
 
@@ -39,5 +19,6 @@ echo "</pre>";
 // $data->save_CSV("query_processato_femmine_Tscore_colonna_bilanciato.arff.csv");
 
 // echo $data;
+echo "</pre>";
 
 ?>

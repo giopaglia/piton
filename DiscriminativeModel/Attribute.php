@@ -168,12 +168,12 @@ class DiscreteAttribute extends Attribute {
   function isAtLeastAsExpressiveAs(Attribute $otherAttr) {
     return get_class($this) == get_class($otherAttr)
         && $this->getName() == $otherAttr->getName()
-        && $this->getType() == $otherAttr->getType()
+        // && $this->getType() == $otherAttr->getType()
         && !count(array_diff($otherAttr->getDomain(), $this->getDomain()));
   }
 
   function numValues() : int { return count($this->domain); }
-  function pushDomainVal(string $v) { $this->domain[] = $v; }
+  function pushDomainVal(string $cl) : int { $this->domain[] = $cl; return $this->getKey($cl); }
 
   /** Obtain the value for the representation of the attribute */
   function getKey($cl, $safety_check = false) {
@@ -193,12 +193,16 @@ class DiscreteAttribute extends Attribute {
 
   /** Obtain the representation for the attribute of a value
     that belonged to a different domain */
-  function reprValAs(DiscreteAttribute $oldAttr, ?int $oldVal) {
+  function reprValAs(DiscreteAttribute $oldAttr, ?int $oldVal, bool $force = false) {
     if ($oldVal === NULL) return NULL;
     $cl = $oldAttr->reprVal($oldVal);
     $i = $this->getKey($cl);
     if ($i === false) {
-      die_error("Can't represent nominal value \"$cl\" ($oldVal) within domain " . get_arr_dump($this->getDomain()));
+      if ($force) {
+        return $this->pushDomainVal($cl);
+      } else {
+        die_error("Can't represent nominal value \"$cl\" ($oldVal) within domain " . get_arr_dump($this->getDomain()));
+      }
     }
     return $i;
   }
@@ -241,7 +245,8 @@ class ContinuousAttribute extends Attribute {
 
   /** The type of the attribute (ARFF/Weka style)  */
   static $type2ARFFtype = [
-    "int"       => "numeric"
+    "parsed"    => "numeric"
+  , "int"       => "numeric"
   , "float"     => "numeric"
   , "double"    => "numeric"
   //, "bool"      => "numeric"
@@ -260,7 +265,8 @@ class ContinuousAttribute extends Attribute {
   function isAtLeastAsExpressiveAs(Attribute $otherAttr) {
     return get_class($this) == get_class($otherAttr)
         && $this->getName() == $otherAttr->getName()
-        && $this->getType() == $otherAttr->getType();
+        // && $this->getType() == $otherAttr->getType()
+        ;
   }
 
   /** Obtain the value for the representation of the attribute */

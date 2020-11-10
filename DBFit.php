@@ -1420,7 +1420,7 @@ class DBFit {
     // if ($text === NULL) {
     //   return [];
     // }
-    $text = strtolower($text);
+    $text = mb_strtolower($text);
     
     # to keep letters only (remove punctuation and such)
     $text = preg_replace('/[^a-z]+/i', '_', $text);
