@@ -343,10 +343,10 @@ class RuleBasedModel extends DiscriminativeModel {
       $out .= "<table class='blueTable' style='border-collapse: collapse; ' border='1'>";
       $out .= "<thead>";
       $out .= "<tr>";
-      $out .= "<th>#</th>
+      $out .= "<th style='width:30px'>#</th>
 <th>rule</th>
-<th colspan='5'>full rule</th>
-<th colspan='5'>sub rule (no model context)</th>
+<th colspan='5' style='width:20%'>full rule</th>
+<th colspan='5' style='width:20%'>sub rule (no model context)</th>
 ";
       $out .= "</tr>";
       $out .= "<tr>";
@@ -993,7 +993,7 @@ end";
 
   // TODO: here I'm asssumning a classification rule
   static function fromString(string $str, ?DiscreteAttribute $classAttr = NULL) : RuleBasedModel {
-    $rules_str_arr = preg_split("/[\n\r]/", trim($str));
+    $rules_str_arr = array_filter(preg_split("/[\n\r]/", trim($str)), function ($v) { return $v !== ""; });
     $rules = [];
     if ($classAttr === NULL) {
       $classAttr = new DiscreteAttribute("outputAttr", "parsedOutputAttr", []);

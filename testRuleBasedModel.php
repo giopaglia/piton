@@ -54,8 +54,7 @@ if (isset($_GET["rbmodel"])) {
   global $data;
   echo "<pre>";
   $a = RuleBasedModel::fromString(trim($_GET["rbmodel"])
-   . "
-  => normaloide"
+   . "\n() => normaloide"
   ,
   new DiscreteAttribute("T_score_normaloidi", "output enum", ["osteoporosi", "normaloide"]));
 
@@ -65,8 +64,8 @@ if (isset($_GET["rbmodel"])) {
 }
 ?>
 <form method="get" action="<?php echo $_SERVER['PHP_SELF'];?>">
-<textarea name="rbmodel" placeholder="Paste rule-based model here..."></textarea>
-<button type="submit">
+<textarea style="height: 300px" name="rbmodel" placeholder="Paste rule-based model here..."><?php echo (isset($_GET["rbmodel"]) ? htmlspecialchars($_GET["rbmodel"]) : ""); ?></textarea>
+<input value="Test!" type="submit">
 </form>
 </body>
 </html>

@@ -6,4 +6,5 @@ cachegrind.out*
 *.arff
 *.sql
 *.csv
-datasetslocal-lib.php
+datasets
+local-lib.php
