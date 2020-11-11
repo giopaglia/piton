@@ -61,14 +61,14 @@ abstract class _Antecedent {
 
   static function fromString(string $str) : _Antecedent {
     switch (true) {
-      case preg_match("/^\s*(.*(?:\S))\s+=\s+(.*(?:\S))\s*$/", $str):
+      case preg_match("/^\s*\(?\s*(.*(?:\S))\s+(!=|=)\s+(.*(?:[^\s\)]))\s*\)?\s*$/", $str):
         $antecedent = DiscreteAntecedent::fromString($str);
         break;
-      case preg_match("/^\s*(.*(?:\S))\s*(>=|<=)\s*(.*(?:\S))\s*$/", $str):
+      case preg_match("/^\s*\(?\s*(.*(?:\S))\s*(>=|<=)\s*(.*(?:[^\s\)]))\s*\)?\s*$/", $str):
         $antecedent = ContinuousAntecedent::fromString($str);
         break;
       default:
-        die_error("Invalid antecedent string encountered! " . PHP_EOL . $str);
+        die_error("Invalid antecedent string encountered: " . PHP_EOL . $str);
         break;
     }
     return $antecedent;
@@ -142,6 +142,8 @@ abstract class _Antecedent {
  */
 class DiscreteAntecedent extends _Antecedent {
 
+  protected $sign;
+
   /**
    * Constructor
    */
@@ -160,6 +162,8 @@ class DiscreteAntecedent extends _Antecedent {
    * @param defAcRt the default accuracy rate for data
    * @param cl the class label to be predicted
    * @return the array of data after split
+   *
+   * NOTE: JRip rules only allow sign=0
    */
   function splitData(Instances &$data, float $defAcRt, int $cla) : ?array {
     if (DEBUGMODE > 2) {
@@ -200,7 +204,7 @@ class DiscreteAntecedent extends _Antecedent {
       $infoGain =
       // Utils.eq(defAcRt, 1.0) ?
       // accurate[x]/(double)numConds :
-      $accurate[$x] * (log($p / $t, 2) - log($defAcRt, 2));
+        $accurate[$x] * (log($p / $t, 2) - log($defAcRt, 2));
 
       if ($infoGain > $this->maxInfoGain) {
         $this->value       = $x;
@@ -216,6 +220,8 @@ class DiscreteAntecedent extends _Antecedent {
         echo "splitData[$k] : \n" . $splitData[$k]->toString() . PHP_EOL;
       }
     }
+    // NOTE: JRip rules only allow sign=0
+    $this->sign = 0;
     return $splitData;
   }
 
@@ -235,7 +241,7 @@ class DiscreteAntecedent extends _Antecedent {
     $val = $data->inst_val($i, $index);
 
     if ($val !== NULL) {
-      if ($val == $this->value) {
+      if (! ( $val == $this->value xor ($this->sign == 0) )) {
         $isCover = true;
       }
     }
@@ -246,14 +252,15 @@ class DiscreteAntecedent extends _Antecedent {
     if (DEBUGMODE > 2)
       echo "DiscreteAntecedent->fromString($str)" . PHP_EOL;
     
-    if (!preg_match("/^\s*(.*(?:\S))\s+=\s+(.*(?:\S))\s*$/", $str, $w)) {
+    if (!preg_match("/^\s*\(?\s*(.*(?:\S))\s+(!=|=)\s+(.*(?:[^\s\)]))\s*\)?\s*$/", $str, $w)) {
       die_error("Couldn't parse DiscreteAntecedent string \"$str\".");
     }
     if (DEBUGMODE > 2)
       echo "w: " . get_var_dump($w) . PHP_EOL;
 
     $name = $w[1];
-    $reprvalue = $w[2];
+    $sign = $w[2];
+    $reprvalue = $w[3];
     
     if (DEBUGMODE > 2)
       echo "name: " . get_var_dump($name) . PHP_EOL;
@@ -261,6 +268,7 @@ class DiscreteAntecedent extends _Antecedent {
       echo "reprvalue: " . get_var_dump($reprvalue) . PHP_EOL;
     
     $ant = _Antecedent::createFromAttribute(new DiscreteAttribute($name, "parsed", [$reprvalue]));
+    $ant->sign = ($sign == "=" ? 0 : 1);
     $ant->value = 0;
     
     if (DEBUGMODE > 2)
@@ -274,10 +282,10 @@ class DiscreteAntecedent extends _Antecedent {
    */
   function toString(bool $short = false) : string {
     if ($short) {
-      return "{$this->attribute->getName()} = {$this->attribute->reprVal($this->value)}";
+      return "{$this->attribute->getName()}" . ($this->sign == 0 ? " = " : " != ") . "{$this->attribute->reprVal($this->value)}";
     }
     else {
-      return "DiscreteAntecedent: ({$this->attribute->getName()} == \"{$this->attribute->reprVal($this->value)}\") (maxInfoGain={$this->maxInfoGain}, accuRate={$this->accuRate}, cover={$this->cover}, accu={$this->accu})";
+      return "DiscreteAntecedent: ({$this->attribute->getName()}" . ($this->sign == 0 ? " == " : " != ") . "\"{$this->attribute->reprVal($this->value)}\") (maxInfoGain={$this->maxInfoGain}, accuRate={$this->accuRate}, cover={$this->cover}, accu={$this->accu})";
     }
   }
 
@@ -505,7 +513,7 @@ class ContinuousAntecedent extends _Antecedent {
     if (DEBUGMODE > 2)
       echo "ContinuousAntecedent->fromString($str)" . PHP_EOL;
     
-    if (!preg_match("/^\s*(.*(?:\S))\s*(>=|<=)\s*(.*(?:\S))\s*$/", $str, $w)) {
+    if (!preg_match("/^\s*\(?\s*(.*(?:\S))\s*(>=|<=)\s*(.*(?:[^\s\)]))\s*\)?\s*$/", $str, $w)) {
       die_error("Couldn't parse ContinuousAntecedent string \"$str\".");
     }
     $name = $w[1];

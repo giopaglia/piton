@@ -144,13 +144,87 @@ class ClassificationRule extends _Rule {
     return $out_str;
   }
 
+  /**
+   * TODO
+   */
+  function computeMeasures(Instances &$data, bool $returnFilteredData = false) : array {
+    if (DEBUGMODE > 2) echo "RipperRule->computeMeasures(&[data])" . PHP_EOL;
+    
+    $tot       = $data->numInstances();
+    $totWeight = $data->getSumOfWeights();
+    
+    if ($data->isWeighted()) {
+      die_error("The code must be expanded to test with weighted datasets" . PHP_EOL);
+    }
+    // TODO use non-weighted counterparts?
+
+    // if (DEBUGMODE > -1) echo "\$totWeight    : $totWeight    " . PHP_EOL;
+    // if (DEBUGMODE > -1) echo "\$tot    : $tot    " . PHP_EOL;
+    // $covered = 0;
+    $coveredWeight = 0;
+    // $tp = 0;
+    $tpWeight = 0;
+    $totConsWeight = 0;
+
+    if ($returnFilteredData) {
+      $filteredData = Instances::createEmpty($data);
+    }
+    // echo $this->toString() . PHP_EOL;
+    for ($i = 0; $i < $tot; $i++) {
+      if ($this->covers($data,  $i)) {
+        // echo "covered: [$i] " . $data->inst_toString($i) . PHP_EOL;
+        // Covered by antecedents
+        // $covered += 1;
+        $coveredWeight += $data->inst_weight($i);
+        // echo "covered " . $data->inst_classValue($i) ." ". $this->consequent . PHP_EOL;
+        if ($data->inst_classValue($i) == $this->consequent) {
+          // True positive for the rule
+          // $tp += 1;
+          $tpWeight += $data->inst_weight($i);
+        }
+      }
+      else if ($returnFilteredData) {
+        $filteredData->pushInstance($data->getInstance($i));
+      }
+      if ($data->inst_classValue($i) == $this->consequent) {
+        // Same consequent
+        $totConsWeight += $data->inst_weight($i);
+      }
+    }
+    
+    $covered      = $coveredWeight;
+    $support      = safe_div($coveredWeight, $totWeight);
+    $confidence   = safe_div(safe_div($tpWeight, $totWeight), $support);
+    $supportCons  = safe_div($totConsWeight, $totWeight);
+    $lift         = safe_div($confidence, $supportCons);
+    $conviction   = safe_div((1-$support), (1-$confidence));
+
+    if (DEBUGMODE) echo "\$coveredWeight  : $coveredWeight"        . PHP_EOL;
+    if (DEBUGMODE) echo "\$tpWeight       : $tpWeight"             . PHP_EOL;
+    if (DEBUGMODE) echo "\$totConsWeight  : $totConsWeight       " . PHP_EOL;
+    if (DEBUGMODE) echo "\$covered    : $covered    " . PHP_EOL;
+    if (DEBUGMODE) echo "\$support    : $support    " . PHP_EOL;
+    if (DEBUGMODE) echo "\$confidence : $confidence " . PHP_EOL;
+    if (DEBUGMODE) echo "\$lift       : $lift       " . PHP_EOL;
+    if (DEBUGMODE) echo "\$conviction : $conviction " . PHP_EOL;
+    $out_dict = ["covered"        => $covered,
+                 "support"        => $support,
+                 "confidence"     => $confidence,
+                 "lift"           => $lift,
+                 "conviction"     => $conviction];
+    if ($returnFilteredData) {
+      $out_dict["filteredData"] = $filteredData;
+    }
+    return $out_dict;
+  }
+
   static function fromString(string $str, ?array $outputMap = NULL) {
-    // if (DEBUGMODE > 2)
+    if (DEBUGMODE > 2)
       echo "ClassificationRule->fromString($str)" . PHP_EOL;
     
-    if (!preg_match("/^\s*()\s*=>\s*(.*(?:\S))\s*$/", $str, $w) &&
-        !preg_match("/^\s*()\(\s*\)\s*=>\s*(.*(?:\S))\s*$/", $str, $w) &&
-        !preg_match("/^\s*\(\s*(.*(?:\S))\s*\)\s*=>\s*(.*(?:\S))\s*$/", $str, $w)) {
+    if (!preg_match("/^\s*()\s*(?:=>|:)\s*(.*(?:\S))\s*$/", $str, $w) &&
+        !preg_match("/^\s*()\(\s*\)\s*(?:=>|:)\s*(.*(?:\S))\s*$/", $str, $w) &&
+        !preg_match("/^\s*(.*(?:\S))\s*(?:=>|:)\s*(.*(?:\S))\s*$/", $str, $w)) {
       die_error("Couldn't parse ClassificationRule string \"$str\".");
     }
     
@@ -165,36 +239,41 @@ class ClassificationRule extends _Rule {
       $consequent = intval($consequent_str);
     } else if (preg_match("/^\s*(.*)=(.*(?:\S))\s*\([\d\.]+\/[\d\.]+\)\s*$/", $w[2], $w2)) {
       $consequent = $outputMap[$w2[2]];
+    } else if (preg_match("/^\s*(.*(?:\S))\s*\([\d\.]+\/[\d\.]+\)\s*$/", $w[2], $w2)) {
+      $consequent = $outputMap[$w2[1]];
     } else if (preg_match("/^\s*(.*(?:\S))(\s*\([\d\.]+(\/[\d\.]+)?\))?\s*$/", $w[2], $w2)) {
       $consequent = $outputMap[$w2[1]];
     } else {
       die_error("Couldn't parse ClassificationRule conseguent string \"$str\".");
     }
-    // if (DEBUGMODE > 2)
+
+    if (DEBUGMODE > 2)
       echo "w2:" . get_var_dump($w2) . PHP_EOL;
     
-
-    // if (DEBUGMODE > 2)
+    if (DEBUGMODE > 2)
       echo "antecedents_str: " . get_var_dump($antecedents_str) . PHP_EOL;
 
     $ants_str_arr = [];
     if ($antecedents_str != "") {
-      $ants_str_arr = preg_split("/\)?\s*and\s*\(?/i", $antecedents_str);
+      $ants_str_arr = preg_split("/\s*and\s*/i", $antecedents_str);
     }
-    echo "ants_str_arr: " . get_var_dump($ants_str_arr) . PHP_EOL;
+    
+    if (DEBUGMODE > 2)
+      echo "ants_str_arr: " . get_var_dump($ants_str_arr) . PHP_EOL;
 
     $antecedents = array_map(function ($str) {
       return _Antecedent::fromString($str);
       }, $ants_str_arr);
     
-    // if (DEBUGMODE > 2)
+    if (DEBUGMODE > 2)
       echo "consequent: " . $consequent . PHP_EOL;
-    // if (DEBUGMODE > 2)
+    if (DEBUGMODE > 2)
       echo "antecedents: " . toString($antecedents) . PHP_EOL;
 
     $rule = new ClassificationRule($consequent);
     $rule->setAntecedents($antecedents);
-    echo "ClassificationRule " . $rule . PHP_EOL;
+    if (DEBUGMODE > 2)
+      echo "ClassificationRule " . $rule . PHP_EOL;
     $ruleAttributes = [];
     foreach ($antecedents as $a) {
       $ruleAttributes[] = $a->getAttribute();
@@ -217,60 +296,6 @@ class RipperRule extends ClassificationRule {
   /** Constructor */
   function __construct(int $consequent) {
     parent::__construct($consequent);
-  }
-
-  /**
-   * TODO
-   */
-  function computeMeasures(Instances &$data) : array {
-    if (DEBUGMODE > 2) echo "RipperRule->computeMeasures(&[data])" . PHP_EOL;
-    
-    $tot       = $data->numInstances();
-    $totWeight = $data->getSumOfWeights();
-    
-    if ($data->isWeighted()) {
-      die_error("The code must be expanded to test with weighted datasets" . PHP_EOL);
-    }
-    // TODO use non-weighted counterparts?
-
-    // if (DEBUGMODE > -1) echo "\$totWeight    : $totWeight    " . PHP_EOL;
-    // if (DEBUGMODE > -1) echo "\$tot    : $tot    " . PHP_EOL;
-    // $covered = 0;
-    $coveredWeight = 0;
-    // $tp = 0;
-    $tpWeight = 0;
-    $totConsWeight = 0;
-
-    // echo $this->toString() . PHP_EOL;
-    for ($i = 0; $i < $tot; $i++) {
-      if ($this->covers($data,  $i)) {
-        // echo "covered: [$i] " . $data->inst_toString($i) . PHP_EOL;
-        // Covered by antecedents
-        // $covered += 1;
-        $coveredWeight += $data->inst_weight($i);
-        if ($data->inst_classValue($i) == $this->consequent) {
-          // True positive for the rule
-          // $tp += 1;
-          $tpWeight += $data->inst_weight($i);
-        }
-      }
-      if ($data->inst_classValue($i) == $this->consequent) {
-        // Same consequent
-        $totConsWeight += $data->inst_weight($i);
-      }
-    }
-    
-    $support      = safe_div($coveredWeight, $totWeight);
-    $confidence   = safe_div(safe_div($tpWeight, $totWeight), $support);
-    $supportCons  = safe_div($totConsWeight, $totWeight);
-    $lift         = safe_div($confidence, $supportCons);
-    $conviction   = safe_div((1-$support), (1-$confidence));
-
-    if (DEBUGMODE) echo "\$support    : $support    " . PHP_EOL;
-    if (DEBUGMODE) echo "\$confidence : $confidence " . PHP_EOL;
-    if (DEBUGMODE) echo "\$lift       : $lift       " . PHP_EOL;
-    if (DEBUGMODE) echo "\$conviction : $conviction " . PHP_EOL;
-    return [$support, $confidence, $lift, $conviction];
   }
 
 

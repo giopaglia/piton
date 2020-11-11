@@ -128,7 +128,9 @@ class RuleBasedModel extends DiscriminativeModel {
   }
 
   /* Perform prediction onto some data. */
-  function predict(Instances $testData, bool $useClassIndices = false) : array {
+  function predict(Instances $testData, bool $useClassIndices = false
+    , bool $returnPerRuleMeasures = false
+  ) : array {
     if (DEBUGMODE > 2) echo "RuleBasedModel->predict(" . $testData->toString(true) . ")" . PHP_EOL;
 
     if (!(is_array($this->rules)))
@@ -138,13 +140,13 @@ class RuleBasedModel extends DiscriminativeModel {
       die_error("Can't use empty set of rules in rule-based model.");
 
     /* Extract the data in the same form that was seen during training */
-    $testData = clone $testData;
+    $allTestData = clone $testData;
     if ($this->attributes !== NULL) {
-      // $testData->sortAttrsAs($this->attributes);
-      $testData->sortAttrsAs($this->attributes, true);
-
+      // $allTestData->sortAttrsAs($this->attributes);
+      $allTestData->sortAttrsAs($this->attributes, true);
+      
       /* Predict */
-      $classAttr = $testData->getClassAttribute();
+      $classAttr = $allTestData->getClassAttribute();
       $predictions = [];
       if (DEBUGMODE > 1) {
         echo "rules:\n";
@@ -153,32 +155,77 @@ class RuleBasedModel extends DiscriminativeModel {
           echo "\n";
         }
       }
+      // if ($returnRuleCovering) {
+      //   $rules_covering = array_fill(0,count($this->getRules()),0);
+      //   $rules_hitting = array_fill(0,count($this->getRules()),0);
+      // }
+
       if (DEBUGMODE > 1) echo "testing:\n";
-      for ($x = 0; $x < $testData->numInstances(); $x++) {
+      for ($x = 0; $x < $allTestData->numInstances(); $x++) {
         if (DEBUGMODE > 1) echo "[$x] : ";
-        if (DEBUGMODE & DEBUGMODE_DATA) echo $testData->inst_toString($x);
+        if (DEBUGMODE & DEBUGMODE_DATA) echo $allTestData->inst_toString($x);
+        $prediction = NULL;
         foreach ($this->rules as $r => $rule) {
-          if ($rule->covers($testData, $x)) {
+          if ($rule->covers($allTestData, $x)) {
             if (DEBUGMODE > 1) echo " R$r";
             $idx = $rule->getConsequent();
+            // if ($returnRuleCovering) {
+            //   $rules_covering[$r]++;
+            //   if ($returnRuleCovering) {
+            //     $rules_hitting[$r]++;
+            //   }
+            // }
             if (DEBUGMODE > 1) echo " -> $idx";
-            $predictions[] = ($useClassIndices ? $idx : $classAttr->reprVal($idx));
+            $prediction = ($useClassIndices ? $idx : $classAttr->reprVal($idx));
             break;
           }
         }
+        $predictions[] = $prediction;
         if (DEBUGMODE > 1) echo "\n";
+      }
+
+      if ($returnPerRuleMeasures) {
+        $curTestData = clone $allTestData;
+        $rules_measures = [];
+        foreach ($this->getRules() as $r => $rule) {
+          
+          $fullRuleMeasures = $rule->computeMeasures($curTestData, true);
+          $curTestData = $fullRuleMeasures["filteredData"];
+          // echo "<pre>" . $curTestData->toString() . "</pre>" . PHP_EOL;
+
+          $subRuleMeasures = $rule->computeMeasures($allTestData);
+
+          $rules_measures[$r] = [
+            "rule"            => $rule->toString(),
+            "subCovered"      => $subRuleMeasures["covered"],
+            "subSupport"      => $subRuleMeasures["support"],
+            "subConfidence"   => $subRuleMeasures["confidence"],
+            "subLift"         => $subRuleMeasures["lift"],
+            "subConviction"   => $subRuleMeasures["conviction"],
+            "covered"         => $fullRuleMeasures["covered"],
+            "support"         => $fullRuleMeasures["support"],
+            "confidence"      => $fullRuleMeasures["confidence"],
+            "lift"            => $fullRuleMeasures["lift"],
+            "conviction"      => $fullRuleMeasures["conviction"],
+          ];
+        }
       }
     }
     else {
       die_error("RuleBasedModel needs attributesSet for predict().");
     }
 
-    if (count($predictions) != $testData->numInstances()) {
-      die_error("Couldn't perform predictions for some instances (" .
-        count($predictions) . "/" . $testData->numInstances() . " performed)");
+    $null_predictions = count(array_filter($predictions, function ($v) { return $v !== NULL; }));
+    if ($null_predictions != $allTestData->numInstances()) {
+      warn("Couldn't perform predictions for some instances (# predictions: " .
+        $null_predictions . "/" . $allTestData->numInstances() . ")");
     }
     
-    return $predictions;
+    if($returnPerRuleMeasures) {
+      return [$predictions, $rules_measures];
+    } else {
+      return $predictions;
+    }
   }
 
   /* Save model to file */
@@ -220,7 +267,7 @@ class RuleBasedModel extends DiscriminativeModel {
   }
 
   // Test a model TODO explain
-  function test(Instances $testData) : array {
+  function test(Instances $testData, bool $testRuleByRule = false) : array {
     if (DEBUGMODE)
       echo "RuleBasedModel->test(" . $testData->toString(true) . ")" . PHP_EOL;
 
@@ -230,21 +277,25 @@ class RuleBasedModel extends DiscriminativeModel {
     $ground_truths = [];
     
     for ($x = 0; $x < $testData->numInstances(); $x++) {
-      // $ground_truths[] = $testData->inst_classValue($x);
-      $ground_truths[] = $domain[$testData->inst_classValue($x)];
+      $ground_truths[] = $testData->inst_classValue($x);
+      // $ground_truths[] = $domain[$testData->inst_classValue($x)];
     }
 
     // $testData->dropOutputAttr();
     // $predictions = $this->predict($testData, true);
-    $predictions = $this->predict($testData, false);
-    
+    if ($testRuleByRule) {
+      list($predictions, $rules_measures) = $this->predict($testData, true, $testRuleByRule);
+    } else {
+      $predictions = $this->predict($testData, true, $testRuleByRule);
+    }
+
     // echo "\$ground_truths : " . get_var_dump($ground_truths) . PHP_EOL;
     // echo "\$predictions : " . get_var_dump($predictions) . PHP_EOL;
     if (DEBUGMODE > 1) {
-      echo "ground_truths,predictions:" . PHP_EOL;
-      foreach ($ground_truths as $i => $val) {
-        echo "[" . $val . "," . $predictions[$i] . "]" . PHP_EOL;
-      }
+      // echo "ground_truths,predictions:" . PHP_EOL;
+      // foreach ($ground_truths as $i => $val) {
+      //   echo "[" . $val . "," . $predictions[$i] . "]" . PHP_EOL;
+      // }
     }
 
     // For the binary case, one measure for YES class is enough
@@ -265,7 +316,173 @@ class RuleBasedModel extends DiscriminativeModel {
     foreach ($domain as $classId => $className) {
       $measures[$classId] = $this->computeMeasures($ground_truths, $predictions, $classId);
     }
-    return $measures;
+
+    if ($testRuleByRule) {
+      return ["rules_measures" => $rules_measures, "measures" => $measures, "totTest" => $testData->numInstances()];
+    } else {
+      return $measures;
+    }
+  }
+
+  static function HTMLShowTestResults (array $testResults) : string {
+    $measures = NULL;
+    $rules_measures = NULL;
+    if (isset($testResults["measures"]) && isset($testResults["rules_measures"])) {
+      $measures = $testResults["measures"];
+      $rules_measures = $testResults["rules_measures"];
+    } else {
+      $measures = $testResults;
+      $rules_measures = NULL;
+    }
+
+    $out = "";
+    $out .= "<br><br>";
+
+    if (isset($rules_measures)) {
+      $out .= "Local measurements:<br>";
+      $out .= "<table class='blueTable' style='border-collapse: collapse; ' border='1'>";
+      $out .= "<thead>";
+      $out .= "<tr>";
+      $out .= "<th>#</th>
+<th>rule</th>
+<th colspan='5'>full rule</th>
+<th colspan='5'>sub rule (no model context)</th>
+";
+      $out .= "</tr>";
+      $out .= "<tr>";
+      $out .= "<th>#</th>
+<th>rule</th>
+<th colspan='2'>support</th>
+<th>confidence</th>
+<th>lift</th>
+<th>conviction</th>
+<th colspan='2'>support</th>
+<th>confidence</th>
+<th>lift</th>
+<th>conviction</th>";
+      $out .= "</tr>";
+      $out .= "</thead>";
+      $out .= "<tbody>";
+      foreach ($rules_measures as $r => $rules_measure) {
+        $out .= "<tr>";
+        $out .= "<td>" . $r . "</td>";
+        $out .= "<td>" . $rules_measure["rule"] . "</td>";
+        $out .= "<td>" . number_format($rules_measure["covered"]/$testResults["totTest"], 3) . "</td><td>" . $rules_measure["covered"] . "</td>";
+        $out .= "<td>" . number_format($rules_measure["confidence"], 3) . "</td>";
+        // $out .= "<td>" . number_format($rules_measure["support"]*100, 2) . "%</td>";
+        // $out .= "<td>" . number_format($rules_measure["confidence"]*100, 2) . "%</td>";
+        $out .= "<td>" . number_format($rules_measure["lift"], 3) . "</td>";
+        $out .= "<td>" . number_format($rules_measure["conviction"], 3) . "</td>";
+        $out .= "<td>" . number_format($rules_measure["subSupport"], 3) . "</td><td>" . $rules_measure["subCovered"] . "</td>";
+        $out .= "<td>" . number_format($rules_measure["subConfidence"], 3) . "</td>";
+        // $out .= "<td>" . number_format($rules_measure["subSupport"]*100, 2) . "%</td>";
+        // $out .= "<td>" . number_format($rules_measure["subConfidence"]*100, 2) . "%</td>";
+        $out .= "<td>" . number_format($rules_measure["subLift"], 3) . "</td>";
+        $out .= "<td>" . number_format($rules_measure["subConviction"], 3) . "</td>";
+        $out .= "</tr>";
+      }
+      $out .= "</tbody>";
+      $out .= "</table>";
+    }
+
+    if (isset($measures)) {
+      $out .= "Global measurements:<br>";
+      $out .= "<table class='blueTable' style='border-collapse: collapse; ' border='1'>";
+      $out .= "<thead>";
+      $out .= "<tr>";
+      $out .= "<th>classId</th>
+<th>positives</th>
+<th>negatives</th>
+<th>TP</th>
+<th>TN</th>
+<th>FP</th>
+<th>FN</th>
+<th>accuracy</th>
+<th>sensitivity</th>
+<th>specificity</th>
+<th>PPV</th>
+<th>NPV</th>";
+      $out .= "</tr>";
+      $out .= "</thead>";
+      $out .= "<tbody>";
+      foreach ($measures as $m => $measure) {
+        $out .= "<tr>";
+        $out .= "<td>" . $m . "</td>";
+        $out .= "<td>" . ($measure[0]) . "</td>";
+        $out .= "<td>" . ($measure[1]) . "</td>";
+        $out .= "<td>" . ($measure[2]) . "</td>";
+        $out .= "<td>" . ($measure[3]) . "</td>";
+        $out .= "<td>" . ($measure[4]) . "</td>";
+        $out .= "<td>" . ($measure[5]) . "</td>";
+        $out .= "<td>" . number_format($measure[6], 2) . "</td>";
+        $out .= "<td>" . number_format($measure[7], 2) . "</td>";
+        $out .= "<td>" . number_format($measure[8], 2) . "</td>";
+        $out .= "<td>" . number_format($measure[9], 2) . "</td>";
+        $out .= "<td>" . number_format($measure[10], 2) . "</td>";
+        $out .= "</tr>";
+      }
+      $out .= "</tbody>";
+      $out .= "</table>";
+      
+    }
+    $out .= "<style>table.blueTable {
+  border: 1px solid #1C6EA4;
+  background-color: #EEEEEE;
+  width: 100%;
+  text-align: left;
+  border-collapse: collapse;
+}
+table.blueTable td, table.blueTable th {
+  border: 1px solid #AAAAAA;
+  padding: 3px 2px;
+}
+table.blueTable tbody td {
+  font-size: 13px;
+}
+table.blueTable tbody tr:nth-child(even) {
+  background: #D0E4F5;
+}
+table.blueTable thead {
+  background: #1C6EA4;
+  background: -moz-linear-gradient(top, #5592bb 0%, #327cad 66%, #1C6EA4 100%);
+  background: -webkit-linear-gradient(top, #5592bb 0%, #327cad 66%, #1C6EA4 100%);
+  background: linear-gradient(to bottom, #5592bb 0%, #327cad 66%, #1C6EA4 100%);
+  border-bottom: 2px solid #444444;
+}
+table.blueTable thead th {
+  font-size: 15px;
+  font-weight: bold;
+  color: #FFFFFF;
+  border-left: 2px solid #D0E4F5;
+}
+table.blueTable thead th:first-child {
+  border-left: none;
+}
+
+table.blueTable tfoot {
+  font-size: 14px;
+  font-weight: bold;
+  color: #FFFFFF;
+  background: #D0E4F5;
+  background: -moz-linear-gradient(top, #dcebf7 0%, #d4e6f6 66%, #D0E4F5 100%);
+  background: -webkit-linear-gradient(top, #dcebf7 0%, #d4e6f6 66%, #D0E4F5 100%);
+  background: linear-gradient(to bottom, #dcebf7 0%, #d4e6f6 66%, #D0E4F5 100%);
+  border-top: 2px solid #444444;
+}
+table.blueTable tfoot td {
+  font-size: 14px;
+}
+table.blueTable tfoot .links {
+  text-align: right;
+}
+table.blueTable tfoot .links a{
+  display: inline-block;
+  background: #1C6EA4;
+  color: #FFFFFF;
+  padding: 2px 8px;
+  border-radius: 5px;
+}</style>";
+    return $out;
   }
 
   function computeMeasures(array $ground_truths, array $predictions, int $classId) : array {
@@ -279,7 +496,9 @@ class RuleBasedModel extends DiscriminativeModel {
     foreach ($ground_truths as $i => $val) {
       if ($ground_truths[$i] == $classId) {
         $positives++;
-
+        if ($predictions[$i] === NULL) {
+          die_error("TODO: how to evaluate with NULL predictions?");
+        }
         if ($ground_truths[$i] == $predictions[$i]) {
           $TP++;
         } else {
@@ -288,7 +507,9 @@ class RuleBasedModel extends DiscriminativeModel {
       }
       else {
         $negatives++;
-
+        if ($predictions[$i] === NULL) {
+          die_error("TODO: how to evaluate with NULL predictions?");
+        }
         if ($ground_truths[$i] == $predictions[$i]) {
           $TN++;
         } else {
@@ -412,9 +633,13 @@ class RuleBasedModel extends DiscriminativeModel {
 
       if ($testData !== NULL) {
         $ruleMeasures = $rule->computeMeasures($testData);
-        list($support, $confidence, $lift, $conviction) = $ruleMeasures;
-        
-        $str .= "," . join(",", array_map("mysql_number", $ruleMeasures));
+        $covered    = $ruleMeasures["covered"];
+        $support    = $ruleMeasures["support"];
+        $confidence = $ruleMeasures["confidence"];
+        $lift       = $ruleMeasures["lift"];
+        $conviction = $ruleMeasures["conviction"];
+
+        $str .= "," . join(",", array_map("mysql_number", [$support, $confidence, $lift, $conviction]));
         
         $ril = $support > $rulesAffRilThesholds[0];
         $aff = $confidence > $rulesAffRilThesholds[1];
