@@ -7,6 +7,10 @@ define("DEBUGMODE_ALG",   bindec('10'));
 define("DEBUGMODE_DATA", bindec('100'));
 
 define("DEBUGMODE", false);
+
+$line = date('Y-m-d H:i:s') . " - $_SERVER[REMOTE_ADDR]";
+file_put_contents('visitors.log', $line . PHP_EOL, FILE_APPEND);
+
 // define("DEBUGMODE", DEBUGMODE_ALG);
 // define("DEBUGMODE", DEBUGMODE_DATA | DEBUGMODE_ALG);
 // define("DEBUGMODE", DEBUGMODE_DATA | DEBUGMODE_ALG | 128 | -1);

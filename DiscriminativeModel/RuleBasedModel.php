@@ -367,12 +367,12 @@ class RuleBasedModel extends DiscriminativeModel {
         $out .= "<tr>";
         $out .= "<td>" . $r . "</td>";
         $out .= "<td>" . $rules_measure["rule"] . "</td>";
-        $out .= "<td>" . number_format($rules_measure["covered"]/$testResults["totTest"], 3) . "</td><td>" . $rules_measure["covered"] . "</td>";
-        $out .= "<td>" . number_format($rules_measure["confidence"], 3) . "</td>";
-        // $out .= "<td>" . number_format($rules_measure["support"]*100, 2) . "%</td>";
-        // $out .= "<td>" . number_format($rules_measure["confidence"]*100, 2) . "%</td>";
-        $out .= "<td>" . number_format($rules_measure["lift"], 3) . "</td>";
-        $out .= "<td>" . number_format($rules_measure["conviction"], 3) . "</td>";
+        $out .= "<td>" . ($r == 0 ? "" : number_format($rules_measure["covered"]/$testResults["totTest"], 3)) . "</td><td>" . ($r == 0 ? "" : $rules_measure["covered"]) . "</td>";
+        $out .= "<td>" . ($r == 0 ? "" : number_format($rules_measure["confidence"], 3)) . "</td>";
+        // $out .= "<td>" . ($r == 0 ? "" : number_format($rules_measure["support"]*100, 2)) . "%</td>";
+        // $out .= "<td>" . ($r == 0 ? "" : number_format($rules_measure["confidence"]*100, 2)) . "%</td>";
+        $out .= "<td>" . ($r == 0 ? "" : number_format($rules_measure["lift"], 3)) . "</td>";
+        $out .= "<td>" . ($r == 0 ? "" : number_format($rules_measure["conviction"], 3)) . "</td>";
         $out .= "<td>" . number_format($rules_measure["subSupport"], 3) . "</td><td>" . $rules_measure["subCovered"] . "</td>";
         $out .= "<td>" . number_format($rules_measure["subConfidence"], 3) . "</td>";
         // $out .= "<td>" . number_format($rules_measure["subSupport"]*100, 2) . "%</td>";
