@@ -149,6 +149,7 @@ class ClassificationRule extends _Rule {
    */
   function computeMeasures(Instances &$data, bool $returnFilteredData = false) : array {
     if (DEBUGMODE > 2) echo "RipperRule->computeMeasures(&[data])" . PHP_EOL;
+    if (DEBUGMODE) echo "<pre>"        . PHP_EOL;
     
     $tot       = $data->numInstances();
     $totWeight = $data->getSumOfWeights();
@@ -171,6 +172,7 @@ class ClassificationRule extends _Rule {
     }
     // echo $this->toString() . PHP_EOL;
     for ($i = 0; $i < $tot; $i++) {
+        // echo $data->inst_toString($i) . PHP_EOL;
       if ($this->covers($data,  $i)) {
         // echo "covered: [$i] " . $data->inst_toString($i) . PHP_EOL;
         // Covered by antecedents
@@ -207,6 +209,7 @@ class ClassificationRule extends _Rule {
     if (DEBUGMODE) echo "\$confidence : $confidence " . PHP_EOL;
     if (DEBUGMODE) echo "\$lift       : $lift       " . PHP_EOL;
     if (DEBUGMODE) echo "\$conviction : $conviction " . PHP_EOL;
+    if (DEBUGMODE) echo "</pre>"        . PHP_EOL;
     $out_dict = ["covered"        => $covered,
                  "support"        => $support,
                  "confidence"     => $confidence,
@@ -278,6 +281,7 @@ class ClassificationRule extends _Rule {
     foreach ($antecedents as $a) {
       $ruleAttributes[] = $a->getAttribute();
     }
+    // echo get_arr_dump($rule);
     return [$rule, $ruleAttributes];
   }
 }
@@ -391,8 +395,8 @@ class RipperRule extends ClassificationRule {
       /* Build one condition based on all attributes not used yet */
       foreach ($growData->getAttributes(false) as $attr) {
 
-        // if (DEBUGMODE | DEBUGMODE_ALG) echo "\nAttribute '{$attr->toString()}'. (total weight = " . $growData->getSumOfWeights() . ")" . PHP_EOL;
-        if (DEBUGMODE | DEBUGMODE_ALG) {
+        // if (DEBUGMODE & DEBUGMODE_ALG) echo "\nAttribute '{$attr->toString()}'. (total weight = " . $growData->getSumOfWeights() . ")" . PHP_EOL;
+        if (DEBUGMODE & DEBUGMODE_ALG) {
           echo "\nOne condition: size = " . $growData->getSumOfWeights() . PHP_EOL;
         }
 
@@ -413,18 +417,18 @@ class RipperRule extends ClassificationRule {
               $maxCoverData = $coverData;
               $maxInfoGain  = $infoGain;
             }
-            // if (DEBUGMODE | DEBUGMODE_ALG) {
+            // if (DEBUGMODE & DEBUGMODE_ALG) {
             //   echo "Test of {" . $antd->toString()
             //     . "}:\n\tinfoGain = " . $infoGain . " | Accuracy = "
             //     . $antd->getAccuRate()*100 . "% = " . $antd->getAccu() . "/"
             //     . $antd->getCover() . " | def. accuracy: $defAcRt"
             //     . "\n\tmaxInfoGain = " . $maxInfoGain . PHP_EOL;
             // }
-            if (DEBUGMODE | DEBUGMODE_ALG) {
+            if (DEBUGMODE & DEBUGMODE_ALG) {
               "Test of \'" . $antd->toString(true)
                   . "\': infoGain = " . $infoGain . " | Accuracy = "
                   . $antd->getAccuRate() . "=" . $antd->getAccu() . "/"
-                  . $antd->getCover() . " def. accuracy: " + $defAcRt;
+                  . $antd->getCover() . " def. accuracy: " . $defAcRt;
             }
           }
         }

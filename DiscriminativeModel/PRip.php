@@ -80,7 +80,7 @@ class PRip extends Learner {
       $random_seed = make_seed();
     }
 
-    $this->debug = (DEBUGMODE | DEBUGMODE_ALG);
+    $this->debug = (DEBUGMODE & DEBUGMODE_ALG);
     $this->numOptimizations = 2;
     $this->seed = $random_seed;
     $this->numFolds = 3;

@@ -1182,8 +1182,8 @@ class DBFit {
         continue;
       }
 
-      $dataframe->save_CSV("datasets/data-" . $this->getModelName($recursionPath, NULL) . ".csv");
-      $dataframe->save_ARFF("datasets/arff/data-" . $this->getModelName($recursionPath, NULL) . ".arff");
+      $dataframe->save_CSV("datasets/data-" . $this->getModelName($recursionPath, $i_prob) . ".csv");
+      $dataframe->save_ARFF("datasets/arff/data-" . $this->getModelName($recursionPath, $i_prob) . ".arff");
 
       /* Obtain and train, test set */
       list($trainData, $testData) = $this->getDataSplit($dataframe);
@@ -1198,10 +1198,10 @@ class DBFit {
       // $testData->save_CSV("datasets/data-" . $this->getModelName($recursionPath, $i_prob) . "-TEST.csv");
       
       if ($i_prob == 0) {
-        $trainData->save_CSV("datasets/data-" . $this->getModelName($recursionPath, NULL) . "-TRAIN.csv"); // , false);
-        $testData->save_CSV("datasets/data-" . $this->getModelName($recursionPath, NULL) . "-TEST.csv"); // , false);
-        $trainData->save_ARFF("datasets/arff/data-" . $this->getModelName($recursionPath, NULL) . "-TRAIN.arff");
-        $testData->save_ARFF("datasets/arff/data-" . $this->getModelName($recursionPath, NULL) . "-TEST.arff");
+        $trainData->save_CSV("datasets/data-" . $this->getModelName($recursionPath, $i_prob) . "-TRAIN.csv"); // , false);
+        $testData->save_CSV("datasets/data-" . $this->getModelName($recursionPath, $i_prob) . "-TEST.csv"); // , false);
+        $trainData->save_ARFF("datasets/arff/data-" . $this->getModelName($recursionPath, $i_prob) . "-TRAIN.arff");
+        $testData->save_ARFF("datasets/arff/data-" . $this->getModelName($recursionPath, $i_prob) . "-TEST.arff");
       }
 
       /* Train */
@@ -1387,8 +1387,8 @@ class DBFit {
       // var_dump($model->getAttributes());
       
       /* Perform local prediction */
-      $predictedVal = $model->predict($dataframe, true);
-      $predictedVal = $predictedVal[0];
+      $predictedVals = $model->predict($dataframe, true)["predictions"];
+      $predictedVal = $predictedVals[0];
       $className = $dataframe->getClassAttribute()->reprVal($predictedVal);
       echo "Prediction: [$predictedVal] '$className' (using model '$model_name')" . PHP_EOL;
 
@@ -1952,7 +1952,7 @@ class DBFit {
       die_error("Model is not initialized");
 
     die_error("TODO check if predict still works");
-    return $model->predict($inputData);
+    return $model->predict($inputData)["predictions"];
   }
 
   /* DEBUG-ONLY - TODO remove */
