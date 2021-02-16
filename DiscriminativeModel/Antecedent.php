@@ -267,7 +267,7 @@ class DiscreteAntecedent extends _Antecedent {
     if (DEBUGMODE > 2)
       echo "reprvalue: " . get_var_dump($reprvalue) . PHP_EOL;
     
-    $ant = _Antecedent::createFromAttribute(new DiscreteAttribute($name, "parsed", [$reprvalue]));
+    $ant = _Antecedent::createFromAttribute(new DiscreteAttribute($name, "parsed", [strval($reprvalue)]));
     $ant->sign = ($sign == "=" ? 0 : 1);
     $ant->value = 0;
     

@@ -130,6 +130,7 @@ class RuleBasedModel extends DiscriminativeModel {
   /* Perform prediction onto some data. */
   function predict(Instances $testData, bool $useClassIndices = false
     , bool $returnPerRuleMeasures = false
+    , ?Array $rulesAffRilThesholds = NULL
   ) : array {
     if (DEBUGMODE > 2) echo "RuleBasedModel->predict(" . $testData->toString(true) . ")" . PHP_EOL;
 
@@ -148,6 +149,9 @@ class RuleBasedModel extends DiscriminativeModel {
       /* Predict */
       $classAttr = $allTestData->getClassAttribute();
       $predictions = [];
+      if ($rulesAffRilThesholds !== NULL) {
+        $rule_types = [];
+      }
       if (DEBUGMODE > 1) {
         echo "rules:\n";
         foreach ($this->rules as $r => $rule) {
@@ -169,6 +173,15 @@ class RuleBasedModel extends DiscriminativeModel {
           if ($rule->covers($allTestData, $x)) {
             if (DEBUGMODE > 1) echo " R$r";
             $idx = $rule->getConsequent();
+            if ($rulesAffRilThesholds !== NULL) {
+              $ruleMeasures = $rule->computeMeasures($allTestData);
+              $support    = $ruleMeasures["support"];
+              $confidence = $ruleMeasures["confidence"];
+
+              $ril = $support > $rulesAffRilThesholds[0];
+              $aff = $confidence > $rulesAffRilThesholds[1];
+              $rule_type = ($ril ? "R" : "NR") . ($aff ? "A" : "NA");
+            }
             // if ($returnRuleCovering) {
             //   $rules_covering[$r]++;
             //   if ($returnRuleCovering) {
@@ -181,6 +194,9 @@ class RuleBasedModel extends DiscriminativeModel {
           }
         }
         $predictions[] = $prediction;
+        if ($rulesAffRilThesholds !== NULL) {
+          $rule_types[] = $rule_type;
+        }
         if (DEBUGMODE > 1) echo "\n";
       }
 
@@ -221,11 +237,14 @@ class RuleBasedModel extends DiscriminativeModel {
         $null_predictions . "/" . $allTestData->numInstances() . ")");
     }
     
+    $output = ["predictions" => $predictions];
     if($returnPerRuleMeasures) {
-      return [$predictions, $rules_measures];
-    } else {
-      return $predictions;
+      $output["rules_measures"] = $rules_measures;
     }
+    if ($rulesAffRilThesholds !== NULL) {
+      $output["rule_types"] = $rule_types;
+    }
+    return $output;
   }
 
   /* Save model to file */
@@ -267,7 +286,7 @@ class RuleBasedModel extends DiscriminativeModel {
   }
 
   // Test a model TODO explain
-  function test(Instances $testData, bool $testRuleByRule = false) : array {
+  function test(Instances $testData, bool $testRuleByRule = false, ?Array $rulesAffRilThesholds = NULL) : array {
     if (DEBUGMODE)
       echo "RuleBasedModel->test(" . $testData->toString(true) . ")" . PHP_EOL;
 
@@ -283,10 +302,15 @@ class RuleBasedModel extends DiscriminativeModel {
 
     // $testData->dropOutputAttr();
     // $predictions = $this->predict($testData, true);
+    $p = $this->predict($testData, true, $testRuleByRule, $rulesAffRilThesholds);
+    $predictions = $p["predictions"];
     if ($testRuleByRule) {
-      list($predictions, $rules_measures) = $this->predict($testData, true, $testRuleByRule);
+      $rules_measures = $p["rules_measures"];
+    }
+    if ($rulesAffRilThesholds !== NULL) {
+      $rule_types = $p["rule_types"];
     } else {
-      $predictions = $this->predict($testData, true, $testRuleByRule);
+      $rule_types = NULL;
     }
 
     // echo "\$ground_truths : " . get_var_dump($ground_truths) . PHP_EOL;
@@ -314,17 +338,21 @@ class RuleBasedModel extends DiscriminativeModel {
     }
     $measures = [];
     foreach ($domain as $classId => $className) {
-      $measures[$classId] = $this->computeMeasures($ground_truths, $predictions, $classId);
+      $measures[$classId] = $this->computeMeasures($ground_truths, $predictions, $classId, $rule_types);
     }
 
     if ($testRuleByRule) {
-      return ["rules_measures" => $rules_measures, "measures" => $measures, "totTest" => $testData->numInstances()];
+      return [
+        "rules_measures" => $rules_measures,
+        "measures" => $measures,
+        "totTest" => $testData->numInstances()
+      ];
     } else {
       return $measures;
     }
   }
 
-  static function HTMLShowTestResults (array $testResults) : string {
+  static function HTMLShowTestResults(array $testResults) : string {
     $measures = NULL;
     $rules_measures = NULL;
     if (isset($testResults["measures"]) && isset($testResults["rules_measures"])) {
@@ -397,6 +425,22 @@ class RuleBasedModel extends DiscriminativeModel {
 <th>TN</th>
 <th>FP</th>
 <th>FN</th>
+<th>TP type I</th>
+<th>TN type I</th>
+<th>FP type I</th>
+<th>FN type I</th>
+<th>TP type II</th>
+<th>TN type II</th>
+<th>FP type II</th>
+<th>FN type II</th>
+<th>TP type III</th>
+<th>TN type III</th>
+<th>FP type III</th>
+<th>FN type III</th>
+<th>TP type IV</th>
+<th>TN type IV</th>
+<th>FP type IV</th>
+<th>FN type IV</th>
 <th>accuracy</th>
 <th>sensitivity</th>
 <th>specificity</th>
@@ -408,17 +452,34 @@ class RuleBasedModel extends DiscriminativeModel {
       foreach ($measures as $m => $measure) {
         $out .= "<tr>";
         $out .= "<td>" . $m . "</td>";
-        $out .= "<td>" . ($measure[0]) . "</td>";
-        $out .= "<td>" . ($measure[1]) . "</td>";
-        $out .= "<td>" . ($measure[2]) . "</td>";
-        $out .= "<td>" . ($measure[3]) . "</td>";
-        $out .= "<td>" . ($measure[4]) . "</td>";
-        $out .= "<td>" . ($measure[5]) . "</td>";
-        $out .= "<td>" . number_format($measure[6], 2) . "</td>";
-        $out .= "<td>" . number_format($measure[7], 2) . "</td>";
-        $out .= "<td>" . number_format($measure[8], 2) . "</td>";
-        $out .= "<td>" . number_format($measure[9], 2) . "</td>";
-        $out .= "<td>" . number_format($measure[10], 2) . "</td>";
+        $out .= "<td>" . ($measure["positives"]) . "</td>";
+        $out .= "<td>" . ($measure["negatives"]) . "</td>";
+        $out .= "<td>" . ($measure["TP"]) . "</td>";
+        $out .= "<td>" . ($measure["TN"]) . "</td>";
+        $out .= "<td>" . ($measure["FP"]) . "</td>";
+        $out .= "<td>" . ($measure["FN"]) . "</td>";
+        $out .= "<td>" . ($measure["TP_RA"]) . "</td>";
+        $out .= "<td>" . ($measure["TP_RNA"]) . "</td>";
+        $out .= "<td>" . ($measure["TP_NRA"]) . "</td>";
+        $out .= "<td>" . ($measure["TP_NRNA"]) . "</td>";
+        $out .= "<td>" . ($measure["TN_RA"]) . "</td>";
+        $out .= "<td>" . ($measure["TN_RNA"]) . "</td>";
+        $out .= "<td>" . ($measure["TN_NRA"]) . "</td>";
+        $out .= "<td>" . ($measure["TN_NRNA"]) . "</td>";
+        $out .= "<td>" . ($measure["FP_RA"]) . "</td>";
+        $out .= "<td>" . ($measure["FP_RNA"]) . "</td>";
+        $out .= "<td>" . ($measure["FP_NRA"]) . "</td>";
+        $out .= "<td>" . ($measure["FP_NRNA"]) . "</td>";
+        $out .= "<td>" . ($measure["FN_RA"]) . "</td>";
+        $out .= "<td>" . ($measure["FN_RNA"]) . "</td>";
+        $out .= "<td>" . ($measure["FN_NRA"]) . "</td>";
+        $out .= "<td>" . ($measure["FN_NRNA"]) . "</td>";
+
+        $out .= "<td>" . number_format($measure["accuracy"], 2) . "</td>";
+        $out .= "<td>" . number_format($measure["sensitivity"], 2) . "</td>";
+        $out .= "<td>" . number_format($measure["specificity"], 2) . "</td>";
+        $out .= "<td>" . number_format($measure["PPV"], 2) . "</td>";
+        $out .= "<td>" . number_format($measure["NPV"], 2) . "</td>";
         $out .= "</tr>";
       }
       $out .= "</tbody>";
@@ -485,13 +546,20 @@ table.blueTable tfoot .links a{
     return $out;
   }
 
-  function computeMeasures(array $ground_truths, array $predictions, int $classId) : array {
+  function computeMeasures(array $ground_truths, array $predictions, int $classId
+      , ?Array $rule_types = NULL) : array {
     $positives = 0;
     $negatives = 0;
     $TP = 0;
     $TN = 0;
     $FP = 0;
     $FN = 0;
+
+    $TP_rt = []; $TP_rt["RA"] = $TP_rt["RNA"] = $TP_rt["NRA"] = $TP_rt["NRNA"] = 0;
+    $TN_rt = []; $TN_rt["RA"] = $TN_rt["RNA"] = $TN_rt["NRA"] = $TN_rt["NRNA"] = 0;
+    $FP_rt = []; $FP_rt["RA"] = $FP_rt["RNA"] = $FP_rt["NRA"] = $FP_rt["NRNA"] = 0;
+    $FN_rt = []; $FN_rt["RA"] = $FN_rt["RNA"] = $FN_rt["NRA"] = $FN_rt["NRNA"] = 0;
+
     if (DEBUGMODE > 1) echo "\n";
     foreach ($ground_truths as $i => $val) {
       if ($ground_truths[$i] == $classId) {
@@ -501,8 +569,14 @@ table.blueTable tfoot .links a{
         }
         if ($ground_truths[$i] == $predictions[$i]) {
           $TP++;
+          if ($rule_types !== NULL) {
+            $TP_rt[$rule_types[$i]]++;
+          }
         } else {
           $FN++;
+          if ($rule_types !== NULL) {
+            $FN_rt[$rule_types[$i]]++;
+          }
         }
       }
       else {
@@ -512,8 +586,14 @@ table.blueTable tfoot .links a{
         }
         if ($ground_truths[$i] == $predictions[$i]) {
           $TN++;
+          if ($rule_types !== NULL) {
+            $TN_rt[$rule_types[$i]]++;
+          }
         } else {
           $FP++;
+          if ($rule_types !== NULL) {
+            $FP_rt[$rule_types[$i]]++;
+          }
         }
       }
     }
@@ -536,14 +616,25 @@ table.blueTable tfoot .links a{
     // if (DEBUGMODE > -1) echo "\$NPV          : $NPV " . PHP_EOL;
 
     return [
-      $positives, $negatives,
-      $TP, $TN, $FP, $FN,
-      $accuracy,
-      $sensitivity, $specificity, $PPV, $NPV];
+      "positives" => $positives,
+      "negatives" => $negatives,
+
+      "TP" => $TP, "TN" => $TN, "FP" => $FP, "FN" => $FN,
+
+      "TP_typeRA" => $TP_rt["RA"], "TP_typeRNA" => $TP_rt["RNA"], "TP_typeNRA" => $TP_rt["NRA"], "TP_typeNRNA" => $TP_rt["NRNA"],
+      "TN_typeRA" => $TN_rt["RA"], "TN_typeRNA" => $TN_rt["RNA"], "TN_typeNRA" => $TN_rt["NRA"], "TN_typeNRNA" => $TN_rt["NRNA"],
+      "FP_typeRA" => $FP_rt["RA"], "FP_typeRNA" => $FP_rt["RNA"], "FP_typeNRA" => $FP_rt["NRA"], "FP_typeNRNA" => $FP_rt["NRNA"],
+      "FN_typeRA" => $FN_rt["RA"], "FN_typeRNA" => $FN_rt["RNA"], "FN_typeNRA" => $FN_rt["NRA"], "FN_typeNRNA" => $FN_rt["NRNA"],
+
+      "accuracy" => $accuracy,
+      "sensitivity" => $sensitivity,
+      "specificity" => $specificity,
+      "PPV" => $PPV,
+      "NPV" => $NPV];
   }
 
   /* Save model to database */
-  function saveToDB(object &$db, $modelName, string $tableName, ?Instances &$testData = NULL, ?Instances &$trainData = NULL, $rulesAffRilThesholds = NULL) {
+  function saveToDB(object &$db, $modelName, string $tableName, ?Instances &$testData = NULL, ?Instances &$trainData = NULL, ?Array $rulesAffRilThesholds = NULL) {
     
     if ($rulesAffRilThesholds === NULL) {
       $rulesAffRilThesholds = [0.2, 0.7];
@@ -727,6 +818,22 @@ table.blueTable tfoot .links a{
     $sql .= ", TN DECIMAL(10,2) DEFAULT NULL";
     $sql .= ", FP DECIMAL(10,2) DEFAULT NULL";
     $sql .= ", FN DECIMAL(10,2) DEFAULT NULL";
+    $sql .= ", TP_typeRA DECIMAL(10,2) DEFAULT NULL";
+    $sql .= ", TP_typeRNA DECIMAL(10,2) DEFAULT NULL";
+    $sql .= ", TP_typeNRA DECIMAL(10,2) DEFAULT NULL";
+    $sql .= ", TP_typeNRNA DECIMAL(10,2) DEFAULT NULL";
+    $sql .= ", TN_typeRA DECIMAL(10,2) DEFAULT NULL";
+    $sql .= ", TN_typeRNA DECIMAL(10,2) DEFAULT NULL";
+    $sql .= ", TN_typeNRA DECIMAL(10,2) DEFAULT NULL";
+    $sql .= ", TN_typeNRNA DECIMAL(10,2) DEFAULT NULL";
+    $sql .= ", FP_typeRA DECIMAL(10,2) DEFAULT NULL";
+    $sql .= ", FP_typeRNA DECIMAL(10,2) DEFAULT NULL";
+    $sql .= ", FP_typeNRA DECIMAL(10,2) DEFAULT NULL";
+    $sql .= ", FP_typeNRNA DECIMAL(10,2) DEFAULT NULL";
+    $sql .= ", FN_typeRA DECIMAL(10,2) DEFAULT NULL";
+    $sql .= ", FN_typeRNA DECIMAL(10,2) DEFAULT NULL";
+    $sql .= ", FN_typeNRA DECIMAL(10,2) DEFAULT NULL";
+    $sql .= ", FN_typeNRNA DECIMAL(10,2) DEFAULT NULL";
     $sql .= ", accuracy DECIMAL(10,2) DEFAULT NULL";
     $sql .= ", sensitivity DECIMAL(10,2) DEFAULT NULL";
     $sql .= ", specificity DECIMAL(10,2) DEFAULT NULL";
@@ -838,12 +945,21 @@ end";
     $sql .= "date, modelName, tableName, classId, className";
     $sql .= ", numRulesRA, numRulesRNA, numRulesNRA, numRulesNRNA";
     if ($allData !== NULL) {
-      $sql .= ", totPositives, totNegatives";
-      $totMeasures = $this->test($allData);
+      $allColumns = ["positives" => "totPositives", "negatives" => "totNegatives"];
+      $sql .= ", " . join(", ", $allColumns);
+      $totMeasures = $this->test($allData, false, $rulesAffRilThesholds);
     }
     if ($testData !== NULL) {
-      $sql .= ", testPositives, testNegatives, TP, TN, FP, FN, accuracy, sensitivity, specificity, PPV, NPV";
-      $testMeasures = $this->test($testData);
+      $testColumns = ["positives" => "testPositives", "negatives" => "testNegatives",
+        "TP" => "TP", "TN" => "TN", "FP" => "FP", "FN" => "FN",
+        "TP_typeRA" => "TP_typeRA", "TP_typeRNA" => "TP_typeRNA", "TP_typeNRA" => "TP_typeNRA", "TP_typeNRNA" => "TP_typeNRNA",
+        "TN_typeRA" => "TN_typeRA", "TN_typeRNA" => "TN_typeRNA", "TN_typeNRA" => "TN_typeNRA", "TN_typeNRNA" => "TN_typeNRNA",
+        "FP_typeRA" => "FP_typeRA", "FP_typeRNA" => "FP_typeRNA", "FP_typeNRA" => "FP_typeNRA", "FP_typeNRNA" => "FP_typeNRNA",
+        "FN_typeRA" => "FN_typeRA", "FN_typeRNA" => "FN_typeRNA", "FN_typeNRA" => "FN_typeNRA", "FN_typeNRNA" => "FN_typeNRNA",
+        "accuracy" => "accuracy",
+        "sensitivity" => "sensitivity", "specificity" => "specificity", "PPV" => "PPV", "NPV" => "NPV"];
+      $sql .= ", " . join(", ", $testColumns);
+      $testMeasures = $this->test($testData, false, $rulesAffRilThesholds);
     }
     $sql .= ") VALUES (";
 
@@ -867,50 +983,37 @@ end";
       $valueSql .= ", " . strval($numRulesNRA);
       $valueSql .= ", " . strval($numRulesNRNA);
 
-      if ($allData !== NULL) {
-        // $valueSql .= ", " . strval($allData->numInstances());
-        list($totPositives, $totNegatives,
-          , , , ,
-          ,
-          , , , ) = $totMeasures[$classId];
-        $valueSql .= ", " . strval($totPositives);
-        $valueSql .= ", " . strval($totNegatives);
-        // $valueSql .= ", " . strval($allData->getClassShare($classId));
-      }
-      if ($testData !== NULL) {
-        $valueSql .= ", " . join(", ", array_map("mysql_number", $testMeasures[$classId])); 
-        $valuesSql[] = $valueSql;
-      }
-
       if (intval(DEBUGMODE) > -1) {
         echo "    '$className', ($classId): " . PHP_EOL;
-        if ($allData !== NULL) {
-          // echo "    totN: " . ($allData->numInstances()) . PHP_EOL;
-          echo "    totPositives: " . ($totPositives) . PHP_EOL;
-          echo "    totNegatives: " . ($totNegatives) . PHP_EOL;
-          // echo "    classShare: " . ($allData->getClassShare($classId)) . PHP_EOL;
-        }
-        if ($testData !== NULL) {
-          // echo "    testN: {$testData->numInstances()}" . PHP_EOL;
-          list($positives, $negatives,
-            $TP, $TN, $FP, $FN,
-            $accuracy,
-            $sensitivity, $specificity, $PPV, $NPV) = $testMeasures[$classId];
-          echo "    testN: " . ($positives+$negatives) . PHP_EOL;
-          echo "      positives    : $positives\n";
-          echo "      negatives    : $negatives\n";
-          echo "      TP           : $TP\n";
-          echo "      TN           : $TN\n";
-          echo "      FP           : $FP\n";
-          echo "      FN           : $FN\n";
-          echo "      accuracy     : $accuracy\n";
-          echo "      sensitivity  : $sensitivity\n";
-          echo "      specificity  : $specificity\n";
-          echo "      PPV          : $PPV\n";
-          echo "      NPV          : $NPV\n";
+      }
+
+      if ($allData !== NULL) {
+        $vals = $totMeasures[$classId];
+        $valuesArray = array_map(function($col) use ($vals) { return $vals[$col]; }, array_keys($allColumns));
+        $valueSql .= ", " . join(", ", $valuesArray);
+
+        if (intval(DEBUGMODE) > -1) {
+          foreach ($allColumns as $col => $sql_col) {
+            echo "    $sql_col: " . $vals[$col] . PHP_EOL;
+          }
         }
       }
+      if ($testData !== NULL) {
+        $vals = $testMeasures[$classId];
+        $valuesArray = array_map(function($col) use ($vals) { return $vals[$col]; }, array_keys($testColumns));
+
+        $valueSql .= ", " . join(", ", array_map("mysql_number", $valuesArray));
+
+        if (intval(DEBUGMODE) > -1) {
+          foreach ($testColumns as $col => $sql_col) {
+            echo "    $sql_col: " . $vals[$col] . PHP_EOL;
+          }
+        }
+      }
+      $valuesSql[] = $valueSql;
+      // die_error("stop.");
     }
+
     $sql .= join("), (", $valuesSql) . ")";
 
     // echo "SQL: $sql" . PHP_EOL;

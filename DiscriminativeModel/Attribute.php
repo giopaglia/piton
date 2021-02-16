@@ -41,27 +41,34 @@ abstract class Attribute {
   , "real"     => "float"
   ];
 
-  static function createFromARFF(string $line) : Attribute {
+  static function createFromARFF(string $line, string $csv_delimiter = "'") : Attribute {
     if (DEBUGMODE > 2) echo "$line" . PHP_EOL;
     
-    $wordChars = "\wA-Za-zÀ-ÖØ-öø-ÿ’";
-    if (preg_match("/@attribute\s+'/", $line)) {
-      $regExp =  "/@attribute\s+'([\s$wordChars]+)'\s+(.*)/";
-    } else if (preg_match("/@attribute\s+\"/", $line)) {
-      $regExp =  "/@attribute\s+\"([\s$wordChars]+)\"\s+(.*)/";
+    $wordChars = "\wA-Za-zÀ-ÖØ-öø-ÿ\/()-’";
+    if (preg_match("/@attribute\s+'/i", $line)) {
+      $regExp =  "/@attribute\s+'([\s$wordChars]+)'\s+(.*)/i";
+    } else if (preg_match("/@attribute\s+\"/i", $line)) {
+      # $regExp =  "/@attribute\s+\"([\s$wordChars]+)\"\s+(.*)/i";
+      # https://stackoverflow.com/a/5696141/5646732
+      // $regExp =  "/@attribute\s+\"(" . '[^"\\\\]*(?:\\\\.[^"\\\\]*)*' . ")\"\s+(.*)/i";
+      $regExp =  "/@attribute\s+\"(" . '[^"\\\\]*(?:\\\\.[^"\\\\]+)*' . ")\"\s+(.*)/i";
     } else {
-      $regExp =  "/@attribute\s+([$wordChars]+)\s+(.*)/";
+      $regExp =  "/@attribute\s+([$wordChars]+)\s+(.*)/i";
     }
 
     preg_match($regExp, $line, $matches);
     # preg_match("/@attribute\s+([\S_]+|)\s+(.*)/", $line, $matches);
+    if (count($matches) < 2) {
+      die_error("Malformed ARFF attribute line:" . PHP_EOL . $line . PHP_EOL . $regExp);
+    }
+
     $name = $matches[1];
     $type = $matches[2];
-    if (DEBUGMODE > 2) echo "$name" . PHP_EOL;
-    if (DEBUGMODE > 2) echo "$type" . PHP_EOL;
+    if (DEBUGMODE > 2) echo "name: $name" . PHP_EOL;
+    if (DEBUGMODE > 2) echo "type: $type" . PHP_EOL;
     switch (true) {
       case preg_match("/\{\s*(.*)\s*\}/", $type, $domain_str):
-        $domain_arr = array_map("trim",  array_map("trim", str_getcsv($domain_str[1], ",", "'")));
+        $domain_arr = array_map("trim",  array_map("trim", str_getcsv($domain_str[1], ",", $csv_delimiter)));
         $attribute = new DiscreteAttribute($name, "enum", $domain_arr);
         break;
       case isset(self::$ARFFtype2type[$type])

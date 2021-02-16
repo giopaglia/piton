@@ -745,7 +745,7 @@ function testDiabetes() {
   }
 
   // $testData->dropOutputAttr();
-  $predictions = $model->predict($testData);
+  $predictions = $model->predict($testData)["predictions"];
 
   // echo "\$ground_truths : " . get_var_dump($ground_truths) . PHP_EOL;
   // echo "\$predictions : " . get_var_dump($predictions) . PHP_EOL;

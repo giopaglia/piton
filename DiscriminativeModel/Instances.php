@@ -31,8 +31,10 @@ class Instances {
         die_error("Malformed weights encountered when building Instances(). "
           . "Weights argument can only be an integer value or an array, but got \""
           . gettype($weights) . "\".");
+      else if(is_numeric($weights)) {
+        $weights = array_fill(0,count($data),$weights);
+      }
     }
-
     $this->setAttributes($attributes);
 
     if(!($this->getClassAttribute() instanceof DiscreteAttribute))
@@ -49,8 +51,9 @@ class Instances {
     $this->sumOfWeights = 0;
     
     foreach ($data as $k => &$inst) {
-      $w = (!is_array($weights) ? $weights : $weights[$k]);
+      $w = $weights[$k];
       $inst[] = $w;
+      // echo $w;
       $this->sumOfWeights += $w;
     }
     $this->data = $data;
@@ -93,7 +96,7 @@ class Instances {
   /**
    * Read data from file, (dense) ARFF/Weka format
    */
-  static function createFromARFF(string $path) {
+  static function createFromARFF(string $path, string $csv_delimiter = "'") {
     if (DEBUGMODE > 2) echo "Instances::createFromARFF($path)" . PHP_EOL;
     $f = fopen($path, "r");
     
@@ -101,16 +104,18 @@ class Instances {
     $attributes = [];
     while(!feof($f))  {
       $line = /* mb_strtolower */ (fgets($f));
-      if (startsWith($line, "@attribute")) {
-        $attributes[] = Attribute::createFromARFF($line);
+      if (startsWith(mb_strtolower($line), "@attribute")) {
+        $attributes[] = Attribute::createFromARFF($line, $csv_delimiter);
       }
-      if (startsWith($line, "@data")) {
+      if (startsWith(mb_strtolower($line), "@data")) {
         break;
       }
     }
     $classAttr = array_pop($attributes);
     array_unshift($attributes, $classAttr);
-
+    // var_dump($attributes);
+    // die_error("TODO");
+    
     // echo get_var_dump($classAttr);
     /* Print the internal representation given the ARFF value read */
     $getVal = function ($ARFFVal, Attribute $attr) {
@@ -128,11 +133,11 @@ class Instances {
     $i = 0;
     while(!feof($f) && $line = /* mb_strtolower */ (fgets($f)))  {
       // echo $i;
-      $row = str_getcsv($line, ",", "'");
+      $row = str_getcsv($line, ",", $csv_delimiter);
 
       if (count($row) == count($attributes) + 1) {  
-        preg_match("/\{\s*(.*)\s*\}/", $row[array_key_last($row)], $w);
-        $weights[] = $w;
+        preg_match("/\s*\{\s*([\d\.]+)\s*\}\s*/", $row[array_key_last($row)], $w);
+        $weights[] = floatval($w[1]);
         array_splice($row, array_key_last($row), 1);
       } else if (count($row) != count($attributes)) {
         die_error("ARFF data wrongfully encoded. Found data row [$i] with " . 
@@ -145,6 +150,7 @@ class Instances {
       $data[] = array_map($getVal, $row, $attributes);
       $i++;
     }
+    // var_dump($data);
 
     if (!count($weights)) {
       $weights = 1;
@@ -291,7 +297,8 @@ class Instances {
   }
   function isWeighted() : bool {
     foreach ($this->weightsGenerator() as $weight) {
-      if ($weight !== 1) {
+      if ($weight != 1) {
+        // echo $weight;
         return true;
       }
     }
@@ -437,10 +444,29 @@ class Instances {
       $copyMap[] = [$oldAttribute, $newAttribute];
     }
 
-    if (DEBUGMODE > 2) echo "copyMap" . PHP_EOL . get_var_dump($copyMap);
+    if (DEBUGMODE > 2) {
+      echo "<pre>" . PHP_EOL;
+      echo "copyMap:" . PHP_EOL;
+      foreach ($copyMap as $i => $oldAndNewAttr) {
+        $oldAttr = $oldAndNewAttr[0];
+        $newAttr = $oldAndNewAttr[1];
+        echo "[" . $oldAttr->getIndex() . "] " . $oldAttr->toString() . PHP_EOL;
+        echo "[" . $newAttr->getIndex() . "] " . $newAttr->toString() . PHP_EOL . PHP_EOL;
+      }
+      echo "</pre>" . PHP_EOL;
+    }
+
+
+    // echo "<pre>";
+    //   echo $this->toString(false);
+    // echo "</pre>";
 
     $newData = [];
     foreach ($this->rowGenerator() as $row) {
+
+      // echo "<pre>";
+      //   echo toString($row) . PHP_EOL;
+      // echo "</pre>";
       $newRow = [];
       foreach ($copyMap as $i => $oldAndNewAttr) {
         $oldAttr = $oldAndNewAttr[0];
@@ -459,8 +485,13 @@ class Instances {
         }
       }
       $newRow[] = $this->getRowWeight($row);
+      
+      // echo "<pre>";
+      //   echo toString($newRow) . PHP_EOL;
+      // echo "</pre>";
       $newData[] = $newRow;
     }
+    
 
     // if(count($attributes) && !$allowDataLoss) { doesn't work without that unset
     //   warn("Some attributes were not requested in the new attribute set"
@@ -474,6 +505,10 @@ class Instances {
       echo $this;
       // $this->checkIntegrity();
     }
+
+    // echo "<pre>";
+    //   echo $this->toString(false);
+    // echo "</pre>";
 
     return $sameAttributes;
   }
@@ -577,7 +612,7 @@ class Instances {
 
   /* Perform prediction onto some data. */
   function appendPredictions(DiscriminativeModel $model) {
-    $new_col = $model->predict($this, true);
+    $new_col = $model->predict($this, true)["predictions"];
     $newAttr = clone $this->getClassAttribute();
     $newAttr->setName($newAttr->getName() . "_" // . $model->getName()
      . "predictions");
@@ -594,28 +629,34 @@ class Instances {
     depostfixify($relName, ".arff");
     // die_error("TODO: save_ARFF is experimental and has to be tested.");
     $f = fopen($path, "w");
-    fwrite($f, "% Generated with \"" . PACKAGE_NAME . "\"\n");
+    fwrite($f, "% Generated with " . PACKAGE_NAME . "\n");
     fwrite($f, "\n");
-    fwrite($f, "@RELATION " . basename($relName) . "\n\n");
+    fwrite($f, "@RELATION '" . addcslashes(basename($relName), "'") . "'\n\n");
 
     // Move output attribute from first to last position
-    $attributes = array_push($numbers, array_shift($this->getAttributes()));
+    $attributes = $this->getAttributes();
+    $classAttr = array_shift($attributes);
+    array_push($attributes, $classAttr);
 
     /* Attributes */
     foreach ($attributes as $attr) {
-      fwrite($f, "@ATTRIBUTE \"" . addcslashes($attr->getName(), "\"") . "\" {$attr->getARFFType()}");
+      fwrite($f, "@ATTRIBUTE '" . addcslashes($attr->getName(), "'") . "' {$attr->getARFFType()}");
       fwrite($f, "\n");
     }
     
     /* Print the ARFF representation of a value of the attribute */
     $getARFFRepr = function ($val, Attribute $attr) {
-      return $val === NULL ? "?" : ($attr instanceof DiscreteAttribute ? "\"" . addcslashes($attr->reprVal($val), "\"") . "\"" : $attr->reprVal($val));
+      return $val === NULL ? "?" : ($attr instanceof DiscreteAttribute ? "'" . addcslashes($attr->reprVal($val), "'") . "'" : $attr->reprVal($val));
     };
     
     /* Data */
     fwrite($f, "\n@DATA\n");
     foreach ($this->data as $k => $row) {
-      fwrite($f, join(",", array_map($getARFFRepr, $this->getInstance($k), $attributes)) . ", {" . $this->inst_weight($k) . "}\n");
+      $row_perm = array_map($getARFFRepr, $this->getInstance($k), $this->getAttributes());
+      $classVal = array_shift($row_perm);
+      array_push($row_perm, $classVal);
+
+      fwrite($f, join(",", $row_perm) . ", {" . $this->inst_weight($k) . "}\n");
     }
 
     fclose($f);

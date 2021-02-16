@@ -40,23 +40,27 @@ chdir(dirname(__FILE__));
 ini_set('xdebug.halt_level', E_WARNING|E_NOTICE|E_USER_WARNING|E_USER_NOTICE);
 ini_set('memory_limit', '1024M'); // or you could use 1G
 ini_set('max_execution_time', 3000);
-set_time_limit(3000);
+// set_time_limit(3000);
 
 include "lib.php";
 include "local-lib.php";
 
 include "DBFit.php";
 echo "<pre>";
-$data = Instances::createFromARFF("query_processato_femmine_2_NORMALOIDI_no_FRAX_bilanciato.arff");
+// $data = Instances::createFromARFF("query_processato_femmine_2_NORMALOIDI_no_FRAX_bilanciato.arff");
+// $data = Instances::createFromARFF("query_processato_femmine_2_NORMALOIDI_no_FRAX.arff");
+$data = Instances::createFromARFF("data-RaccomandazioniTerapeuticheUnitarie>TIPO.Calcio supplementazione=Calcio supplementazione_PrincipioAttivo.Calcio carbonato.arff", '"');
+
+// echo $data->toString(false);
 echo "</pre>";
 
 if (isset($_GET["rbmodel"])) {
   global $data;
   echo "<pre>";
   $a = RuleBasedModel::fromString(trim($_GET["rbmodel"])
-   . "\n() => normaloide"
+   . "\n() => NO_Calcio carbonato"
   ,
-  new DiscreteAttribute("T_score_normaloidi", "output enum", ["osteoporosi", "normaloide"]));
+  new DiscreteAttribute("PrincipioAttivo/Calcio carbonato", "output enum", ["NO_Calcio carbonato", "Calcio carbonato"]));
 
   // echo "MODEL:" . PHP_EOL . $a . PHP_EOL;
   echo "</pre>";
