@@ -341,15 +341,13 @@ class RuleBasedModel extends DiscriminativeModel {
       $measures[$classId] = $this->computeMeasures($ground_truths, $predictions, $classId, $rule_types);
     }
 
+    $outArray = ["measures" => $measures];
+
     if ($testRuleByRule) {
-      return [
-        "rules_measures" => $rules_measures,
-        "measures" => $measures,
-        "totTest" => $testData->numInstances()
-      ];
-    } else {
-      return $measures;
+      $outArray["rules_measures"] = $rules_measures;
+      $outArray["totTest"] = $testData->numInstances();
     }
+    return $outArray;
   }
 
   static function HTMLShowTestResults(array $testResults) : string {
@@ -947,7 +945,7 @@ end";
     if ($allData !== NULL) {
       $allColumns = ["positives" => "totPositives", "negatives" => "totNegatives"];
       $sql .= ", " . join(", ", $allColumns);
-      $totMeasures = $this->test($allData, false, $rulesAffRilThesholds);
+      $totMeasures = $this->test($allData, false, $rulesAffRilThesholds)["measures"];
     }
     if ($testData !== NULL) {
       $testColumns = ["positives" => "testPositives", "negatives" => "testNegatives",
@@ -959,7 +957,7 @@ end";
         "accuracy" => "accuracy",
         "sensitivity" => "sensitivity", "specificity" => "specificity", "PPV" => "PPV", "NPV" => "NPV"];
       $sql .= ", " . join(", ", $testColumns);
-      $testMeasures = $this->test($testData, false, $rulesAffRilThesholds);
+      $testMeasures = $this->test($testData, false, $rulesAffRilThesholds)["measures"];
     }
     $sql .= ") VALUES (";
 

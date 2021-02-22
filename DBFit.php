@@ -1229,7 +1229,7 @@ class DBFit {
       $model->dumpToDB($this->db, $model_id);
         // . "_" . join("", array_map([$this, "getColumnName"], ...).);
 
-      $this->models[$model_name] = clone $model;
+      $this->setModel($recursionPath, $i_prob, clone $model);
       
       /* Recursion base case */
       if ($recursionLevel+1 == count($this->outputColumns)) {
@@ -1371,11 +1371,12 @@ class DBFit {
       
       /* Retrieve model */
       $model_name = $this->getModelName($recursionPath, $i_prob);
-      if (!(isset($this->models[$model_name]))) {
+      $model = $this->getModel($recursionPath, $i_prob);
+
+      if ($model == NULL) {
         continue;
         // die_error("Model '$model_name' is not initialized");
       }
-      $model = $this->models[$model_name];
       if (!($model instanceof DiscriminativeModel)) {
         die_error("Something's off. Model '$model_name' is not a DiscriminativeModel. " . get_var_dump($model));
       }
@@ -1395,8 +1396,7 @@ class DBFit {
       /* Recursive step: recurse and predict the subtree of this predicted value */
       // TODO right now I'm not recurring when a "NO_" outcome happens. This is not supersafe, there must be a nice generalization.
       if (!startsWith($className, "NO_")) {
-        $predictions[] = [[$dataframe->getClassAttribute()->getName(), $predictedVal], $this->predictByIdentifier($idVal,
-          array_merge($recursionPath, [[$i_prob, $className]]))];
+        $predictions[] = [[$dataframe->getClassAttribute()->getName(), $predictedVal], $this->predictByIdentifier($idVal, array_merge($recursionPath, [[$i_prob, $className]]))];
         echo PHP_EOL;
       }
     }
@@ -1940,20 +1940,48 @@ class DBFit {
     return $out;
 
   }
-  /* Use the model for predicting on a set of instances */
-  function predict(Instances $inputData) : array {
-    echo "DBFit->predict(" . $inputData->toString(true) . ")" . PHP_EOL;
+  /*
+   * Use the model for predicting the output attribute on a set of instances.
+   * With multiple models, this requires a complex hierarchy of predictions and
+   *  the computation of confusion matrices at different levels
+   */
+  // function predict(Instances $inputData, array $recursionPath = []) : array {
+  //   echo "DBFit->predict(" . $inputData->toString(true) . ", " . toString($recursionPath) . ")" . PHP_EOL;
 
-    if (count($this->models) > 1) {
-      die_error("Can't use predict with multiple models. By the way, TODO this function has to go.");
-    }
-    $model = $this->models[array_key_last($this->models)];
-    if (!($model instanceof DiscriminativeModel))
-      die_error("Model is not initialized");
+  //   $recursionLevel = count($recursionPath);
 
-    die_error("TODO check if predict still works");
-    return $model->predict($inputData)["predictions"];
-  }
+  //   /* Recursion base case */
+  //   if ($recursionLevel == count($this->outputColumns)) {
+  //     echo "Prediction-time recursion stops here due to reached bottom (recursionPath = " . toString($recursionPath) . ":" . PHP_EOL;
+  //     return [];
+  //   }
+
+  //   &$this->outputColumns[$recursionLevel];
+  //   $this->getColumnAttributes($outputColumn, $recursionPath)
+    
+  //   foreach ($this->generateDataframes($rawDataframe) as $i_prob => $dataframe) {
+  //     echo "Problem $i_prob/" . $numDataframes . PHP_EOL;
+  //     // $outputAttribute = $outputAttributes[$i_prob];
+  //     $outputAttribute = $dataframe->getClassAttribute();
+
+  //     /* If no data available, skip training */
+  //     if (!$dataframe->numInstances()) {
+  //       echo "Skipping node due to lack of data." . PHP_EOL;
+  //       if ($recursionLevel == 0) {
+  //         die_error("Training failed! No data instance found.");
+  //       }
+  //       continue;
+  //     }
+  //   }
+
+  //   $model = $this->models...[array_key_last($this->models)];
+  //   if (!($model instanceof DiscriminativeModel)) {
+  //     die_error("Model is not initialized");
+  //   }
+
+  //   die_error("TODO check if predict still works");
+  //   return $model->predict($inputData)["predictions"];
+  // }
 
   /* DEBUG-ONLY - TODO remove */
   function test_all_capabilities() {
@@ -1965,7 +1993,7 @@ class DBFit {
     echo "updateModel took " . ($end - $start) . " seconds to complete." . PHP_EOL;
     
     echo "AVAILABLE MODELS:" . PHP_EOL;
-    var_dump($this->listAvailableModels());
+    $this->listAvailableModels();
     // TODO
     // $start = microtime(TRUE);
     // $this->model->LoadFromDB($this->db, str_replace(".", ":", $this->getOutputColumnAttributes()[0]))->getName();
@@ -1980,8 +2008,17 @@ class DBFit {
     }
   }
 
-  function listAvailableModels() {
-    return array_keys($this->models);
+  function listAvailableModels($models = NULL, $indentation = 0) {
+    if ($models == NULL) {
+      $models = $this->models;
+    }
+    foreach ($models as $i_prob => $node) {
+      // $model    = $node["model"];
+      $name     = $node["name"];
+      $children = $node["subtree"];
+      echo str_repeat("  ", $indentation) . "[$i_prob] \"$name\"" . PHP_EOL;
+      listAvailableModels($children, $indentation+1);
+    }
   }
 
   function showAvailableColumns() {
@@ -2210,6 +2247,44 @@ class DBFit {
       }
     }
     return $cols;
+  }
+
+  private function setModel(array $recursionPath, int $i_prob, DiscriminativeModel $model) {
+    $name = "";
+    $modelKeyPath = [];
+    foreach ($recursionPath as $recursionLevel => $node) {
+       $modelKeyPath[] = $node[0];
+       $modelKeyPath[] = "subtree";
+      // $className = $node[1];
+      // $this->getColumnAttributes($this->outputColumns[$recursionLevel], array_slice($recursionPath, 0, $recursionLevel))[$node[0]]->getName()
+      // $node[1]
+    }
+    $modelKeyPath[] = $i_prob;
+
+    $recursionLevel = count($recursionPath);
+    $name .= $this->getColumnAttributes($this->outputColumns[$recursionLevel], $recursionPath)[$i_prob]->getName();
+    
+    $node = [
+      "name" => $name,
+      "model" => $model,
+      "subtree" => []
+    ];
+    arr_set_value($this->models, $modelKeyPath, $node);
+
+    echo "setModel(" . toString($recursionPath) . ")";
+    echo get_var_dump($this->models);
+  }
+
+  private function getModel(array $recursionPath, int $i_prob) : DiscriminativeModel {
+    $modelKeyPath = [];
+    foreach ($recursionPath as $recursionLevel => $node) {
+       $modelKeyPath[] = $node[0];
+       $modelKeyPath[] = "subtree";
+    }
+    $modelKeyPath[] = $i_prob;
+    $modelKeyPath[] = "model";
+
+    return arr_get_value($this->models, $modelKeyPath);
   }
 
 }
