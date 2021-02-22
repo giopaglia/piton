@@ -315,7 +315,7 @@ function testMed3($lr) {
   echo "updateModel took " . ($end - $start) . " seconds to complete." . PHP_EOL;
   
   echo "AVAILABLE MODELS:" . PHP_EOL;
-  var_dump($db_fit->listAvailableModels());
+  $db_fit->listAvailableModels();
 
   $db_fit->predictByIdentifier(1);
 

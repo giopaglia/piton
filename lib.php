@@ -132,6 +132,28 @@ function is_array_of_strings($arr) {
 }
 function clone_object(object $o) {return clone $o;}
 
+// Set value in multi-dimensional array
+// https://stackoverflow.com/questions/15483496/how-to-dynamically-set-value-in-multidimensional-array-by-reference
+function arr_set_value(&$arr, $keyPath, $value) {
+    $temp = &$arr;
+    foreach ( $keyPath as $key ) {
+        $temp = &$temp[$key];
+    }
+    $temp = $value;
+    // TODO use arr_get_value?
+    return $value ;
+}
+
+function arr_get_value(&$arr, $keyPath) {
+    $temp = &$arr;
+    foreach ( $keyPath as $key ) {
+        $temp = &$temp[$key];
+    }
+    $out = $temp;
+    // directly? return $temp;
+    return $out;
+}
+
 # Source: https://www.php.net/manual/en/function.array-diff.php#110572
 function array_equiv(array $A, array $B) {
   sort($A);
