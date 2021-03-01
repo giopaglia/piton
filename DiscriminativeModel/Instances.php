@@ -26,14 +26,10 @@ class Instances {
         die_error("Malformed data/weights pair encountered when building Instances(). "
         . "Need exactly " . count($data) . " weights, but "
         . count($weights) . " were found.");
-    } else {
-      if(!(is_int($weights)))
+    } else if(!(is_int($weights)) && $weights !== NULL) {
         die_error("Malformed weights encountered when building Instances(). "
-          . "Weights argument can only be an integer value or an array, but got \""
+          . "Weights argument can only be an integer value or an array (or NULL), but got \""
           . gettype($weights) . "\".");
-      else if(is_numeric($weights)) {
-        $weights = array_fill(0,count($data),$weights);
-      }
     }
     $this->setAttributes($attributes);
 
@@ -41,21 +37,43 @@ class Instances {
       die_error("Instances' class attribute (here \"{$this->getClassAttribute()->toString()}\")"
       . " can only be nominal (i.e categorical).");
 
-    foreach ($data as $i => $inst) {
-      if(!(count($this->attributes) == count($inst)))
-        die_error("Malformed data encountered when building Instances(). "
-        . "Need exactly " . count($this->attributes) . " columns, but "
-        . count($inst) . " were found (on row/inst $i).");
-    }
-
     $this->sumOfWeights = 0;
     
-    foreach ($data as $k => &$inst) {
-      $w = $weights[$k];
-      $inst[] = $w;
-      // echo $w;
-      $this->sumOfWeights += $w;
+    if ($weights !== NULL) {
+      # weights aren't included in data array
+      foreach ($data as $instance_id => $inst) {
+        if(!(count($this->attributes) == count($inst)))
+          die_error("Malformed data encountered when building Instances(). "
+          . "Need exactly " . count($this->attributes) . " columns, but "
+          . count($inst) . " were found (on row/inst $instance_id).");
+      }
+      
+      foreach ($data as $instance_id => &$inst) {
+        if (is_array($weights)) {
+          $w = $weights[$instance_id];
+        } else if(is_numeric($weights)) {
+          $w = $weights;
+        }
+        $inst[] = $w;
+        // echo $w;
+        $this->sumOfWeights += $w;
+      }
     }
+    else {
+      # weights are included in data array
+      foreach ($data as $instance_id => $inst) {
+        if(!(count($this->attributes) == count($inst)-1))
+          die_error("Malformed data encountered when building Instances(). "
+          . "Need exactly " . count($this->attributes) . " columns, but "
+          . count($inst) . " were found (on row/inst $instance_id).");
+      }
+      
+      foreach ($data as $instance_id => &$inst) {
+        $w = $inst[array_key_last($inst)];
+        $this->sumOfWeights += $w;
+      }
+    }
+
     $this->data = $data;
   }
 
@@ -64,11 +82,10 @@ class Instances {
    */
   static function createFromSlice(Instances &$insts, int $offset
     , int $length = NULL) : Instances {
-    $data = $insts->getInstances();
-    $weights = $insts->getWeights();
-    $newData = array_slice($data, $offset, $length);
-    $newWeights = array_slice($weights, $offset, $length);
-    return new Instances($insts->attributes, $newData, $newWeights);
+    $data = $insts->data;
+    $preserve_keys = true;
+    $newData = array_slice($data, $offset, $length, $preserve_keys);
+    return new Instances($insts->attributes, $newData, NULL);
   }
 
   static function createEmpty(Instances &$insts) : Instances {
@@ -100,12 +117,18 @@ class Instances {
     if (DEBUGMODE > 2) echo "Instances::createFromARFF($path)" . PHP_EOL;
     $f = fopen($path, "r");
     
+    $ID_piton_is_present = false;
     /* Attributes */
     $attributes = [];
     while(!feof($f))  {
       $line = /* mb_strtolower */ (fgets($f));
       if (startsWith(mb_strtolower($line), "@attribute")) {
-        $attributes[] = Attribute::createFromARFF($line, $csv_delimiter);
+        if (!startsWith(mb_strtolower($line), "@attribute '__ID_piton__'")) {
+          $attributes[] = Attribute::createFromARFF($line, $csv_delimiter);
+        }
+        else {
+          $ID_piton_is_present = true;
+        }
       }
       if (startsWith(mb_strtolower($line), "@data")) {
         break;
@@ -135,11 +158,18 @@ class Instances {
       // echo $i;
       $row = str_getcsv($line, ",", $csv_delimiter);
 
+      if ($ID_piton_is_present) {
+        preg_match("/\s*(\d+)\s*/", $row[array_key_first($row)], $id);
+        $instance_id = intval($id[1]);
+        array_pop($row);
+      }
+
       if (count($row) == count($attributes) + 1) {  
         preg_match("/\s*\{\s*([\d\.]+)\s*\}\s*/", $row[array_key_last($row)], $w);
+
         $weights[] = floatval($w[1]);
         array_splice($row, array_key_last($row), 1);
-      } else if (count($row) != count($attributes)) {
+      } else if (count($row) != 1 + count($attributes)) {
         die_error("ARFF data wrongfully encoded. Found data row [$i] with " . 
           count($row) . " values when there are " . count($attributes) .
           " attributes.");
@@ -147,7 +177,7 @@ class Instances {
 
       $classVal = array_pop($row);
       array_unshift($row, $classVal);
-      $data[] = array_map($getVal, $row, $attributes);
+      $data[$instance_id] = array_map($getVal, $row, $attributes);
       $i++;
     }
     // var_dump($data);
@@ -167,62 +197,64 @@ class Instances {
   function numAttributes() : int { return count($this->attributes); }
   function numInstances() : int { return count($this->data); }
 
-  function pushInstancesFrom(Instances $insts, $safety_check = false) {
+  function pushInstancesFrom(Instances $data, $safety_check = false) {
     if ($safety_check) {
-      if ($insts->sortAttrsAs($this->getAttributes(), true) == false) {
+      if ($data->sortAttrsAs($this->getAttributes(), true) == false) {
       die_error("Couldn't pushInstancesFrom, since attribute sets do not match. "
-        . $insts->toString(true) . PHP_EOL . PHP_EOL
+        . $data->toString(true) . PHP_EOL . PHP_EOL
         . $this->toString(true));
       }
     }
-    foreach ($insts->instsGenerator() as $inst) {
-      $this->pushInstance($inst);
+    foreach ($data->iterateRows() as $instance_id => $row) {
+      $this->pushInstanceFrom($data, $instance_id);
     }
   }
 
-  function rowGenerator() {
-    foreach($this->data as $row) {
-      yield $row;
+  function iterateRows() {
+    foreach($this->data as $instance_id => $row) {
+      yield $instance_id => $row;
     }
   }
 
-  function instsGenerator() {
-    foreach($this->data as $row) {
-      yield array_slice($row, 0, -1);
+  function iterateInsts() {
+    foreach($this->data as $instance_id => $row) {
+      yield $instance_id => array_slice($row, 0, -1);
     }
   }
-  function weightsGenerator() {
+  function iterateWeights() {
     $numAttrs = $this->numAttributes();
-    foreach($this->data as $row) {
-      yield $row[$numAttrs];
+    foreach($this->data as $instance_id => $row) {
+      yield $instance_id => $row[$numAttrs];
     }
   }
 
-  function _getInstance(int $i, bool $includeClassAttr) : array
+  function _getInstance(int $instance_id, bool $includeClassAttr) : array
   {
     if ($includeClassAttr) {
-      return array_slice($this->data[$i], 0, -1);
+      return array_slice($this->data[$instance_id], 0, -1);
     }
     else {
-      return array_slice($this->data[$i], 1, -1);
+      return array_slice($this->data[$instance_id], 1, -1);
     }
   }
-  function getInstance(int $i) : array { return array_slice($this->data[$i], 0, -1); }
-  function getInstances() : array {
+  function getInstance(int $instance_id) : array { return array_slice($this->data[$instance_id], 0, -1); }
+
+  private function getRow(int $instance_id) : array { return $this->data[$instance_id]; }
+  // function getInstances() : array {
     // var_dump(range(0, ($this->numInstances() > 0 ? $this->numInstances()-1 : 0)));
-    return array_map([$this, "getInstance"], 
-      ($this->numInstances() > 0 ? range(0, $this->numInstances()-1) : [])
-      );
-  }
+    // return array_map([$this, "getInstance"], 
+      // ($this->numInstances() > 0 ? $this->getIds() : [])
+      // );
+  // }
 
 
   /**
    * Functions for the single data instance
    */
   
-  function inst_valueOfAttr(int $i, Attribute $attr) {
+  function inst_valueOfAttr(int $instance_id, Attribute $attr) {
     $j = $attr->getIndex();
-    return $this->inst_val($i, $j);
+    return $this->inst_val($instance_id, $j);
   }
 
   // function inst_isMissing(int $i, Attribute $attr) : bool {
@@ -239,26 +271,30 @@ class Instances {
     }
   }
 
-  function inst_weight(int $i) : int {
-    return $this->data[$i][$this->numAttributes()];
+  function inst_weight(int $instance_id) : int {
+    return $this->data[$instance_id][$this->numAttributes()];
   }
   function getRowWeight(array $row) {
     return $row[$this->numAttributes()];
   }
   
-  function inst_classValue(int $i) : int {
+  function reprClassVal($classVal) {
+    return $this->getClassAttribute()->reprVal($classVal);
+  }
+  
+  function inst_classValue(int $instance_id) : int {
     // Note: assuming the class attribute is the first
-    return (int) $this->inst_val($i, 0);
+    return (int) $this->inst_val($instance_id, 0);
   }
 
-  function inst_setClassValue(int $i, int $cl) {
+  function inst_setClassValue(int $instance_id, int $cl) {
     // Note: assuming the class attribute is the first
-    $this->data[$i][0] = $cl;
+    $this->data[$instance_id][0] = $cl;
   }
 
-  // protected function inst_val(int $i, int $j) {
-  function inst_val(int $i, int $j) {
-    return $this->data[$i][$j];
+  // protected function inst_val(int $instance_id, int $j) {
+  function inst_val(int $instance_id, int $j) {
+    return $this->data[$instance_id][$j];
   }
   function getInstanceVal(array $inst, int $j) {
     return $inst[$j];
@@ -269,26 +305,42 @@ class Instances {
 
   function pushColumn(array $column, Attribute $attribute)
   {
-    foreach ($this->data as $i => &$inst) { 
-      array_splice($inst, 1, 0, [$column[$i]]);
+    foreach ($this->data as $instance_id => &$inst) { 
+      array_splice($inst, 1, 0, [$column[$instance_id]]);
     }
     array_splice($this->attributes, 1, 0, [$attribute]);
     $this->reindexAttributes();
   }
 
-  function pushInstance(array $inst, int $weight = 1)
+  // TODO remove pushInstance per sicurezza? No dai
+  private function pushRow(array $row, ?int $instance_id = NULL)
   {
-    if(!(count($this->attributes) == count($inst)))
+    if(!(count($this->attributes)+1 == count($row)))
       die_error("Malformed data encountered when pushing an instance to Instances() object. "
       . "Need exactly " . count($this->attributes) . " columns, but "
-      . count($inst) . " were found.");
-    $inst[]       = $weight;
-    $this->data[] = $inst;
-    $this->sumOfWeights += $weight;
+      . count($row) . " were found.");
+    if ($instance_id === NULL) {
+      // TODO test che non sia indicizzato
+      die_error("pushInstance without an instance_id is not allowed anymore.");
+      $this->data[] = $row;
+    } else {
+      if (isset($this->data[$instance_id])) {
+        die_error("instance of id $instance_id is already in Instances. " . get_var_dump($row) . PHP_EOL . get_var_dump($this->data)
+      // . PHP_EOL . get_var_dump($this)
+        );
+      }
+      $this->data[$instance_id] = $row;
+    }
+
+    $this->sumOfWeights += $this->inst_weight($instance_id);
+  }
+
+  function pushInstanceFrom(Instances $data, int $instance_id) {
+    return $this->pushRow($data->getRow($instance_id), $instance_id);
   }
 
   function getWeights() : array {
-    return array_column($this->data, $this->numAttributes());
+    return array_column_assoc($this->data, $this->numAttributes());
   }
   
   function getSumOfWeights() : int {
@@ -296,7 +348,7 @@ class Instances {
     // return array_sum($this->getWeights());
   }
   function isWeighted() : bool {
-    foreach ($this->weightsGenerator() as $weight) {
+    foreach ($this->iterateWeights() as $weight) {
       if ($weight != 1) {
         // echo $weight;
         return true;
@@ -311,7 +363,7 @@ class Instances {
   }
 
   function getClassValues() : array {
-    return array_map([$this, "inst_classValue"], range(0, $this->numInstances()-1));
+    return array_map([$this, "inst_classValue"], $this->getIds());
   }
 
   /*
@@ -334,10 +386,11 @@ class Instances {
    */
   function removeUselessInsts() {
     if (DEBUGMODE) $c = 0;
+    $instance_ids = $this->getIds();
     for ($x = $this->numInstances() - 1; $x >= 0; $x--) {
-      if ($this->inst_classValue($x) === NULL) {
-        $this->sumOfWeights -= $this->inst_weight($x);
-        array_splice($this->data, $x, 1);
+      if ($this->inst_classValue($instance_ids[$x]) === NULL) {
+        $this->sumOfWeights -= $this->inst_weight($instance_ids[$x]);
+        array_splice($this->data, $instance_ids[$x], 1);
         if (DEBUGMODE) $c++;
       }
     }
@@ -373,6 +426,10 @@ class Instances {
     $this->reindexAttributes();
   }
 
+  function getIds() : array
+  {
+    return array_keys($this->data);
+  }
   /**
    * Sort the instances by the values they hold for an attribute
    */
@@ -384,7 +441,7 @@ class Instances {
     // if (DEBUGMODE > 2) echo " => ";
     $j = $attr->getIndex();
     
-    usort($this->data, function ($a,$b) use($j) {
+    uasort($this->data, function ($a,$b) use($j) {
       $A = $a[$j];
       $B = $b[$j];
       if ($A == $B) return 0;
@@ -462,7 +519,7 @@ class Instances {
     // echo "</pre>";
 
     $newData = [];
-    foreach ($this->rowGenerator() as $row) {
+    foreach ($this->iterateRows() as $instance_id => $row) {
 
       // echo "<pre>";
       //   echo toString($row) . PHP_EOL;
@@ -489,7 +546,7 @@ class Instances {
       // echo "<pre>";
       //   echo toString($newRow) . PHP_EOL;
       // echo "</pre>";
-      $newData[] = $newRow;
+      $newData[$instance_id] = $newRow;
     }
     
 
@@ -521,7 +578,7 @@ class Instances {
     if (DEBUGMODE > 2) echo "[ Instances->randomize() ]" . PHP_EOL;
 
     // if (DEBUGMODE > 2) echo $this->toString();
-    shuffle($this->data);
+    shuffle_assoc($this->data);
     // if (DEBUGMODE > 2) echo $this->toString();
   }
 
@@ -548,9 +605,9 @@ class Instances {
     // if (DEBUGMODE > 2) echo get_var_dump($indices);
     // if (DEBUGMODE > 2) echo get_var_dump($class_map);
 
-    for ($x = 0; $x < $this->numInstances(); $x++) {
-      $cl = $this->inst_classValue($x);
-      $this->inst_setClassValue($x, $class_map[$cl]);
+    foreach ($this->iterateRows() as $instance_id => $row) {
+      $cl = $this->inst_classValue($instance_id);
+      $this->inst_setClassValue($instance_id, $class_map[$cl]);
     }
     $this->getClassAttribute()->setDomain($classes);
     if (DEBUGMODE > 2) echo get_arr_dump($this->getClassAttribute()->getDomain());
@@ -566,7 +623,7 @@ class Instances {
   function numDistinctValues(Attribute $attr) : int {
     $j = $attr->getIndex();
     $valPresence = [];
-    foreach ($this->instsGenerator() as $inst) {
+    foreach ($this->iterateInsts() as $instance_id => $inst) {
       $val = $this->getInstanceVal($inst, $j);
       if (!isset($valPresence[$val])) {
         $valPresence[$val] = 1;
@@ -596,8 +653,8 @@ class Instances {
   function getClassCounts() : array {
     $classes = $this->getClassAttribute()->getDomain();
     $class_counts = array_fill(0,count($classes),0);
-    for ($x = 0; $x < $this->numInstances(); $x++) {
-      $val = $this->inst_classValue($x);
+    foreach ($this->iterateRows() as $instance_id => $row) {
+      $val = $this->inst_classValue($instance_id);
       $class_counts[$val]++;
     }
     return $class_counts;
@@ -605,8 +662,7 @@ class Instances {
 
   function checkIntegrity() : bool {
     die_error("checkIntegrity TODO.");
-    foreach ($this->rowGenerator() as $i => $row) {
-
+    foreach ($this->iterateRows() as $i => $row) {
     }
   }
 
@@ -639,6 +695,7 @@ class Instances {
     array_push($attributes, $classAttr);
 
     /* Attributes */
+    fwrite($f, "@ATTRIBUTE '__ID_piton__' numeric");
     foreach ($attributes as $attr) {
       fwrite($f, "@ATTRIBUTE '" . addcslashes($attr->getName(), "'") . "' {$attr->getARFFType()}");
       fwrite($f, "\n");
@@ -651,12 +708,12 @@ class Instances {
     
     /* Data */
     fwrite($f, "\n@DATA\n");
-    foreach ($this->data as $k => $row) {
-      $row_perm = array_map($getARFFRepr, $this->getInstance($k), $this->getAttributes());
+    foreach ($this->iterateRows() as $instance_id => $row) {
+      $row_perm = array_map($getARFFRepr, $this->getInstance($instance_id), $this->getAttributes());
       $classVal = array_shift($row_perm);
       array_push($row_perm, $classVal);
 
-      fwrite($f, join(",", $row_perm) . ", {" . $this->inst_weight($k) . "}\n");
+      fwrite($f, "$instance_id, " . join(",", $row_perm) . ", {" . $this->inst_weight($instance_id) . "}\n");
     }
 
     fclose($f);
@@ -694,13 +751,13 @@ class Instances {
     /* Data */
     
     if(!$this->isWeighted()) {
-      foreach ($this->data as $k => $row) {
-        fputcsv($f, array_merge([$k], array_map($getCSVAttrRepr, $this->getRowInstance($row, $includeClassAttr), $attributes)));
+      foreach ($this->iterateRows() as $instance_id => $row) {
+        fputcsv($f, array_merge([$instance_id], array_map($getCSVAttrRepr, $this->getRowInstance($row, $includeClassAttr), $attributes)));
       }
     }
     else {
-      foreach ($this->data as $k => $row) {
-        fputcsv($f, array_merge([$k], array_map($getCSVAttrRepr, $this->getRowInstance($row, $includeClassAttr), $attributes), [$this->getRowWeight($row)]));
+      foreach ($this->iterateRows() as $instance_id => $row) {
+        fputcsv($f, array_merge([$instance_id], array_map($getCSVAttrRepr, $this->getRowInstance($row, $includeClassAttr), $attributes), [$this->getRowWeight($row)]));
       }
     }
 
@@ -744,7 +801,7 @@ class Instances {
     $fillNonNumWithNull($row_sum);
     $row_count = array_fill(0,count($attrs)+1,0);;
     $row_weight = array_fill(0,count($attrs)+1,0);;
-    foreach ($this->rowGenerator() as $row) {
+    foreach ($this->iterateRows() as $instance_id => $row) {
       $weight = $this->getRowWeight($row);
       foreach ($row as $i => $val) {
         if ($val !== NULL) {
@@ -784,7 +841,7 @@ class Instances {
 
     $row_stdev = array_fill(0,count($attrs)+1,0);
     $fillNonNumWithNull($row_stdev);
-    foreach ($this->rowGenerator() as $row) {
+    foreach ($this->iterateRows() as $instance_id => $row) {
       foreach ($row as $i => $val) {
         if ($row_sum[$i] !== NULL && $row_avg[$i] !== NULL && $row_avg[$i] !== NAN && $val !== NULL) {
           $row_stdev[$i] += pow(($row_avg[$i] - $val), 2);
@@ -809,20 +866,21 @@ class Instances {
   /**
    * Print a textual representation of the instances
    */
-  function inst_toString(int $i, bool $short = true) : string {
+  function inst_toString(int $instance_id, bool $short = true) : string {
     $out_str = "";
     if (!$short) {
       $out_str .= "\n";
-      $out_str .= str_repeat("======|=", $this->numAttributes()+1) . "|\n";
+      $out_str .= str_repeat("======|=", 1+$this->numAttributes()+1) . "|\n";
       $out_str .= "";
       foreach ($this->getAttributes() as $att) {
         $out_str .= substr($att->toString(), 0, 7) . "\t";
       }
       $out_str .= "weight";
       $out_str .= "\n";
-      $out_str .= str_repeat("======|=", $this->numAttributes()+1) . "|\n";
+      $out_str .= str_repeat("======|=", 1+$this->numAttributes()+1) . "|\n";
     }
-    foreach ($this->getInstance($i) as $val) {
+    $out_str .= str_pad($instance_id, 7, " ", STR_PAD_BOTH) . "\t";
+    foreach ($this->getInstance($instance_id) as $val) {
       if ($val === NULL) {
         $x = "N/A";
       }
@@ -831,10 +889,10 @@ class Instances {
       }
       $out_str .= str_pad($x, 7, " ", STR_PAD_BOTH) . "\t";
     }
-    $out_str .= "{" . $this->inst_weight($i) . "}";
+    $out_str .= "{" . $this->inst_weight($instance_id) . "}";
     if (!$short) {
       $out_str .= "\n";
-      $out_str .= str_repeat("======|=", $this->numAttributes()+1) . "|\n";
+      $out_str .= str_repeat("======|=", 1+$this->numAttributes()+1) . "|\n";
     }
     return $out_str;
   }
@@ -861,8 +919,9 @@ class Instances {
       $out_str .= "Instances{{$this->numInstances()} instances; "
         . ($this->numAttributes()-1) . "+1 attributes [" . PHP_EOL . join(";", $atts_str) . "]}";
       $out_str .= "\n";
-      $out_str .= str_repeat("======|=", count($attributes)+1) . "|\n";
+      $out_str .= str_repeat("======|=", 1+count($attributes)+1) . "|\n";
       $out_str .= "";
+      $out_str .= str_pad("ID", 7, " ", STR_PAD_BOTH) . "\t";
       foreach ($attributes as $i => $att) {
         // $out_str .= substr($att->toString(), 0, 7) . "\t";
         $out_str .= str_pad("[$i]", 7, " ", STR_PAD_BOTH) . "\t";
@@ -870,9 +929,10 @@ class Instances {
       $out_str .= "weight";
       $out_str .= "\n";
       // TODO reuse inst_toString
-      $out_str .= str_repeat("======|=", count($attributes)+1) . "|\n";
-      foreach ($this->data as $i => $row) {
-        foreach ($this->getInstance($i) as $j => $val) {
+      $out_str .= str_repeat("======|=", 1+count($attributes)+1) . "|\n";
+      foreach ($this->iterateRows() as $instance_id => $row) {
+        $out_str .= str_pad($instance_id, 7, " ", STR_PAD_BOTH) . "\t";
+        foreach ($this->getInstance($instance_id) as $j => $val) {
           if ($attributesSubset !== NULL && !in_array($j, $attributesSubset)) {
             continue;
           }
@@ -884,10 +944,10 @@ class Instances {
           }
           $out_str .= str_pad($x, 7, " ", STR_PAD_BOTH) . "\t";
         }
-        $out_str .= "{" . $this->inst_weight($i) . "}";
+        $out_str .= "{" . $this->inst_weight($instance_id) . "}";
         $out_str .= "\n";
       }
-      $out_str .= str_repeat("======|=", count($attributes)+1) . "|\n";
+      $out_str .= str_repeat("======|=", 1+count($attributes)+1) . "|\n";
     }
     return $out_str;
   }

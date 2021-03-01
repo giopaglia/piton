@@ -6,18 +6,41 @@ include "DiscriminativeModel/RuleBasedModel.php";
 include "DiscriminativeModel/PRip.php";
 
 /*
- * This class can be used to learn intelligent models from a MySQL database.
+ * This class can be used to learn intelligent classifier models from a MySQL database.
  *
- * TODO explain
+ * The class requires information on:
+ * - how to perform SQL queries;
+ * - how to transform SQL columns to tabular attributes;
+ * - how to split the data into training/testing subsets;
+ * - how to decide whether a given dataset is valid (e.g. not worth if dataset is unbalanced);
+ * - what kind of classifier models are to be trained (for now, rule-based models only);
+ *
+ * Only binary classification is contemplated here: a multi-label multi-class classification problem
+ *  with N classes is split into N binary classification problem.
  * 
- * Handles different types of attributes:
- * - numerical
- * - categorical (finite domain)
- * - dates
- * - strings
+ * One key feature of this class is the ability to handle an hierarchy of problems,
+ *  as opposed to single problems: multi-label multi-class classification problems
+ *  are first converted to binary classification problems, and whenever the portion of dataset
+ *  associated with the *positive* label is good (e.g. big and balanced enough),
+ *  this new data can be used to train a classification model for a secondary attribute.
+ * This process can be repeated ad libitum, so that in general, a hierarchy of problems
+ *  and classifiers can be considered. In order to do this, the indications for the SQL queries
+ *  must be organized by levels. In general, it is assumed that the dataset for a sub-problem i
+ *  of a problem j is very similar to that of problem j, and it only differ by additional
+ *  join operations.
+ * 
+ * A few features worthy of note:
+ * - Possibility to set an identifier column, and to perform the prediction on an existing SQL row;
+ * - The datasets and trained models are saved into different formats (as files and/or SQL tables)
+ * - Handles different types of attributes:
+ *   - numerical
+ *   - categorical (finite domain)
+ *   - dates
+ *   - strings
  * 
  */
 class DBFit {
+
   /* Database access (Object-Oriented MySQL style) */
   private $db;
 
@@ -67,7 +90,8 @@ class DBFit {
   */
   private $inputColumns;
   
-  /* Columns that are to be treated as output.
+  /*
+    Columns that are to be treated as output.
       (array of outputColumn-terms, one for each column)
 
     *
@@ -104,28 +128,45 @@ class DBFit {
   */
   private $outputColumns;
 
-  /* TODO update
-    SQL WHERE clauses for the concerning inputTables (array of strings, or single string)
+  /* SQL WHERE clauses for the concerning inputTables (array of {array of strings, or single string})
+
+    *
+    
+    The input array provides, for each recursion level, the set of where clauses (to be joined with AND's).
     For example:
-    - "patient.Age > 30"
-    - ["patient.Age > 30", "patient.Name IS NOT NULL"]
+    - [["patient.Age > 30"]]
+    - ["patient.Age > 30"]
+      -> at the first level: "...WHERE patient.Age > 30..."
+      -> at the second level: (no WHERE clause)
+    - [["patient.Age > 30", "patient.Name IS NOT NULL"], []]
+      -> at the first level: "...WHERE patient.Age > 30 AND patient.Name IS NOT NULL..."
+      -> at the second level: (no WHERE clause)
   */
   private $whereClauses;
 
-  /* TODO update
-    SQL ORDER BY clauses (array of strings, or single string)
+  /* SQL ORDER BY clauses (array of strings, or single string)
+
+    *
+
+    Differently from whereClauses, the ORDER BY clauses are fixed at all levels.
     For example:
     - [["patient.Age", "DESC"]]
+      -> "...ORDER BY patient.ID DESC..."
     - ["patient.Age", ["patient.ID", "DESC"]]
+      -> "...ORDER BY patient.Age, patient.ID DESC..."
   */
   private $OrderByClauses;
 
   /* SQL LIMIT term in the SELECT query (integer) */
-  // TODO remove? Just for debug? because note that rn we use the same value at every recursion level. Maybe we want to specify a different value for every outputLevel?
+  // This is perhaps just for debug.
+  // TODO remove this parameter? note that right now we use the same value at every recursion level. Maybe we want to specify a different value for every recursion level instead?
   private $limit;
 
-  /* An identifier column, used during sql-based prediction
-    A value for the identifier column identifies a set of data rows that are to be compressed into a single data instance before use.
+  /* An identifier column, used for
+    - sql-based prediction
+    - a correct retrieval step of prediction results
+    Furthermore, a value for the identifier column identifies a set of data rows that are to be
+      compressed into a single data instance before use. TODO explain better this important point.
   */
   private $identifierColumnName;
 
@@ -135,8 +176,16 @@ class DBFit {
   */
   private $learner;
 
-  /* Array storing all the hierarchy of discriminative models trained (or loaded) */
+  /*
+    Array storing all the hierarchy of discriminative models trained (or loaded)
+  */
   private $models;
+
+  /*
+    Array storing the prediction results for each hierarchy node
+    TODO merge with $models
+  */
+  private $predictionResults;
 
   /*
     Training mode.
@@ -147,14 +196,21 @@ class DBFit {
   private $trainingMode;
 
   /*
-    TODO explain
+    The cut off value is the value between 0 and 1 representing the minimum percentage
+    of any of the two classes (in the binary classification case) that is needed
+    for telling whether a dataset is too unbalanced to be good, or not.
   */
   private $cutOffValue;
 
   /*
-    TODO explain
+    The ID of the current run
   */
   private $experimentID;
+
+  /*
+    This array is used to tweak the (generally random) order in which the problems are discovered and solved
+  */
+  private $globalNodeOrder;
 
   /* Default options, to be set via ->setDefaultOption() */
   private $defaultOptions = [
@@ -206,10 +262,15 @@ class DBFit {
     $this->setOrderByClauses([]);
     $this->limit = NULL;
 
-    $this->models = [];
+    $this->models = [
+      "name" => "root",
+      "subtree" => []
+    ];
     $this->learner = NULL;
     $this->trainingMode = NULL;
     $this->cutOffValue = NULL;
+    $this->globalNodeOrder = [];
+    $this->predictionResults = [];
   }
 
   /** Given the path to a recursion node, read data from database, pre-process it,
@@ -232,8 +293,6 @@ class DBFit {
     
     $outputColumnName = $this->getOutputColumnNames()[$recursionLevel];
 
-    // var_dump($this->outputColumns);
-    
     // var_dump($this->outputColumns[$recursionLevel]);
     // var_dump($this->outputColumns);
     // var_dump($this->inputColumns);
@@ -289,7 +348,7 @@ class DBFit {
     /* Recompute and obtain output attributes in order to profit from attributes that are more specific to the current recursionPath. */
     $outputColumn = &$this->outputColumns[$recursionLevel];
     if ($idVal === NULL) {
-      $this->assignColumnAttributes($outputColumn, $recursionPath);
+      $this->assignColumnAttributes($outputColumn, $recursionPath, true);
     }
     $outputAttributes = $this->getColumnAttributes($outputColumn, $recursionPath);
 
@@ -363,7 +422,7 @@ class DBFit {
       /* Deflate attribute and data arrays (breaking the symmetry with columns) */
       
       $final_data = [];
-      foreach ($data as $attr_vals) {
+      foreach ($data as $instance_id => $attr_vals) {
         $row = [];
         foreach ($attr_vals as $i_col => $attr_val) {
           if ($attributes[$i_col] === NULL) {
@@ -380,7 +439,7 @@ class DBFit {
             die_error("Something's off. Invalid attr_val = " . get_var_dump($attr_val) . get_var_dump($attributes[$i_col]));
           }
         }
-        $final_data[] = $row;
+        $final_data[$instance_id] = $row;
       }
       
       $final_attributes = [];
@@ -419,11 +478,11 @@ class DBFit {
       /* Build instances for this output attribute */
       $outputAttr = clone $final_attributes[$i_prob];
       $inputAttrs = array_map("clone_object", array_slice($final_attributes, $numOutputAttributes));
-      $outputVals = array_column($final_data, $i_prob);
+      $outputVals = array_column_assoc($final_data, $i_prob);
       $attrs = array_merge([$outputAttr], $inputAttrs);
       $data = [];
-      foreach ($final_data as $i => $row) {
-        $data[] = array_merge([$outputVals[$i]], array_slice($row, $numOutputAttributes));
+      foreach ($final_data as $instance_id => $row) {
+        $data[$instance_id] = array_merge([$outputVals[$instance_id]], array_slice($row, $numOutputAttributes));
       }
 
       $dataframe = new Instances($attrs, $data);
@@ -719,13 +778,13 @@ class DBFit {
 
     // forceRecursionLevel
     $recursionLevel = $forceRecursionLevel;
-    if ($forceRecursionLevel == NULL) {
+    if ($forceRecursionLevel === NULL) {
       $recursionLevel = count($recursionPath);
     }
 
     // forceWhereClausesArr
     $whereClauses = $forceWhereClausesArr;
-    if ($forceWhereClausesArr == NULL) {
+    if ($forceWhereClausesArr === NULL) {
       $whereClauses = $this->getSQLWhereClauses($idVal, $recursionPath);
     }
 
@@ -735,7 +794,7 @@ class DBFit {
     /* SELECT ... FROM */
     $cols_str = [];
 
-    if ($outputColumn != NULL && !$distinct) {
+    if ($outputColumn !== NULL && !$distinct) {
       if ($idVal !== NULL) {
         $cols_str[] = "NULL AS " . $this->getColumnNickname($outputColumn);
       }
@@ -914,7 +973,7 @@ class DBFit {
   }
 
   /* Create and assign the corresponding attribute(s) to a given column */
-  function assignColumnAttributes(array &$column, array $recursionPath = [])
+  function assignColumnAttributes(array &$column, array $recursionPath = [], bool $isOutputAttribute = false)
   {
     /* Attribute base-name */
     $attrName = $this->getColumnAttrName($column);
@@ -943,39 +1002,47 @@ class DBFit {
           }
           $classes = array_unique($classes);
         }
+        if ($isOutputAttribute) {
+          usort($classes, [$this, "cmp_nodes"]);
+        }
+        // var_dump($classes);
 
         if (!count($classes)) {
           // warn("Couldn't apply ForceSet (depth: " . toString($depth) . ") to column " . $this->getColumnName($column) . ". No data instance found.");
           $attributes = NULL;
         }
         else {
-          if ($depth == NULL) {
+          if ($depth === NULL) {
             $depth = 0;
           }
           else if ($depth == -1) {
             $depth = count($classes) - 1;
           }
 
+          // echo "classes" . get_var_dump($classes);
           $powerClasses = powerSet($classes, false, $depth+1);
           // TODO check
-          // var_dump("powerClasses");
-          // var_dump($powerClasses);
+          // echo "powerClasses" . get_var_dump($powerClasses);
           $attributes = [];
           // if (DEBUGMODE)
           // echo "Creating attributes for power domain: \n" . get_var_dump($powerClasses) . PHP_EOL;
 
           /* Create one attribute per set */
           foreach ($powerClasses as $classSet) {
+            $cn = join(",", $classSet);
             if ($depth != 0) {
-              $className = "{" . join(",", $classSet) . "}";
+              $className = "{" . $cn . "}";
             }
             else {
-              $className = join(",", $classSet);
+              $className = $cn;
             }
-            $a = new DiscreteAttribute($attrName . "/" . $className, "bool", ["NO_" . $className, $className]);
+            // $a = new DiscreteAttribute($attrName . "/" . $className, "bool", ["NO_" . $className, $className]); TODO bring back?
+            $a = new DiscreteAttribute($className, "bool", ["NO_" . $className, $className]);
             $a->setMetadata($classSet);
             $attributes[] = $a;
           }
+          // if ($isOutputAttribute)
+          // var_dump($attributes);
         }
         break;
       /* Enum column */
@@ -1141,6 +1208,10 @@ class DBFit {
     /* Read the dataframes specific to this recursion path */
     $rawDataframe = $this->readData(NULL, $recursionPath, $numDataframes);
     
+    // if($recursionLevel === 0) {
+    //   $this->models["rawDataframe"] = $rawDataframe;
+    // }
+
     /* Check: if no data available stop recursion */
     if ($rawDataframe === NULL || !$numDataframes) {
       echo "Train-time recursion stops here due to lack of data (recursionPath = " . toString($recursionPath)
@@ -1154,6 +1225,9 @@ class DBFit {
     /* Obtain output attributes */
     // $outputAttributes = $this->getColumnAttributes($this->outputColumns[$recursionLevel], $recursionPath);
     
+    /* Prepare child recursion paths, in order to train the models in a breadth-first fashion */
+    $childPaths = [];
+
     /* For each attribute, train subtree */
     foreach ($this->generateDataframes($rawDataframe) as $i_prob => $dataframe) {
       echo "Problem $i_prob/" . $numDataframes . PHP_EOL;
@@ -1215,9 +1289,6 @@ class DBFit {
 
       // die_error(strval(DEBUGMODE) . strval(DEBUGMODE_DATA) . strval(DEBUGMODE & DEBUGMODE_DATA));
 
-      /* Test */
-      $model->test($testData);
-
       echo $model . PHP_EOL;
 
       /* Save model */
@@ -1229,10 +1300,31 @@ class DBFit {
       $model->dumpToDB($this->db, $model_id);
         // . "_" . join("", array_map([$this, "getColumnName"], ...).);
 
-      $this->setModel($recursionPath, $i_prob, clone $model);
-      
-      /* Recursion base case */
-      if ($recursionLevel+1 == count($this->outputColumns)) {
+
+      $this->setHierarchyModel($recursionPath, $i_prob, clone $model);
+      $prob_name = $this->getHierarchyName($recursionPath, $i_prob);
+      $subRecursionPath = array_merge($recursionPath, [[$i_prob, $prob_name]]);
+
+      /* Test */
+      $testResults = $model->test($testData);
+
+      if ($this->identifierColumnName !== NULL) {
+        $testResTuplesGtprrt = zip_assoc($testResults["ground_truths"], $testResults["predictions"], $testResults["rule_types"]);
+        // var_dump($testResults["rule_types"]);
+        // var_dump($testResTuplesGtprrt);
+        foreach ($testResTuplesGtprrt as $instance_id => $gtprrt) {
+          $res = [$testData->reprClassVal($gtprrt[0]), $testData->reprClassVal($gtprrt[1]), $gtprrt[2]];
+
+          $classRecursionPath = array_column($subRecursionPath, 1);
+          $classRecursionPath = array_merge($classRecursionPath, ["res"]);
+          arr_set_value($this->predictionResults, array_merge($classRecursionPath, [$instance_id]), $res, true);
+          // echo "changed" . PHP_EOL . toString($this->predictionResults) . PHP_EOL . toString(array_merge($classRecursionPath, [$instance_id])) . PHP_EOL;
+        }
+      }
+
+      /* Prepare recursion */
+      if ($recursionLevel+1 == $this->getHierarchyDepth()) {
+        /* Recursion base case */
         echo "Train-time recursion stops here (recursionPath = " . toString($recursionPath)
            . ", problem $i_prob/" . $numDataframes . ") : '$model_name'. " . PHP_EOL;
       }
@@ -1244,15 +1336,24 @@ class DBFit {
           . " with domain " . toString($outputAttribute->getDomain())
           . ". " . PHP_EOL;
         ob_flush();
+
+        // echo get_var_dump($outputAttribute->getDomain()) . PHP_EOL;
+
         foreach ($outputAttribute->getDomain() as $className) {
           // TODO right now I'm not recurring when a "NO_" outcome happens. This is not supersafe, there must be a nice generalization.
           if (!startsWith($className, "NO_")) {
             echo "Recursion on class '$className' for attribute \""
               . $outputAttribute->getName() . "\". " . PHP_EOL;
-            $this->updateModel(array_merge($recursionPath, [[$i_prob, $className]]));
+            // TODO generalize this. For each level we have a problem A, subproblems B,C,D. E dunque A/B, A/C, etc. For each subproblem we have a certain number of classes, like A/B/B, A/B/NO_B for the binary case.
+            $childPaths[] = array_merge($recursionPath, [[$i_prob, $className]]);
           }
         }
       }
+    } // END foreach
+
+    /* Recurse */
+    foreach ($childPaths as $childPath) {
+      $this->updateModel($childPath);
     }
   }
 
@@ -1301,7 +1402,7 @@ class DBFit {
     $recursionLevel = count($recursionPath);
 
     /* Recursion base case */
-    if ($recursionLevel == count($this->outputColumns)) {
+    if ($recursionLevel == $this->getHierarchyDepth()) {
       echo "Prediction-time recursion stops here due to reached bottom (recursionPath = " . toString($recursionPath) . ":" . PHP_EOL;
       return [];
     }
@@ -1371,9 +1472,9 @@ class DBFit {
       
       /* Retrieve model */
       $model_name = $this->getModelName($recursionPath, $i_prob);
-      $model = $this->getModel($recursionPath, $i_prob);
+      $model = $this->getHierarchyModel($recursionPath, $i_prob);
 
-      if ($model == NULL) {
+      if ($model === NULL) {
         continue;
         // die_error("Model '$model_name' is not initialized");
       }
@@ -1389,8 +1490,8 @@ class DBFit {
       
       /* Perform local prediction */
       $predictedVals = $model->predict($dataframe, true)["predictions"];
-      $predictedVal = $predictedVals[0];
-      $className = $dataframe->getClassAttribute()->reprVal($predictedVal);
+      $predictedVal = $predictedVals[$idVal];
+      $className = $dataframe->reprClassVal($predictedVal);
       echo "Prediction: [$predictedVal] '$className' (using model '$model_name')" . PHP_EOL;
 
       /* Recursive step: recurse and predict the subtree of this predicted value */
@@ -1834,6 +1935,10 @@ class DBFit {
     return $this;
   }
 
+  function getHierarchyDepth() : int {
+    return count($this->outputColumns);
+  }
+
   function check_columnName(string $colName) : self
   {
     if(func_num_args()>count(get_defined_vars())) trigger_error(__FUNCTION__ . " was supplied more arguments than it needed. Got the following arguments:" . PHP_EOL . toString(func_get_args()), E_USER_WARNING);
@@ -1899,7 +2004,6 @@ class DBFit {
     $column["mysql_type"] = $mysql_type;
   }
   
-
   /* TODO explain */
   function getModelName(array $recursionPath, ?int $i_prob, $short = false) : string {
 
@@ -1945,13 +2049,13 @@ class DBFit {
    * With multiple models, this requires a complex hierarchy of predictions and
    *  the computation of confusion matrices at different levels
    */
-  // function predict(Instances $inputData, array $recursionPath = []) : array {
-  //   echo "DBFit->predict(" . $inputData->toString(true) . ", " . toString($recursionPath) . ")" . PHP_EOL;
+  // function predict(array $recursionPath = []) : array {
+  //   echo "DBFit->predict(" . $testData->toString(true) . ", " . toString($recursionPath) . ")" . PHP_EOL;
 
   //   $recursionLevel = count($recursionPath);
 
   //   /* Recursion base case */
-  //   if ($recursionLevel == count($this->outputColumns)) {
+  //   if ($recursionLevel == $this->getHierarchyDepth()) {
   //     echo "Prediction-time recursion stops here due to reached bottom (recursionPath = " . toString($recursionPath) . ":" . PHP_EOL;
   //     return [];
   //   }
@@ -2008,16 +2112,18 @@ class DBFit {
     }
   }
 
-  function listAvailableModels($models = NULL, $indentation = 0) {
-    if ($models == NULL) {
-      $models = $this->models;
+  function listAvailableModels($model_tree = NULL, $indentation = 0) {
+    if ($model_tree === NULL) {
+      $model_tree = $this->models["subtree"];
     }
-    foreach ($models as $i_prob => $node) {
+    // var_dump(count($model_tree));
+    // echo "listAvailableModels(" . get_var_dump($model_tree) . ", $indentation)";
+    foreach ($model_tree as $i_prob => $node) {
       // $model    = $node["model"];
       $name     = $node["name"];
-      $children = $node["subtree"];
+      $subtree = $node["subtree"];
       echo str_repeat("  ", $indentation) . "[$i_prob] \"$name\"" . PHP_EOL;
-      listAvailableModels($children, $indentation+1);
+      $this->listAvailableModels($subtree, $indentation+1);
     }
   }
 
@@ -2051,10 +2157,10 @@ class DBFit {
     }
   }
 
-  // function getIdentifierColumnName() : string
-  // {
-  //   return $this->identifierColumnName;
-  // }
+  function getIdentifierColumnName() : string
+  {
+    return $this->identifierColumnName;
+  }
 
   function setIdentifierColumnName(?string $identifierColumnName) : self
   {
@@ -2143,6 +2249,10 @@ class DBFit {
 
   function getTrainingMode()
   {
+    if ($this->trainingMode === NULL) {
+      $this->trainingMode = $this->defaultOptions["trainingMode"];
+      echo "Training mode defaulted to " . toString($this->trainingMode);
+    }
     return $this->trainingMode;
   }
 
@@ -2186,24 +2296,69 @@ class DBFit {
     return $this;
   }
 
-
-  function &getDataSplit(Instances &$data) : array {
-    if ($this->trainingMode === NULL) {
-      $this->trainingMode = $this->defaultOptions["trainingMode"];
-      echo "Training mode defaulted to " . toString($this->trainingMode);
+  function setGlobalNodeOrder(array $globalNodeOrder) : self
+  {
+    $this->globalNodeOrder = $globalNodeOrder;
+    return $this;
+  }
+  
+  function cmp_nodes($a, $b) : int
+  {
+    $x = array_search($a, $this->globalNodeOrder);
+    $y = array_search($b, $this->globalNodeOrder);
+    if ($x === false && $y === false) {
+      warn("Nodes not found in globalNodeOrder array: " . PHP_EOL . get_var_dump($a) . PHP_EOL . get_var_dump($b) . PHP_EOL . get_var_dump($this->globalNodeOrder));
+      return 0;
     }
+    else if ($x === false) {
+      warn("Node not found in globalNodeOrder array: " . PHP_EOL . get_var_dump($a) . PHP_EOL . get_var_dump($this->globalNodeOrder));
+      return 1;
+    }
+    else if ($y === false) {
+      warn("Node not found in globalNodeOrder array: " . PHP_EOL . get_var_dump($b) . PHP_EOL . get_var_dump($this->globalNodeOrder));
+      return -1;
+    }
+    return $x-$y;
+  }
 
+  function getPredictionResults() : array
+  {
+    return $this->predictionResults;
+  }
+
+  // function setPredictionResults(array $predictionResults) : self
+  // {
+  //   $this->predictionResults = $predictionResults;
+  //   return $this;
+  // }
+
+
+  // function &getRawDataSplit(array $rawDataframe) : array {
+  //   list($final_attributes, $final_data, $outputAttributes) = $rawDataframe;
+
+  //   list($trainData, $testData) = $this->getDataSplit(...Instances($final_data));
+
+  //   $train_final_data = toarray($trainData);
+  //   $test_final_data = toarray($testData);
+    
+  //   return [
+  //           [$final_attributes, $train_final_data, $outputAttributes],
+  //           [$final_attributes, $test_final_data, $outputAttributes]
+  //         ];
+  // }
+  function &getDataSplit(Instances &$data) : array {
+    $trainingMode = $this->getTrainingMode();
     $rt = NULL;
     /* training modes */
     switch (true) {
       /* Full training: use data for both training and testing */
-      case $this->trainingMode == "FullTraining":
+      case $trainingMode == "FullTraining":
         $rt = [$data, $data];
         break;
       
       /* Train+test split */
-      case is_array($this->trainingMode):
-        $trRat = $this->trainingMode[0]/($this->trainingMode[0]+$this->trainingMode[1]);
+      case is_array($trainingMode):
+        $trRat = $trainingMode[0]/($trainingMode[0]+$trainingMode[1]);
         // $rt = Instances::partition($data, $trRat);
         $numFolds = 1/(1-$trRat);
         // echo $numFolds;
@@ -2212,7 +2367,7 @@ class DBFit {
         break;
       
       default:
-        die_error("Unknown training mode: " . toString($this->trainingMode));
+        die_error("Unknown training mode: " . toString($trainingMode));
         break;
     }
 
@@ -2249,44 +2404,87 @@ class DBFit {
     return $cols;
   }
 
-  private function setModel(array $recursionPath, int $i_prob, DiscriminativeModel $model) {
+  private function setHierarchyModel(array $recursionPath, int $i_prob, DiscriminativeModel $model) {
     $name = "";
     $modelKeyPath = [];
     foreach ($recursionPath as $recursionLevel => $node) {
-       $modelKeyPath[] = $node[0];
        $modelKeyPath[] = "subtree";
+       $modelKeyPath[] = $node[0];
       // $className = $node[1];
       // $this->getColumnAttributes($this->outputColumns[$recursionLevel], array_slice($recursionPath, 0, $recursionLevel))[$node[0]]->getName()
       // $node[1]
     }
+    $modelKeyPath[] = "subtree";
     $modelKeyPath[] = $i_prob;
 
     $recursionLevel = count($recursionPath);
     $name .= $this->getColumnAttributes($this->outputColumns[$recursionLevel], $recursionPath)[$i_prob]->getName();
     
+    $subRecursionPath = array_merge($recursionPath, [[$i_prob, $name]]);
+    
     $node = [
       "name" => $name,
       "model" => $model,
+      "recursionPath" => $subRecursionPath,
       "subtree" => []
     ];
     arr_set_value($this->models, $modelKeyPath, $node);
 
-    echo "setModel(" . toString($recursionPath) . ")";
-    echo get_var_dump($this->models);
+    echo "setHierarchyModel(" . toString($recursionPath) . ")";
+    // echo get_var_dump($this->models);
   }
 
-  private function getModel(array $recursionPath, int $i_prob) : DiscriminativeModel {
+  private function getHierarchyModel(array $recursionPath, int $i_prob) : ?DiscriminativeModel {
     $modelKeyPath = [];
     foreach ($recursionPath as $recursionLevel => $node) {
-       $modelKeyPath[] = $node[0];
-       $modelKeyPath[] = "subtree";
+      $modelKeyPath[] = "subtree";
+      $modelKeyPath[] = $node[0];
     }
+    $modelKeyPath[] = "subtree";
     $modelKeyPath[] = $i_prob;
     $modelKeyPath[] = "model";
 
-    return arr_get_value($this->models, $modelKeyPath);
+    return arr_get_value($this->models, $modelKeyPath, true);
   }
 
+  private function getHierarchyName(array $recursionPath, int $i_prob) : string {
+    $modelKeyPath = [];
+    foreach ($recursionPath as $recursionLevel => $node) {
+      $modelKeyPath[] = "subtree";
+      $modelKeyPath[] = $node[0];
+    }
+    $modelKeyPath[] = "subtree";
+    $modelKeyPath[] = $i_prob;
+    $modelKeyPath[] = "name";
+
+    return arr_get_value($this->models, $modelKeyPath, true);
+  }
+
+  function listHierarchyNodes($node = NULL, $maxdepth = -1) {
+    // echo "listHierarchyNodes(" . toString($node) . ", $maxdepth)" . PHP_EOL;
+    if ($maxdepth == 0) {
+      return [];
+    }
+    $arr = [];
+    if ($node === NULL) {
+      $node = $this->models;
+      $arr[$node["name"]] = [$node, []];
+    }
+    $childarr = [];
+
+    foreach ($node["subtree"] as $i_prob => $childnode) {
+      // $model    = $childnode["model"];
+      $name    = $childnode["name"];
+      $subtree = $childnode["subtree"];
+      $subRecursionPath = $childnode["recursionPath"];
+
+      $arr[$childnode["name"]] = [$childnode, $subRecursionPath];
+
+      $childarr = array_merge($childarr, $this->listHierarchyNodes($childnode, $maxdepth-1));
+    }
+
+    return array_merge($arr, $childarr);
+  }
 }
 
 ?>

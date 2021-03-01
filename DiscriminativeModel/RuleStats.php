@@ -286,7 +286,7 @@ class RuleStats {
     }
 
     for ($j = $index; $j < $size; $j++) {
-      $stats = array_fill(0, 6, 0.0); // 6 statistics parameters
+      $stats = array_fill(0, 6, 0.0); // 6 statistical measures
       $filtered = self::computeSimpleStats($this->ruleset[$j], $data[1], $stats, NULL);
       $this->filtered[] = $filtered;
       $this->simpleStats[] = $stats;
@@ -318,8 +318,8 @@ class RuleStats {
   //   }
 
   //   // Sort by class
-  //   for ($j = 0; $j < $data->numInstances(); $j++) {
-  //     $bagsByClasses[$data->inst_classValue($j)]->pushInstance($data->getInstance($j));
+  //   foreach ($data->iterateInsts() as $instance_id => $inst) {
+  //     $bagsByClasses[$data->inst_classValue($instance_id)]->pushInstanceFrom($data, $instance_id);
   //   }
 
   //   // Randomize each class
@@ -338,7 +338,7 @@ class RuleStats {
   //         }
   //       }
 
-  //       $data_out->pushInstance($bagsByClasses[$i_bag]->getInstance($offset));
+  //       $data_out->pushInstanceFrom($bagsByClasses[$i_bag], $offset);
   //       $offset += $numFolds;
   //     }
   //   }
@@ -369,8 +369,8 @@ class RuleStats {
     }
 
     // Sort by class
-    for ($j = 0; $j < $data->numInstances(); $j++) {
-      $bagsByClasses[$data->inst_classValue($j)]->pushInstance($data->getInstance($j));
+    foreach ($data->iterateInsts() as $instance_id => $inst) {
+      $bagsByClasses[$data->inst_classValue($instance_id)]->pushInstanceFrom($data, $instance_id);
     }
 
     // Randomize each class
@@ -501,19 +501,19 @@ class RuleStats {
     array $rules, int $index) : Instances {
     $data_out = Instances::createEmpty($data);
 
-    for ($i = 0; $i < $data->numInstances(); $i++) {
+    foreach ($data->iterateInsts() as $instance_id => $inst) {
       $covered = false;
 
       for ($j = $index + 1; $j < count($rules); $j++) {
         $rule = $rules[$j];
-        if ($rule->covers($data, $i)) {
+        if ($rule->covers($data, $instance_id)) {
           $covered = true;
           break;
         }
       }
 
       if (!$covered) {
-        $data_out->pushInstance($data->getInstance($i));
+        $data_out->pushInstanceFrom($data, $instance_id);
       }
     }
     return $data_out;
@@ -537,23 +537,23 @@ class RuleStats {
     
     $out_data = [Instances::createEmpty($data), Instances::createEmpty($data)];
 
-    for ($i = 0; $i < $data->numInstances(); $i++) {
-      $weight = $data->inst_weight($i);
-      if ($rule->covers($data, $i)) {
-        $out_data[0]->pushInstance($data->getInstance($i)); // Covered by this rule
+    foreach ($data->iterateInsts() as $instance_id => $inst) {
+      $weight = $data->inst_weight($instance_id);
+      if ($rule->covers($data, $instance_id)) {
+        $out_data[0]->pushInstanceFrom($data, $instance_id); // Covered by this rule
         $stats[0] += $weight; // Coverage
-        if ($data->inst_classValue($i) == $rule->getConsequent()) {
+        if ($data->inst_classValue($instance_id) == $rule->getConsequent()) {
           $stats[2] += $weight; // True positives
         } else {
           $stats[4] += $weight; // False positives
         }
         if ($dist !== NULL) {
-          $dist[$data->inst_classValue($i)] += $weight;
+          $dist[$data->inst_classValue($instance_id)] += $weight;
         }
       } else {
-        $out_data[1]->pushInstance($data->getInstance($i)); // Not covered by this rule
+        $out_data[1]->pushInstanceFrom($data, $instance_id); // Not covered by this rule
         $stats[1] += $weight;
-        if ($data->inst_classValue($i) != $rule->getConsequent()) {
+        if ($data->inst_classValue($instance_id) != $rule->getConsequent()) {
           $stats[3] += $weight; // True negatives
         } else {
           $stats[5] += $weight; // False negatives

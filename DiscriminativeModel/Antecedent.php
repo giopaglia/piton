@@ -184,14 +184,14 @@ class DiscreteAntecedent extends _Antecedent {
     $index = $this->attribute->getIndex();
 
     /* Split data */
-    for ($x = 0; $x < $data->numInstances(); $x++) {
+    foreach ($data->iterateInsts() as $instance_id => $inst) {
       // $val = $this->inst_valueOfAttr($data, $x);
-      $val = $data->inst_val($x, $index);
+      $val = $data->inst_val($instance_id, $index);
       if ($val !== NULL) {
-        $splitData[$val]->pushInstance($data->getInstance($x));
-        $w = $data->inst_weight($x);
+        $splitData[$val]->pushInstanceFrom($data, $instance_id);
+        $w = $data->inst_weight($instance_id);
         $coverage[$val] += $w;
-        if ($data->inst_classValue($x) == $cla) {
+        if ($data->inst_classValue($instance_id) == $cla) {
           $accurate[$val] += $w;
         }
       }
@@ -233,12 +233,12 @@ class DiscreteAntecedent extends _Antecedent {
    * @return the boolean value indicating whether the instance is covered by
    *         this antecedent
    */
-  function covers(Instances &$data, int $i) : bool {
+  function covers(Instances &$data, int $instance_id) : bool {
     $isCover = false;
 
-    // $val = $this->inst_valueOfAttr($data, $i);
+    // $val = $this->inst_valueOfAttr($data, $instance_id);
     $index = $this->attribute->getIndex();
-    $val = $data->inst_val($i, $index);
+    $val = $data->inst_val($instance_id, $index);
 
     if ($val !== NULL) {
       if (! ( $val == $this->value xor ($this->sign == 0) )) {
@@ -348,31 +348,34 @@ class ContinuousAntecedent extends _Antecedent {
     $sndAccu = 0;
 
     $data->sortByAttr($this->attribute);
-
+    $instance_ids = $data->getIds();
+    
     // Total number of instances without missing value for att
     $total = $data->numInstances();
     $index = $this->attribute->getIndex();
     
     // Find the last instance without missing value
-    for ($x = 0; $x < $data->numInstances(); $x++) {
+    $i = 0;
+    foreach ($data->iterateInsts() as $instance_id => $inst) {
       // if ($this->inst_valueOfAttr($data, $x) === NULL) {
-      if ($data->inst_val($x, $index) === NULL) {
-        $total = $x;
+      if ($data->inst_val($instance_id, $index) === NULL) {
+        $total = $i;
         break;
       }
 
-      $w = $data->inst_weight($x);
+      $w = $data->inst_weight($instance_id);
       $sndCover += $w;
-      if ($data->inst_classValue($x) == $cla) {
+      if ($data->inst_classValue($instance_id) == $cla) {
         $sndAccu += $w;
       }
+      $i++;
     }
 
     if ($total == 0) {
       return NULL; // Data all missing for the attribute
     }
     // $this->splitPoint = $this->inst_valueOfAttr($data, $total - 1);
-    $this->splitPoint = $data->inst_val($total-1, $index);
+    $this->splitPoint = $data->inst_val($instance_ids[$total-1], $index);
 
     // echo "splitPoint: " . $this->splitPoint . PHP_EOL;
     // echo "total: " . $total . PHP_EOL;
@@ -382,13 +385,13 @@ class ContinuousAntecedent extends _Antecedent {
         // Can't split within same value
           // ($this->inst_valueOfAttr($data, $split) >
           //  $this->inst_valueOfAttr($data, $prev))) {
-          ($data->inst_val($split, $index) >
-           $data->inst_val($prev, $index))) {
+          ($data->inst_val($instance_ids[$split], $index) >
+           $data->inst_val($instance_ids[$prev], $index))) {
 
         for ($y = $prev; $y < $split; $y++) {
-          $w = $data->inst_weight($y);
+          $w = $data->inst_weight($instance_ids[$y]);
           $fstCover += $w;
-          if ($data->inst_classValue($y) == $cla) {
+          if ($data->inst_classValue($instance_ids[$y]) == $cla) {
             $fstAccu += $w; // First bag positive# ++
           }
         }
@@ -436,7 +439,7 @@ class ContinuousAntecedent extends _Antecedent {
           $this->cover = $coverage;
           $this->accu = $accurate;
           // $this->splitPoint = $this->inst_valueOfAttr($data, $prev);
-          $this->splitPoint = $data->inst_val($prev, $index);
+          $this->splitPoint = $data->inst_val($instance_ids[$prev], $index);
           $finalSplit = ($isFirst) ? $split : $prev;
         }
 
@@ -449,9 +452,9 @@ class ContinuousAntecedent extends _Antecedent {
         // echo "finalSplit: "  . $finalSplit . PHP_EOL;
 
         for ($y = $prev; $y < $split; $y++) {
-          $w = $data->inst_weight($y);
+          $w = $data->inst_weight($instance_ids[$y]);
           $sndCover -= $w;
-          if ($data->inst_classValue($y) == $cla) {
+          if ($data->inst_classValue($instance_ids[$y]) == $cla) {
             $sndAccu -= $w; // Second bag positive# --
           }
         }
@@ -480,13 +483,13 @@ class ContinuousAntecedent extends _Antecedent {
    * @return the boolean value indicating whether the instance is covered by
    *         this antecedent
    */
-  function covers(Instances &$data, int $i) : bool {
+  function covers(Instances &$data, int $instance_id) : bool {
     $isCover = true;
     $index = $this->attribute->getIndex();
-    $val = $data->inst_val($i, $index);
-    // $val = $this->inst_valueOfAttr($data, $i);
+    $val = $data->inst_val($instance_id, $index);
+    // $val = $this->inst_valueOfAttr($data, $instance_id);
     // echo "covers" . PHP_EOL;
-    // echo "[$i]" . $data->inst_toString($i) . PHP_EOL;
+    // echo "[$instance_id]" . $data->inst_toString($instance_id) . PHP_EOL;
     // echo "VAL " . toString($val) . PHP_EOL;
     // echo "sign " . toString($this->value) . PHP_EOL;
     // echo "splitPoint " . toString($this->splitPoint) . PHP_EOL;
@@ -502,9 +505,8 @@ class ContinuousAntecedent extends _Antecedent {
     } else {
       $isCover = false;
     }
-    // echo "[$i]" . $data->inst_toString($i) . PHP_EOL; "antd doesn't cover: " . $this->toString()
-    //       . "[$i]" . $data->inst_toString($i) . PHP_EOL;
-        
+    // echo "[$instance_id]" . $data->inst_toString($instance_id) . PHP_EOL; "antd doesn't cover: " . $this->toString()
+    //       . "[$instance_id]" . $data->inst_toString($instance_id) . PHP_EOL;
     
     return $isCover;
   }

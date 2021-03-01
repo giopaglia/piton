@@ -134,24 +134,34 @@ function clone_object(object $o) {return clone $o;}
 
 // Set value in multi-dimensional array
 // https://stackoverflow.com/questions/15483496/how-to-dynamically-set-value-in-multidimensional-array-by-reference
-function arr_set_value(&$arr, $keyPath, $value) {
-    $temp = &$arr;
-    foreach ( $keyPath as $key ) {
-        $temp = &$temp[$key];
+function arr_set_value(&$arr, $keyPath, $value, $allowNonExistentPaths = true) {
+  $temp = &$arr;
+  foreach ( $keyPath as $key ) {
+    if ($allowNonExistentPaths && !isset($temp[$key])) {
+      $temp[$key] = [];
     }
-    $temp = $value;
-    // TODO use arr_get_value?
-    return $value ;
+    $temp = &$temp[$key];
+    // echo toString($temp) . PHP_EOL;
+  }
+  $temp = $value;
+  // if ($allowNonExistentPaths)
+  //   die_error();
+  return $temp;
 }
 
-function arr_get_value(&$arr, $keyPath) {
-    $temp = &$arr;
-    foreach ( $keyPath as $key ) {
-        $temp = &$temp[$key];
+function arr_get_value(&$arr, $keyPath, $allowNonExistentPaths = false) {
+  $temp = $arr;
+  foreach ( $keyPath as $key ) {
+    if (!$allowNonExistentPaths || isset($temp[$key])) {
+      $temp = $temp[$key];
+    } else {
+      $temp = NULL;
+      break;
     }
-    $out = $temp;
-    // directly? return $temp;
-    return $out;
+  }
+  $out = $temp;
+  // directly? return $temp;
+  return $out;
 }
 
 # Source: https://www.php.net/manual/en/function.array-diff.php#110572
@@ -166,6 +176,25 @@ function isAssoc(array $arr)
 {
   if (array() === $arr) return false;
   return array_keys($arr) !== range(0, count($arr) - 1);
+}
+
+# https://stackoverflow.com/questions/4102777/php-random-shuffle-array-maintaining-key-value
+# (see others at https://www.php.net/manual/en/function.shuffle.php#113790 )
+function shuffle_assoc($list) { 
+  if (!is_array($list)) return $list; 
+
+  $keys = array_keys($list); 
+  shuffle($keys); 
+  $random = array(); 
+  foreach ($keys as $key) { 
+    $random[$key] = $list[$key]; 
+  }
+  return $random; 
+} 
+
+# https://www.php.net/manual/en/function.array-column.php#122738
+function array_column_assoc($array, $column) {
+  return array_combine(array_keys($array), array_column($array, $column));
 }
 
 # Source: https://www.php.net/manual/en/debugger.php#118058
@@ -211,6 +240,21 @@ function join_paths() {
     return join('/', $paths);
 }
 
+function safe_basename($filename) {
+  return str_replace("/", "-", $filename);
+}
+
+# Source of inspiration: https://www.php.net/manual/en/function.array-map.php#81767
+function array_map_kv() {
+  $args = func_get_args();
+  $newargs = [array_shift($args)];
+  foreach($args as $arr) {
+    $newargs[] = array_keys($arr);
+    $newargs[] = $arr;
+  }
+  return call_user_func_array("array_map", $newargs);
+}
+
 // # Source: https://www.php.net/manual/en/function.explode.php#111307
 // Use preg_split istead
 // function multiexplode(array $delimiters, string $string) : array {
@@ -252,6 +296,37 @@ function zip() {
         }
     }
     return $zipped;
+}
+
+
+function zip_assoc() {
+  $args = func_get_args();
+
+  $ruby = array_pop($args);
+  if (is_array($ruby))
+      $args[] = $ruby;
+
+  $keys = array_keys($args[0]);
+  foreach ($args as $arr) {
+    if ($keys !== array_keys($arr)) {
+      die_error("zip_assoc: expected same keys, but got: "
+        . PHP_EOL . toString($keys)
+        . PHP_EOL . toString(array_keys($arr))
+      );
+    }
+  }
+
+  $counts = array_map('count', $args);
+  $count = ($ruby) ? min($counts) : max($counts);
+  $zipped = array();
+
+  foreach ($keys as $k) {
+    foreach ($args as $j => $arr) {
+      $val = (isset($arr[$k])) ? $arr[$k] : NULL;
+      $zipped[$k][$j] = $val;
+    }
+  }
+  return $zipped; // array_combine($keys, );
 }
 
 # Based onto: https://stackoverflow.com/a/27968556/5646732

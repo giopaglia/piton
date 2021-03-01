@@ -50,9 +50,9 @@ abstract class _Rule {
    * @return the boolean value indicating whether the instance is covered by
    *         this rule
    */
-  function covers(Instances &$data, int $i) : bool {
+  function covers(Instances &$data, int $instance_id) : bool {
     foreach ($this->antecedents as $antd) {
-      if (!$antd->covers($data, $i)) {
+      if (!$antd->covers($data, $instance_id)) {
         return false;
       }
     }
@@ -60,8 +60,8 @@ abstract class _Rule {
   }
 
   function coversAll(Instances &$data) : bool {
-    for ($i = 0; $i < $data->numInstances(); $i++) {
-      if (!$this->covers($data, $i)) {
+    foreach ($data->iterateInsts() as $instance_id => $inst) {
+      if (!$this->covers($data, $instance_id)) {
         return false;
       }
     }
@@ -151,9 +151,8 @@ class ClassificationRule extends _Rule {
     if (DEBUGMODE > 2) echo "RipperRule->computeMeasures(&[data])" . PHP_EOL;
     if (DEBUGMODE) echo "<pre>"        . PHP_EOL;
     
-    $tot       = $data->numInstances();
     $totWeight = $data->getSumOfWeights();
-    
+
     if ($data->isWeighted()) {
       die_error("The code must be expanded to test with weighted datasets" . PHP_EOL);
     }
@@ -171,28 +170,29 @@ class ClassificationRule extends _Rule {
       $filteredData = Instances::createEmpty($data);
     }
     // echo $this->toString() . PHP_EOL;
-    for ($i = 0; $i < $tot; $i++) {
-        // echo $data->inst_toString($i) . PHP_EOL;
-      if ($this->covers($data,  $i)) {
-        // echo "covered: [$i] " . $data->inst_toString($i) . PHP_EOL;
+    foreach ($data->iterateInsts() as $instance_id => $inst) {
+      // echo $data->inst_toString($instance_id) . PHP_EOL;
+      if ($this->covers($data,  $instance_id)) {
+        // echo "covered: [$instance_id] " . $data->inst_toString($instance_id) . PHP_EOL;
         // Covered by antecedents
         // $covered += 1;
-        $coveredWeight += $data->inst_weight($i);
-        // echo "covered " . $data->inst_classValue($i) ." ". $this->consequent . PHP_EOL;
-        if ($data->inst_classValue($i) == $this->consequent) {
+        $coveredWeight += $data->inst_weight($instance_id);
+        // echo "covered " . $data->inst_classValue($instance_id) ." ". $this->consequent . PHP_EOL;
+        if ($data->inst_classValue($instance_id) == $this->consequent) {
           // True positive for the rule
           // $tp += 1;
-          $tpWeight += $data->inst_weight($i);
+          $tpWeight += $data->inst_weight($instance_id);
         }
       }
       else if ($returnFilteredData) {
-        $filteredData->pushInstance($data->getInstance($i));
+        $filteredData->pushInstanceFrom($data, $instance_id);
       }
-      if ($data->inst_classValue($i) == $this->consequent) {
+      if ($data->inst_classValue($instance_id) == $this->consequent) {
         // Same consequent
-        $totConsWeight += $data->inst_weight($i);
+        $totConsWeight += $data->inst_weight($instance_id);
       }
     }
+    // TODO figure out when to use this $tot       = $data->numInstances();
     
     $covered      = $coveredWeight;
     $support      = safe_div($coveredWeight, $totWeight);
@@ -313,9 +313,9 @@ class RipperRule extends ClassificationRule {
   function computeDefAccu(Instances &$data) : float {
     if (DEBUGMODE > 2) echo "RipperRule->computeDefAccu(&[data])" . PHP_EOL;
     $defAccu = 0;
-    for ($i = 0; $i < $data->numInstances(); $i++) {
-      if ($data->inst_classValue($i) == $this->consequent) {
-        $defAccu += $data->inst_weight($i);
+    foreach ($data->iterateInsts() as $instance_id => $inst) {
+      if ($data->inst_classValue($instance_id) == $this->consequent) {
+        $defAccu += $data->inst_weight($instance_id);
       }
     }
     if (DEBUGMODE > 2) echo "\$defAccu : $defAccu" . PHP_EOL;
@@ -499,13 +499,13 @@ class RipperRule extends ClassificationRule {
       $newData = $pruneData;
       $pruneData = Instances::createEmpty($newData); // Make data empty
 
-      for ($y = 0; $y < $newData->numInstances(); $y++) {
-        if ($antd->covers($newData, $y)) { // Covered by this antecedent
-          $classValue = $newData->inst_classValue($y);
-          $weight     = $newData->inst_weight($y);
+      foreach ($newData->iterateInsts() as $instance_id => $inst) {
+        if ($antd->covers($newData, $instance_id)) { // Covered by this antecedent
+          $classValue = $newData->inst_classValue($instance_id);
+          $weight     = $newData->inst_weight($instance_id);
 
           $coverage[$x] += $weight;
-          $pruneData->pushInstance($newData->getInstance($y)); // Add to data for further pruning
+          $pruneData->pushInstanceFrom($newData, $instance_id); // Add to data for further pruning
           if ($classValue == $this->consequent) {
             $worthValue[$x] += $weight;
           }

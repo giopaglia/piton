@@ -130,7 +130,7 @@ class RuleBasedModel extends DiscriminativeModel {
   /* Perform prediction onto some data. */
   function predict(Instances $testData, bool $useClassIndices = false
     , bool $returnPerRuleMeasures = false
-    , ?Array $rulesAffRilThesholds = NULL
+    , ?Array $rulesAffRilThesholds = [0.2, 0.7]
   ) : array {
     if (DEBUGMODE > 2) echo "RuleBasedModel->predict(" . $testData->toString(true) . ")" . PHP_EOL;
 
@@ -165,12 +165,12 @@ class RuleBasedModel extends DiscriminativeModel {
       // }
 
       if (DEBUGMODE > 1) echo "testing:\n";
-      for ($x = 0; $x < $allTestData->numInstances(); $x++) {
-        if (DEBUGMODE > 1) echo "[$x] : ";
-        if (DEBUGMODE & DEBUGMODE_DATA) echo $allTestData->inst_toString($x);
+      foreach ($allTestData->iterateInsts() as $instance_id => $inst) {
+        if (DEBUGMODE > 1) echo "[$instance_id] : ";
+        if (DEBUGMODE & DEBUGMODE_DATA) echo $allTestData->inst_toString($instance_id);
         $prediction = NULL;
         foreach ($this->rules as $r => $rule) {
-          if ($rule->covers($allTestData, $x)) {
+          if ($rule->covers($allTestData, $instance_id)) {
             if (DEBUGMODE > 1) echo " R$r";
             $idx = $rule->getConsequent();
             if ($rulesAffRilThesholds !== NULL) {
@@ -193,9 +193,9 @@ class RuleBasedModel extends DiscriminativeModel {
             break;
           }
         }
-        $predictions[] = $prediction;
+        $predictions[$instance_id] = $prediction;
         if ($rulesAffRilThesholds !== NULL) {
-          $rule_types[] = $rule_type;
+          $rule_types[$instance_id] = $rule_type;
         }
         if (DEBUGMODE > 1) echo "\n";
       }
@@ -286,7 +286,7 @@ class RuleBasedModel extends DiscriminativeModel {
   }
 
   // Test a model TODO explain
-  function test(Instances $testData, bool $testRuleByRule = false, ?Array $rulesAffRilThesholds = NULL) : array {
+  function test(Instances $testData, bool $testRuleByRule = false, ?Array $rulesAffRilThesholds = [0.2, 0.7]) : array {
     if (DEBUGMODE)
       echo "RuleBasedModel->test(" . $testData->toString(true) . ")" . PHP_EOL;
 
@@ -295,9 +295,9 @@ class RuleBasedModel extends DiscriminativeModel {
 
     $ground_truths = [];
     
-    for ($x = 0; $x < $testData->numInstances(); $x++) {
-      $ground_truths[] = $testData->inst_classValue($x);
-      // $ground_truths[] = $domain[$testData->inst_classValue($x)];
+    foreach ($testData->iterateInsts() as $instance_id => $inst) {
+      $ground_truths[$instance_id] = $testData->inst_classValue($instance_id);
+      // $ground_truths[] = $domain[$testData->inst_classValue($instance_id)];
     }
 
     // $testData->dropOutputAttr();
@@ -341,12 +341,18 @@ class RuleBasedModel extends DiscriminativeModel {
       $measures[$classId] = $this->computeMeasures($ground_truths, $predictions, $classId, $rule_types);
     }
 
-    $outArray = ["measures" => $measures];
+    $outArray = [
+      "measures" => $measures,
+      "ground_truths" => $ground_truths,
+      "predictions" => $predictions,
+      "rule_types" => $rule_types
+    ];
 
     if ($testRuleByRule) {
       $outArray["rules_measures"] = $rules_measures;
       $outArray["totTest"] = $testData->numInstances();
     }
+
     return $outArray;
   }
 
@@ -559,38 +565,38 @@ table.blueTable tfoot .links a{
     $FN_rt = []; $FN_rt["RA"] = $FN_rt["RNA"] = $FN_rt["NRA"] = $FN_rt["NRNA"] = 0;
 
     if (DEBUGMODE > 1) echo "\n";
-    foreach ($ground_truths as $i => $val) {
-      if ($ground_truths[$i] == $classId) {
+    foreach ($ground_truths as $instance_id => $val) {
+      if ($ground_truths[$instance_id] == $classId) {
         $positives++;
-        if ($predictions[$i] === NULL) {
+        if ($predictions[$instance_id] === NULL) {
           die_error("TODO: how to evaluate with NULL predictions?");
         }
-        if ($ground_truths[$i] == $predictions[$i]) {
+        if ($ground_truths[$instance_id] == $predictions[$instance_id]) {
           $TP++;
           if ($rule_types !== NULL) {
-            $TP_rt[$rule_types[$i]]++;
+            $TP_rt[$rule_types[$instance_id]]++;
           }
         } else {
           $FN++;
           if ($rule_types !== NULL) {
-            $FN_rt[$rule_types[$i]]++;
+            $FN_rt[$rule_types[$instance_id]]++;
           }
         }
       }
       else {
         $negatives++;
-        if ($predictions[$i] === NULL) {
+        if ($predictions[$instance_id] === NULL) {
           die_error("TODO: how to evaluate with NULL predictions?");
         }
-        if ($ground_truths[$i] == $predictions[$i]) {
+        if ($ground_truths[$instance_id] == $predictions[$instance_id]) {
           $TN++;
           if ($rule_types !== NULL) {
-            $TN_rt[$rule_types[$i]]++;
+            $TN_rt[$rule_types[$instance_id]]++;
           }
         } else {
           $FP++;
           if ($rule_types !== NULL) {
-            $FP_rt[$rule_types[$i]]++;
+            $FP_rt[$rule_types[$instance_id]]++;
           }
         }
       }
@@ -632,12 +638,8 @@ table.blueTable tfoot .links a{
   }
 
   /* Save model to database */
-  function saveToDB(object &$db, $modelName, string $tableName, ?Instances &$testData = NULL, ?Instances &$trainData = NULL, ?Array $rulesAffRilThesholds = NULL) {
+  function saveToDB(object &$db, $modelName, string $tableName, ?Instances &$testData = NULL, ?Instances &$trainData = NULL, ?Array $rulesAffRilThesholds = [0.2, 0.7]) {
     
-    if ($rulesAffRilThesholds === NULL) {
-      $rulesAffRilThesholds = [0.2, 0.7];
-    }
-
     if (DEBUGMODE)
       echo "RuleBasedModel->saveToDB(" . toString($modelName)
         . ", " . toString($tableName) . ", ...)" . PHP_EOL;
