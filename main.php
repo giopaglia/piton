@@ -11,11 +11,11 @@ include "local-lib.php";
 
 include "DBFit.php";
 
-/****************************************************
-*                                                   *
-*                 Here I test stuff                 *
-*                                                   *
-****************************************************/
+/******************************************************************************
+*                                                                             *
+*                              Here I test stuff                              *
+*                                                                             *
+*******************************************************************************/
 $numOptimizations = 2;
 $numFolds = 5;
 $minNo = 2;
@@ -32,44 +32,25 @@ $minNo = 2;
   $lr->setNumOptimizations($numOptimizations);
   $lr->setNumFolds($numFolds);
   $lr->setMinNo($minNo);
-  testMed3($lr);
+  testMed($lr);
 }
 
-exit();
+/******************************************************************************/
+/******************************************************************************/
+/******************************************************************************/
+/******************************************************************************/
 
-$lr = new PRip();
-$lr->setNumOptimizations(3);
-testMed3($lr);
-exit();
-
-testMed2();
-exit();
-testMed();
-exit();
-testSPAM();
-exit();
-testSillyWithJoin();
-exit();
-testSilly();
-testWinery();
-exit();
-testCovid();
-exit();
-testDiabetes();
-exit();
-exit();
-echo "All good" . PHP_EOL;
-
-
-
-function testMed3($lr) {
+function testMed($lr) {
   $db = getDBConnection();
 
   $db_fit = new DBFit($db);
-  $db_fit->setTrainingMode([.8, .2]);
-  
-  $db_fit->setCutOffValue(0.10);
 
+  $db_fit->setTrainingMode([.8, .2]);
+  $db_fit->setCutOffValue(0.10);
+  $db_fit->setLearner($lr);
+  $db_fit->setDefaultOption("textLanguage", "it");
+  // $db_fit->setDefaultOption("textTreatment", ["BinaryBagOfWords", 10]);
+  
   $db_fit->setInputTables([
     "Referti"
   , ["Pazienti", "Pazienti.ID = Referti.ID_PAZIENTE", "LEFT JOIN"]
@@ -80,7 +61,6 @@ function testMed3($lr) {
   ]);
 
   // $db_fit->setLimit(40);
-  // $db_fit->setLimit(100);
   // $db_fit->setLimit(500);
   
   $db_fit->setWhereClauses([
@@ -110,27 +90,20 @@ function testMed3($lr) {
   ]);
 
   $db_fit->setOrderByClauses([["Referti.DATA_REFERTO", "ASC"]]);
-
-  $db_fit->setLearner($lr);
-
-  // $db_fit->setDefaultOption("textLanguage", "it");
-  // $db_fit->setDefaultOption("textTreatment", ["BinaryBagOfWords", 10]);
   
   $db_fit->setIdentifierColumnName("Referti.ID");
 
   // echo $db_fit->showAvailableColumns(); die();
   
-  // TODO remove
-  // $db_fit->addInputColumn(["Referti.ID"]);
-    
-  // gender
-  // $db_fit->addInputColumn(["Densitometrie.NECK_BMD", NULL, "total neck BMD"]);
-  // $db_fit->addInputColumn(["Densitometrie.TOT_BMD", NULL, "total spine BMD"]);
+  // age
+  $db_fit->addInputColumn(["DATEDIFF(Referti.DATA_REFERTO,Pazienti.DATA_NASCITA) / 365", NULL, "age"]);
 
+  // bmi
+  $db_fit->addInputColumn(["0+IF(ISNULL(Anamnesi.BMI) OR Anamnesi.BMI = -1, NULL, Anamnesi.BMI)", NULL, "body mass index"]);
+  
   // gender
   $db_fit->addInputColumn(["Pazienti.SESSO", "ForceCategorical", "gender"]);
   // menopause state (if relevant)
-  $db_fit->addInputColumn(["DATEDIFF(Referti.DATA_REFERTO,Pazienti.DATA_NASCITA) / 365", NULL, "age"]);
   $db_fit->addInputColumn(["Anamnesi.STATO_MENOPAUSALE", NULL, "menopause state"]);
   // age at last menopause (if relevant)
   $db_fit->addInputColumn(["Anamnesi.ETA_MENOPAUSA", NULL, "age at last menopause"]);
@@ -140,8 +113,6 @@ function testMed3($lr) {
   $db_fit->addInputColumn(["CONCAT('', COALESCE(IF(Anamnesi.TERAPIA_COMPLIANCE,Anamnesi.TERAPIA_OSTEOPROTETTIVA_SPECIFICA,'0'),'0'))", "ForceCategorical", "specific osteoprotective therapy"]);
   $db_fit->addInputColumn(["CONCAT('', COALESCE(IF(Anamnesi.TERAPIA_COMPLIANCE,Anamnesi.VITAMINA_D_TERAPIA_OSTEOPROTETTIVA,'0'),'0'))", "ForceCategorical", "vitamin D based osteoprotective therapy"]);
   $db_fit->addInputColumn(["CONCAT('', COALESCE(IF(Anamnesi.TERAPIA_COMPLIANCE,Anamnesi.TERAPIA_ALTRO_CHECKBOX,'0'),'0'))", "ForceCategorical", "other osteoprotective therapy"]);
-  // bmi
-  $db_fit->addInputColumn(["0+IF(ISNULL(Anamnesi.BMI) OR Anamnesi.BMI = -1, NULL, Anamnesi.BMI)", NULL, "body mass index"]);
   // fragility fractures in spine (one or more)
   // checkbox+value("Anamnesi.FRATTURA_VERTEBRE_CHECKBOX" "Anamnesi.FRATTURA_VERTEBRE")
   // $db_fit->addInputColumn(["CONCAT('', IF(Anamnesi.FRATTURA_VERTEBRE_CHECKBOX, Anamnesi.FRATTURA_VERTEBRE, '0'))", "ForceCategorical", "Anamnesi.N_FRATTURE_VERTEBRE"]);
@@ -281,6 +252,10 @@ function testMed3($lr) {
   // $db_fit->addInputColumn(["CONCAT('', IF(Diagnosi.SITUAZIONE_COLONNA_CHECKBOX, Diagnosi.SITUAZIONE_COLONNA, 'Normale'))", "ForceCategorical", "Diagnosi.N_SITUAZIONE_COLONNA"]);
   $db_fit->addInputColumn(["Diagnosi.SITUAZIONE_COLONNA", "ForceCategorical", "spine status"]);
   
+  // BMD
+  // $db_fit->addInputColumn(["Densitometrie.NECK_BMD", NULL, "neck BMD"]);
+  // $db_fit->addInputColumn(["Densitometrie.TOT_BMD", NULL, "spine BMD"]);
+
   // current DXA spine total T score
   $db_fit->addInputColumn(["Densitometrie.TOT_T_SCORE", NULL, "spine T-score"]);
   // current DXA spine total Z score
@@ -296,7 +271,9 @@ function testMed3($lr) {
         ["RaccomandazioniTerapeuticheUnitarie", ["RaccomandazioniTerapeuticheUnitarie.ID_RACCOMANDAZIONE_TERAPEUTICA = RaccomandazioniTerapeutiche.ID"
         , "RaccomandazioniTerapeuticheUnitarie.TIPO != 'Indagini approfondimento'"], "LEFT JOIN"]
       ],
-      "ForceCategoricalBinary"],
+      "ForceCategoricalBinary",
+      "Terapia"
+    ],
     [
       // "CONCAT(PrincipiAttivi.NOME, IF(!STRCMP(PrincipiAttivi.QUANTITA, 'NULL') || ISNULL(PrincipiAttivi.QUANTITA), '', CONCAT(' ', PrincipiAttivi.QUANTITA)))",
       "PrincipiAttivi.NOME",
@@ -309,15 +286,358 @@ function testMed3($lr) {
     ]
   ]);
 
+  // Set globalNodeOrder (to match the output tables and results with those in the paper)
+  $globalNodeOrder = ["Terapie ormonali", "Terapie osteoprotettive", "Vitamina D terapia", "Vitamina D Supplementazione", "Calcio supplementazione", "Alendronato", "Denosumab", "Risedronato", "Calcifediolo", "Colecalciferolo", "Calcio citrato", "Calcio carbonato"];
+  $db_fit->setGlobalNodeOrder($globalNodeOrder);
+
+  // Launch training
   $start = microtime(TRUE);
   $db_fit->updateModel();
   $end = microtime(TRUE);
   echo "updateModel took " . ($end - $start) . " seconds to complete." . PHP_EOL;
   
+  // List trained models
   echo "AVAILABLE MODELS:" . PHP_EOL;
   $db_fit->listAvailableModels();
 
-  $db_fit->predictByIdentifier(1);
+  // Print a few relevant tables
+  if ($db_fit->getIdentifierColumnName() !== NULL) {
+    $cmp_classes = function ($a, $b) use ($globalNodeOrder)
+    {
+      deprefixify($a, "NO_");
+      deprefixify($b, "NO_");
+
+      $x = array_search($a, $globalNodeOrder);
+      $y = array_search($b, $globalNodeOrder);
+      if ($x === false && $y === false) {
+        warn("Nodes not found in globalNodeOrder array: " . PHP_EOL . get_var_dump($a) . PHP_EOL . get_var_dump($b) . PHP_EOL . get_var_dump($globalNodeOrder));
+        return 0;
+      }
+      else if ($x === false) {
+        warn("Node not found in globalNodeOrder array: " . PHP_EOL . get_var_dump($a) . PHP_EOL . get_var_dump($globalNodeOrder));
+        return 1;
+      }
+      else if ($y === false) {
+        warn("Node not found in globalNodeOrder array: " . PHP_EOL . get_var_dump($b) . PHP_EOL . get_var_dump($globalNodeOrder));
+        return -1;
+      }
+      return $x-$y;
+    };
+
+    $compute_set_name = function (array $probs_res) use ($cmp_classes) {
+      $new_arr = [];
+      $name_map = [
+        "Calcio supplementazione" => "calsup",
+        "Terapie osteoprotettive" => "osteop",
+        "Vitamina D Supplementazione" => "vitDsup",
+        "NO_Calcio supplementazione" => "NO_calcio",
+        "NO_Terapie osteoprotettive" => "NO_osteop",
+        "NO_Vitamina D Supplementazione" => "NO_vitDsup",
+        "Alendronato" => "ale",
+        "Denosumab" => "den",
+        "Risedronato" => "ris",
+        "NO_Alendronato" => "NO_ale",
+        "NO_Denosumab" => "NO_den",
+        "NO_Risedronato" => "NO_ris",
+        "Calcifediolo" => "calci",
+        "NO_Calcifediolo" => "NO_calci",
+        "Colecalciferolo" => "colec",
+        "NO_Colecalciferolo" => "NO_colec",
+        "Calcio citrato" => "citr",
+        "NO_Calcio citrato" => "NO_citr",
+        "Calcio carbonato" => "carb",
+        "NO_Calcio carbonato" => "NO_carb",
+      ];
+      foreach($probs_res as $prob_name => $val) {
+        // $boolval = !startsWith($val, "NO_");
+        $new_arr[$prob_name] = $name_map[$val];
+      }
+      uksort($new_arr, $cmp_classes);
+      return join("\n", $new_arr);
+    };
+
+    function cmp_class_names($x, $y) {
+      $a = substr_count($x, "\n");
+      $b = substr_count($y, "\n");
+      if ($a != $b) {
+        return ($a < $b) ? -1 : 1;
+      }
+
+      $a = substr_count($x, "NO_");
+      $b = substr_count($y, "NO_");
+      if ($a != $b) {
+        return ($a < $b) ? -1 : 1;
+      }
+
+      $x = explode("\n", $x);
+      $y = explode("\n", $y);
+      $x = array_map(function ($c) { return (startsWith($c, "NO_") ? 0 : 1); }, $x);
+      $y = array_map(function ($c) { return (startsWith($c, "NO_") ? 0 : 1); }, $y);
+      $x = intval(join("", $x), 2);
+      $y = intval(join("", $y), 2);
+
+      return $y-$x;
+    }
+
+    function printConfusionMatrix($cm, string $cm_name, bool $print_relative = true, bool $print_empty_rows = true, bool $prettyPrintSetCM = false, bool $print_totals = true) {
+      postfixisify($cm_name, ".csv");
+      $f = fopen($cm_name, "w");
+
+      $display_class_name = function ($class_name) use ($prettyPrintSetCM) {
+        if ($prettyPrintSetCM) {
+          // Ignore "NO_*" pieces
+          $class_name = explode("\n", $class_name);
+          $class_name = array_filter($class_name, function($v) { return !startsWith($v, "NO_"); });
+          $class_name = join("\n", $class_name);
+          if ($class_name == "") {
+            $class_name = "∅";
+          }
+        }
+        return $class_name;
+      };
+
+      // Get class names
+      $class_names = [];
+      foreach($cm as $gt_class => $row) {
+        $class_names[] = $gt_class;
+        foreach($row as $pr_class => $count) {
+          $class_names[] = $pr_class;
+        }
+      }
+      $class_names = array_unique($class_names);
+
+      // Fill empty cells with 0s
+      foreach ($class_names as $class_name1) {
+        foreach ($class_names as $class_name2) {
+          if(!isset($cm[$class_name1][$class_name2])) {
+            $cm[$class_name1][$class_name2] = 0;
+          }
+        }
+      }
+
+      // Find correct class ordering
+      usort($class_names, "cmp_class_names");
+
+      // Print HTML table header for $class_names;
+      $out = "";
+      $out .= "<table class='blueTable' style='border-collapse: collapse; ' border='1'>";
+      $out .= "<thead>";
+      $out .= "<tr>";
+      $csv_row = [];
+      $out .= "<th style='width:30px'>#</th>";
+      $csv_row[] = "#";
+      foreach ($class_names as $class_name) {
+        $out .= "<th>" . str_replace("\n", "<br>", $display_class_name($class_name)) . "</th>";
+        $csv_row[] = $display_class_name($class_name);
+      }
+      if ($print_totals) {
+        $out .= "<th>TOT</th>";
+        $csv_row[] = "TOT";
+      }
+      fputcsv($f, $csv_row);
+      $out .= "</tr>";
+      $out .= "</thead>";
+
+      // Print HTML table body
+      $out .= "<tbody>";
+      foreach ($class_names as $i => $gt_class_name) {
+        $out_row = "";
+        $out_row .= "<tr>";
+        $csv_row = [];
+        $out_row .= "<th>" . str_replace("\n", "<br>", $display_class_name($gt_class_name)) . "</th>";
+        $csv_row[] = $display_class_name($gt_class_name);
+        $row = $cm[$gt_class_name];
+
+        $row_tot = 0;
+        foreach ($class_names as $j => $pr_class_name) {
+          $row_tot += $row[$pr_class_name];
+        }
+
+        $empty_row = true;
+        foreach ($class_names as $j => $pr_class_name) {
+          $count = $row[$pr_class_name];
+          if ($count != 0) {
+            $empty_row = false;
+          }
+          if ($print_relative) {
+            $count_str = $count != 0 ? "$count (" . (round(($row_tot == 0 ? 0 : $count/$row_tot), 2)*100) . "%)" : "";
+          } else {
+            $count_str = $count != 0 ? strval($count) : "";
+          }
+          $style_str = "";
+          if ($i == $j) {
+            $style_str = "style='background-color:rgba(225, 235, 52, 40)'";
+          }
+          $out_row .= "<td $style_str>$count_str</td>";
+          $csv_row[] = $count_str;
+        }
+        if ($print_totals) {
+          $out_row .= "<td>$row_tot</td>";
+          $csv_row[] = $row_tot;
+        }
+        
+        $out_row .= "</tr>";
+
+        if (!$empty_row || $print_empty_rows) {
+          $out .= $out_row;
+          fputcsv($f, $csv_row);
+        }
+      }
+      $out .= "</tbody>";
+      $out .= "</table>";
+
+      fclose($f);
+
+      echo $out . PHP_EOL;
+    }
+
+    $predictionResults = $db_fit->getPredictionResults();
+
+    // var_dump($predictionResults);
+    // var_dump($db_fit->listHierarchyNodes());
+    
+    $print_relative = false;
+    $print_empty_rows = false;
+
+    foreach ($db_fit->listHierarchyNodes() as $nodeRp) {
+      $node = $nodeRp[0];
+      $recursionPath = $nodeRp[1];
+      $recursionLevel = count($recursionPath);
+      $classRecursionPath = array_column($recursionPath, 1);
+      $classRecursionPath = array_merge($classRecursionPath, ["res"]);
+
+      echo "<h1>" . $node["name"] . "</h1>" . PHP_EOL;
+      // echo toString($classRecursionPath) . PHP_EOL;
+
+      // Build local confusion matrix if the node is not the root
+      if($recursionLevel != 0) {
+        $confusionMatrix = [];
+        $confusionMatrixRT = ["RA" => [], "RNA" => [], "NRA" => [], "NRNA" => []];
+
+        foreach (arr_get_value($predictionResults, $classRecursionPath) as $instance_id => $res) {
+
+          $gt_key = $res[0];
+          $pr_key = $res[1];
+          
+          if (!isset($confusionMatrix[$gt_key][$pr_key])) {
+            $confusionMatrix[$gt_key][$pr_key] = 0;
+          }
+          $confusionMatrix[$gt_key][$pr_key]++;
+
+          if (!isset($confusionMatrixRT[$res[2]][$gt_key][$pr_key])) {
+            foreach ($confusionMatrixRT as $rt => $cm) {
+              $confusionMatrixRT[$rt][$gt_key][$pr_key] = 0;
+            }
+          }
+          $confusionMatrixRT[$res[2]][$gt_key][$pr_key]++;
+        }
+
+        echo "<h2>Confusion Matrices</h2>" . PHP_EOL;
+        printConfusionMatrix($confusionMatrix, safe_basename("cm_" . $node["name"]), $print_relative, $print_empty_rows);
+        echo "<h2>By RuleType</h2>" . PHP_EOL;
+        foreach ($confusionMatrixRT as $rt => $cmRT) {
+          echo "<h3>Rule Type $rt</h3>" . PHP_EOL;
+          printConfusionMatrix($cmRT, safe_basename("cmRT_" . $rt . "-" . $node["name"]), $print_relative, $print_empty_rows);
+        }
+      }
+
+      // Build set confusion matrix if the node has children
+      $childNodes = $db_fit->listHierarchyNodes($node, 1);
+      // echo get_var_dump($node);
+      // echo get_var_dump($childNodes);
+      if (count($childNodes)) {
+        $confusionMatrixSet = [];
+        $confusionMatrixSetRT = ["RA" => [], "RNA" => [], "NRA" => [], "NRNA" => []];
+
+        $instance_counted = [];
+        foreach ($childNodes as $i_prob => $childnodeRp) {
+          $childNode = $childnodeRp[0];
+          $childRecursionPath = $childnodeRp[1];
+          $childClassRecursionPath = array_column($childRecursionPath, 1);
+          $childClassRecursionPath = array_merge($childClassRecursionPath, ["res"]);
+
+          // echo get_var_dump($childClassRecursionPath);
+          
+          foreach (arr_get_value($predictionResults, $childClassRecursionPath) as $instance_id => $instance_result) {
+            if (in_array($instance_id, $instance_counted)) {
+              continue;
+            }
+            // Only consider instances that are in the test set of all children
+            $instance_results = [];
+            $ignore = false;
+            foreach ($childNodes as $childnodeRp2) {
+              $childNode2 = $childnodeRp2[0];
+              $childRecursionPath2 = $childnodeRp2[1];
+              $childClassRecursionPath2 = array_column($childRecursionPath2, 1);
+              $childClassRecursionPath2 = array_merge($childClassRecursionPath2, ["res"]);
+              $childRes2 = arr_get_value($predictionResults, $childClassRecursionPath2);
+              if (!isset($childRes2[$instance_id])) {
+                $ignore = true;
+                break;
+              }
+              else {
+                $instance_results[$childNode2["name"]] = $childRes2[$instance_id];
+              }
+            }
+            if ($ignore) continue;
+
+            $gtSet_key = $compute_set_name(array_column_assoc($instance_results,0));
+            $prSet_key = $compute_set_name(array_column_assoc($instance_results,1));
+
+            // echo get_var_dump(array_column_assoc($instance_results,0)) . PHP_EOL;
+            // echo $compute_set_name(array_column_assoc($instance_results,0)) . PHP_EOL;
+
+            if (!isset($confusionMatrixSet[$gtSet_key][$prSet_key])) {
+              $confusionMatrixSet[$gtSet_key][$prSet_key] = 0;
+            }
+            $confusionMatrixSet[$gtSet_key][$prSet_key]++;
+
+            // Avoid counting the same instance twice due in the same cell
+            $cell_counted = [];
+            $res_prev = NULL;
+            foreach ($instance_results as $prob_name => $res) {
+              if (in_array([$res[2], $gtSet_key, $prSet_key], $cell_counted)) {
+                continue;
+              }
+              // By default we count if there is at least one rule of this type
+              // With this we only count if all rules are of this type
+              if ($res_prev !== NULL && $res_prev[2] != $res[2]) {
+                break;
+              }
+              else {
+                $res_prev = $res;
+              }
+              //
+              if (!isset($confusionMatrixSetRT[$res[2]][$gtSet_key][$prSet_key])) {
+                foreach ($confusionMatrixSetRT as $rt => $cm) {
+                  $confusionMatrixSetRT[$rt][$gtSet_key][$prSet_key] = 0;
+                }
+              }
+              $confusionMatrixSetRT[$res[2]][$gtSet_key][$prSet_key]++;
+
+              $cell_counted[] = [$res[2], $gtSet_key, $prSet_key];
+            }
+            $instance_counted[] = $instance_id;
+          }
+        }
+
+        echo "<h2>Set confusion Matrices</h2>" . PHP_EOL;
+        printConfusionMatrix($confusionMatrixSet, safe_basename("cmSet_" . $node["name"]), $print_relative, $print_empty_rows, true);
+        echo "<h2>By RuleType</h2>" . PHP_EOL;
+        foreach ($confusionMatrixSetRT as $rt => $cm) {
+          echo "<h3>Rule Type $rt</h3>" . PHP_EOL;
+          printConfusionMatrix($cm, safe_basename("cmSetRT_" . $rt . "-" . $node["name"]), $print_relative, $print_empty_rows, true);
+        }
+      }
+    }
+  }
+  
+  return;
+
+  // This is to test the prediction an a specific data entry
+  if ($db_fit->getIdentifierColumnName() !== NULL) {
+    $db_fit->predictByIdentifier(1);
+  }
 
   // $db_fit->test_all_capabilities();
   // $db_fit->predictByIdentifier(15);
@@ -325,449 +645,9 @@ function testMed3($lr) {
   // $db_fit->predictByIdentifier(2);
   // $db_fit->predictByIdentifier(9);
   // $db_fit->predictByIdentifier(3);
-}
-
-function testMed2() {
-  $db = getDBConnection();
-
-  $db_fit = new DBFit($db);
-  $db_fit->setTrainingMode([.8, .2]);
-
-  $db_fit->setInputTables([
-    "Anamnesi",
-    ["Referti", "Anamnesi.ID_REFERTO = Referti.ID"], 
-    ["Diagnosi", "Diagnosi.ID_REFERTO = Referti.ID"], 
-    ["RaccomandazioniTerapeutiche", "RaccomandazioniTerapeutiche.ID_REFERTO = Referti.ID"], 
-    ["RaccomandazioniTerapeuticheUnitarie", "RaccomandazioniTerapeuticheUnitarie.ID_RACCOMANDAZIONE_TERAPEUTICA = RaccomandazioniTerapeutiche.ID"], 
-    ["ElementiTerapici", "ElementiTerapici.ID_RACCOMANDAZIONE_TERAPEUTICA_UNITARIA = RaccomandazioniTerapeuticheUnitarie.ID"],
-    ["PrincipiAttivi", "ElementiTerapici.ID_PRINCIPIO_ATTIVO = PrincipiAttivi.ID"], 
-    ["Pazienti", "Pazienti.ID = Referti.ID_PAZIENTE"]
-  ]);
-  $db_fit->setIdentifierColumnName("RaccomandazioniTerapeuticheUnitarie.ID");
-  $db_fit->setDefaultOption("textTreatment", ["BinaryBagOfWords", 10]);
-  $db_fit->setInputColumns("*");
-  $db_fit->setInputColumns([
-    "RaccomandazioniTerapeutiche.DATA_ANNULLA",
-    "RaccomandazioniTerapeutiche.MOTIVO_ANNULLA",
-    "RaccomandazioniTerapeutiche.STATO",
-    "RaccomandazioniTerapeutiche.DATA_SALVA",
-    "RaccomandazioniTerapeutiche.ALTRO",
-    "RaccomandazioniTerapeutiche.ALTRO_CHECKBOX",
-    "RaccomandazioniTerapeutiche.SOSPENSIONE_TERAPIA_CHECKBOX",
-    "RaccomandazioniTerapeutiche.SOSPENSIONE_TERAPIA_FARMACO",
-    "RaccomandazioniTerapeutiche.SOSPENSIONE_TERAPIA_MESI",
-    "Referti.DATA_ANNULLA",
-    "Referti.MOTIVO_ANNULLA",
-    "Referti.STATO",
-  ]);
-  // $db_fit->setLimit(10);
-  // $db_fit->setLimit(100);
-  $db_fit->setOutputColumnName("RaccomandazioniTerapeuticheUnitarie.TIPO"
-  // , "ForceCategoricalBinary"
-  );
-  $lr = new PRip();
-  // $lr->setNumOptimizations(10);
-  $lr->setNumOptimizations(3);
-  $db_fit->setLearner($lr);
-  $db_fit->test_all_capabilities();
-  $db_fit->predictByIdentifier(10);
-  $db_fit->predictByIdentifier(15);
-  $db_fit->predictByIdentifier(1);
-  $db_fit->predictByIdentifier(2);
-  $db_fit->predictByIdentifier(3);
-}
-
-
-function testMed() {
-  $db = getDBConnection();
-
-  $db_fit = new DBFit($db);
-  $db_fit->setTrainingMode([.8, .2]);
-
-  /*
-  select * from Anamnesi
-  inner join Diagnosi on Anamnesi.ID_REFERTO = Diagnosi.ID_REFERTO
-    and Anamnesi.DATA_SALVA = Diagnosi.DATA_SALVA
-  inner join Referti on Anamnesi.ID_REFERTO = Referti.ID
-  inner join Pazienti on Anamnesi.ID = Referti.ID_PAZIENTE
-  //  inner join Spine on Pazienti.PATIENT_KEY = Spine.PATIENT_KEY
-  //    and Anamnesi.DATA_SALVA = Spine.DATA_SALVA
-  //  inner join ScanAnalysis on Pazienti.PATIENT_KEY = ScanAnalysis.PATIENT_KEY
-  //    and Anamnesi.DATA_SALVA = ScanAnalysis.DATA_SALVA
-    
-   */
-  $db_fit->setInputTables([
-    "Anamnesi",
-    ["Referti", "Anamnesi.ID_REFERTO = Referti.ID"], 
-    ["Diagnosi", "Diagnosi.ID_REFERTO = Referti.ID"], 
-    ["RaccomandazioniTerapeutiche", "RaccomandazioniTerapeutiche.ID_REFERTO = Referti.ID"], 
-    ["RaccomandazioniTerapeuticheUnitarie", "RaccomandazioniTerapeuticheUnitarie.ID_RACCOMANDAZIONE_TERAPEUTICA = RaccomandazioniTerapeutiche.ID"], 
-    ["Pazienti", "Pazienti.ID = Referti.ID_PAZIENTE"]
-  ]);
-  $db_fit->setIdentifierColumnName("Referti.ID");
-  $db_fit->setDefaultOption("textTreatment", ["BinaryBagOfWords", 10]);
-  $db_fit->setInputColumns([
-"Anamnesi.DATA_SALVA",
-"Anamnesi.DATA_ANNULLA",
-"Anamnesi.MOTIVO_ANNULLA",
-"Anamnesi.INVIATA_DA",
-"Anamnesi.INVIATA_DA_GINECOLOGO",
-"Anamnesi.INVIATA_DA_ALTRO_SPECIALISTA",
-"Anamnesi.STATO_MENOPAUSALE",
-"Anamnesi.ULTIMA_MESTRUAZIONE",
-"Anamnesi.ETA_MENOPAUSA",
-"Anamnesi.TERAPIA_STATO",
-"Anamnesi.TERAPIA_ANNI_SOSPENSIONE",
-"Anamnesi.TERAPIA_OSTEOPROTETTIVA_ORMONALE",
-"Anamnesi.TERAPIA_OSTEOPROTETTIVA_ORMONALE_LISTA",
-"Anamnesi.TERAPIA_OSTEOPROTETTIVA_SPECIFICA",
-"Anamnesi.TERAPIA_OSTEOPROTETTIVA_SPECIFICA_LISTA",
-"Anamnesi.VITAMINA_D_TERAPIA_OSTEOPROTETTIVA",
-"Anamnesi.VITAMINA_D_TERAPIA_OSTEOPROTETTIVA_LISTA",
-"Anamnesi.TERAPIA_ALTRO_CHECKBOX",
-"Anamnesi.TERAPIA_ALTRO",
-"Anamnesi.TERAPIA_COMPLIANCE",
-"Anamnesi.PESO",
-"Anamnesi.ALTEZZA",
-"Anamnesi.BMI",
-"Anamnesi.FRATTURA_VERTEBRE_CHECKBOX",
-"Anamnesi.FRATTURA_VERTEBRE",
-"Anamnesi.FRATTURA_FEMORE",
-"Anamnesi.FRATTURA_SITI_DIVERSI",
-"Anamnesi.FRATTURA_SITI_DIVERSI_ALTRO",
-"Anamnesi.FRATTURA_FAMILIARITA",
-"Anamnesi.ABUSO_FUMO_CHECKBOX",
-"Anamnesi.ABUSO_FUMO",
-"Anamnesi.USO_CORTISONE_CHECKBOX",
-"Anamnesi.USO_CORTISONE",
-"Anamnesi.MALATTIE_ATTUALI_CHECKBOX",
-"Anamnesi.MALATTIE_ATTUALI_ARTRITE_REUM",
-"Anamnesi.MALATTIE_ATTUALI_ARTRITE_PSOR",
-"Anamnesi.MALATTIE_ATTUALI_LUPUS",
-"Anamnesi.MALATTIE_ATTUALI_SCLERODERMIA",
-"Anamnesi.MALATTIE_ATTUALI_ALTRE_CONNETTIVITI",
-"Anamnesi.CAUSE_OSTEOPOROSI_SECONDARIA_CHECKBOX",
-"Anamnesi.CAUSE_OSTEOPOROSI_SECONDARIA",
-"Anamnesi.ALCOL_CHECKBOX",
-"Anamnesi.ALCOL",
-"Anamnesi.PATOLOGIE_UTERINE_CHECKBOX",
-"Anamnesi.PATOLOGIE_UTERINE_DIAGNOSI",
-"Anamnesi.NEOPLASIA_CHECKBOX",
-"Anamnesi.NEOPLASIA_MAMMARIA_DATA",
-"Anamnesi.NEOPLASIA_MAMMARIA_TERAPIA",
-"Anamnesi.SINTOMI_VASOMOTORI",
-"Anamnesi.SINTOMI_DISTROFICI",
-"Anamnesi.DISLIPIDEMIA_CHECKBOX",
-"Anamnesi.DISLIPIDEMIA_TERAPIA",
-"Anamnesi.IPERTENSIONE",
-"Anamnesi.RISCHIO_TEV",
-"Anamnesi.PATOLOGIA_CARDIACA",
-"Anamnesi.PATOLOGIA_VASCOLARE",
-"Anamnesi.INSUFFICIENZA_RENALE",
-"Anamnesi.PATOLOGIA_RESPIRATORIA",
-"Anamnesi.PATOLOGIA_CAVO_ORALE_CHECKBOX",
-"Anamnesi.PATOLOGIA_CAVO_ORALE",
-"Anamnesi.PATOLOGIA_EPATICA",
-"Anamnesi.PAROLOGIA_ESOFAGEA",
-"Anamnesi.GASTRO_DUODENITE",
-"Anamnesi.GASTRO_RESEZIONE",
-"Anamnesi.RESEZIONE_INTESTINALE",
-"Anamnesi.MICI",
-"Anamnesi.VITAMINA_D_CHECKBOX",
-"Anamnesi.VITAMINA_D",
-"Anamnesi.ALTRE_PATOLOGIE_CHECKBOX",
-"Anamnesi.ALTRE_PATOLOGIE",
-"Anamnesi.ALLERGIE_CHECKBOX",
-"Anamnesi.ALLERGIE",
-"Anamnesi.INTOLLERANZE_CHECKBOX",
-"Anamnesi.INTOLLERANZE",
-"Anamnesi.DENSITOMETRIA_PRECEDENTE_CHECKBOX",
-"Anamnesi.DENSITOMETRIA_PRECEDENTE_DATA",
-"Anamnesi.DENSITOMETRIA_PRECEDENTE_INTERNA",
-"Anamnesi.MORFOMETRIA_PRECEDENTE_CHECKBOX",
-"Anamnesi.MORFOMETRIA_PRECEDENTE_DATA",
-"Anamnesi.MORFOMETRIA_PRECEDENTE_INTERNA",
-"Anamnesi.BODY_SCAN_PRECEDENTE_CHECKBOX",
-"Anamnesi.BODY_SCAN_PRECEDENTE_DATA",
-"Anamnesi.BODY_SCAN_PRECEDENTE_INTERNA",
-"Anamnesi.VERTEBRE_VALUTATE_L1",
-"Anamnesi.VERTEBRE_VALUTATE_L2",
-"Anamnesi.VERTEBRE_VALUTATE_L3",
-"Anamnesi.VERTEBRE_VALUTATE_L4",
-"Anamnesi.COLONNA_APPLICABILE",
-"Anamnesi.COLONNA_T_SCORE",
-"Anamnesi.COLONNA_Z_SCORE",
-"Anamnesi.FEMORE_LATO",
-"Anamnesi.FEMORE_APPLICABILE",
-"Anamnesi.FEMORE_T_SCORE",
-"Anamnesi.FEMORE_Z_SCORE",
-"Diagnosi.STATO",
-"Diagnosi.DATA_SALVA",
-"Diagnosi.DATA_ANNULLA",
-"Diagnosi.MOTIVO_ANNULLA",
-"Diagnosi.SITUAZIONE_COLONNA_CHECKBOX",
-"Diagnosi.SITUAZIONE_COLONNA",
-"Diagnosi.SITUAZIONE_FEMORE_SN_CHECKBOX",
-"Diagnosi.SITUAZIONE_FEMORE_SN",
-"Diagnosi.SITUAZIONE_FEMORE_DX_CHECKBOX",
-"Diagnosi.SITUAZIONE_FEMORE_DX",
-"Diagnosi.OSTEOPOROSI_GRAVE",
-"Diagnosi.VERTEBRE_NON_ANALIZZATE_CHECKBOX",
-"Diagnosi.VERTEBRE_NON_ANALIZZATE_L1",
-"Diagnosi.VERTEBRE_NON_ANALIZZATE_L2",
-"Diagnosi.VERTEBRE_NON_ANALIZZATE_L3",
-"Diagnosi.VERTEBRE_NON_ANALIZZATE_L4",
-"Diagnosi.COLONNA_NON_ANALIZZABILE",
-"Diagnosi.COLONNA_VALORI_SUPERIORI",
-"Diagnosi.FEMORE_NON_ANALIZZABILE",
-"Diagnosi.FRAX_APPLICABILE",
-"Diagnosi.FRAX_PERCENTUALE",
-"Diagnosi.FRAX_FRATTURE_MAGGIORI",
-"Diagnosi.FRAX_COLLO_FEMORE_PERCENTUALE",
-"Diagnosi.FRAX_COLLO_FEMORE",
-"Diagnosi.DEFRA_APPLICABILE",
-"Diagnosi.DEFRA_PERCENTUALE_01",
-"Diagnosi.DEFRA_PERCENTUALE_50",
-"Diagnosi.DEFRA",
-"Diagnosi.FRAX_AGGIUSTATO_APPLICABILE",
-"Diagnosi.FRAX_AGGIUSTATO_PERCENTUALE",
-"Diagnosi.FRAX_FRATTURE_MAGGIORI_AGGIUSTATO_VALORE",
-"Diagnosi.FRAX_COLLO_FEMORE_AGGIUSTATO_PERCENTUALE",
-"Diagnosi.FRAX_COLLO_FEMORE_AGGIUSTATO_VALORE",
-"Diagnosi.TBS_COLONNA_APPLICABILE",
-"Diagnosi.TBS_COLONNA_PERCENTUALE",
-"Diagnosi.TBS_COLONNA_VALORE",
-"Diagnosi.VALUTAZIONE_INTEGRATA",
-"Pazienti.PATIENT_KEY",
-"Pazienti.DATA_NASCITA",
-"Pazienti.SESSO",
-"Pazienti.ETNIA",
-"Pazienti.MEDICO_RIFERIMENTO",
-"Pazienti.COMMENTO",
-"RaccomandazioniTerapeutiche.DATA_ANNULLA",
-"RaccomandazioniTerapeutiche.MOTIVO_ANNULLA",
-"RaccomandazioniTerapeutiche.STATO",
-"RaccomandazioniTerapeutiche.DATA_SALVA",
-"RaccomandazioniTerapeutiche.ALTRO",
-"RaccomandazioniTerapeutiche.ALTRO_CHECKBOX",
-"RaccomandazioniTerapeutiche.SOSPENSIONE_TERAPIA_CHECKBOX",
-"RaccomandazioniTerapeutiche.SOSPENSIONE_TERAPIA_FARMACO",
-"RaccomandazioniTerapeutiche.SOSPENSIONE_TERAPIA_MESI",
-"Referti.DATA_ANNULLA",
-"Referti.MOTIVO_ANNULLA",
-"Referti.STATO",
-]);
-  $db_fit->setLimit(10);
-  // $db_fit->setLimit(100);
-  // $db_fit->setLimit(1000);
-  $db_fit->setWhereClauses([]);
-  $db_fit->setOutputColumnName("RaccomandazioniTerapeuticheUnitarie.TIPO"
-     ,"ForceCategoricalBinary"
-  );
-  $lr = new PRip();
-  // $lr->setNumOptimizations(10);
-  $lr->setNumOptimizations(3);
-  $db_fit->setLearner($lr);
-  $db_fit->test_all_capabilities();
-  $db_fit->predictByIdentifier(10);
-  $db_fit->predictByIdentifier(15);
-  $db_fit->predictByIdentifier(1);
-  $db_fit->predictByIdentifier(2);
-  $db_fit->predictByIdentifier(3);
-}
-
-function testSPAM() {
-  $db = getDBConnection();
-  $model_type = "RuleBased";
-  $learning_method = "PRip";
-
-  $table_names = "spam";
-  $columns = [["Category", "ForceCategorical"], ["Message", ["BinaryBagOfWords", 10]]];
-  $output_column_name = "Category";
-
-  $db_fit = new DBFit($db);
-  $db_fit->setIdentifierColumnName("ID");
-  $db_fit->setTrainingMode([.8, .2]);
-  $db_fit->setInputTables($table_names);
-  $db_fit->setInputColumns($columns);
-  $db_fit->setOutputColumnName($output_column_name);
-  // $db_fit->setModelType($model_type);
-  $db_fit->setLearningMethod($learning_method);
-  $db_fit->test_all_capabilities();
-  $db_fit->predictByIdentifier(1);
-}
-
-function testSilly() {
-  $db = getDBConnection();
-  $model_type = "RuleBased";
-  $learning_method = "PRip";
-
-  $table_names = ["patients"];
-  $columns = ["ID", "Gender", ["BirthDate", "YearsSince", "Age"], "Sillyness"];
-  $whereClauses = NULL;
-  $output_column_name = "Sillyness";
-
-  $db_fit = new DBFit($db);
-  $db_fit->setTrainingMode("FullTraining");
-  $db_fit->setInputTables($table_names);
-  $db_fit->setInputColumns($columns);
-  $db_fit->setWhereClauses($whereClauses);
-  $db_fit->setOutputColumnName($output_column_name);
-  // $db_fit->setModelType($model_type);
-  $db_fit->setLearningMethod($learning_method);
-  $db_fit->test_all_capabilities();
-}
-
-function testWinery() {
-  $db = getDBConnection();
-  $model_type = "RuleBased";
-  $learning_method = "PRip";
-
-  $table_names = ["winery"];
-  $columns = [
-    ["winery.country", "ForceCategorical"],
-    ["winery.description", ["BinaryBagOfWords", 14]],
-  ];
-  $whereClauses = [];
-  $output_column_name = "winery.country";
-
-  $db_fit = new DBFit($db);
-  // $db_fit->setTrainingMode("FullTraining");
-  $db_fit->setTrainingMode([.8, .2]);
-  $db_fit->setInputTables($table_names);
-  $db_fit->setInputColumns($columns);
-  $db_fit->setWhereClauses($whereClauses);
-  $db_fit->setLimit(100);
-  $db_fit->setOutputColumnName($output_column_name);
-  // $db_fit->setModelType($model_type);
-  $db_fit->setLearningMethod($learning_method);
-  $db_fit->test_all_capabilities();
-  $db_fit->loadModel("models/2020-07-20_22:25:14");
-  $db_fit->test(NULL);
-}
-
-function testSillyWithJoin() {
   
-  $db = getDBConnection();
-  $model_type = "RuleBased";
-  $learning_method = "PRip";
-
-  $table_names = ["patients", "reports"];
-  $columns = [
-    "patients.Gender",
-    "patients.ID",
-    ["patients.BirthDate", "MonthsSince", "MonthAge"],
-    "patients.Sillyness",
-    "reports.Date",
-    ["reports.PatientState", NULL, "State"],
-    ["reports.PatientHeartbeatMeasure", NULL, "Heartbeat"],
-    ["reports.PatientID", NULL, "ID"],
-    ["reports.DoctorIsFrares"]
-  ];
-  $whereClauses = ["patients.ID = reports.PatientID"];
-  $output_column_name = "patients.Sillyness";
-
-  $db_fit = new DBFit($db);
-  $db_fit->setTrainingMode([.8, .2]);
-  $db_fit->setInputTables($table_names);
-  $db_fit->setInputColumns($columns);
-  $db_fit->setWhereClauses($whereClauses);
-  $db_fit->setOutputColumnName($output_column_name);
-  // $db_fit->setModelType($model_type);
-  $db_fit->setLearningMethod($learning_method);
-  $db_fit->test_all_capabilities();
-
+  var_dump($db_fit->getPredictionResults());
+  echo PHP_EOL . toString($db_fit->getPredictionResults()) . PHP_EOL;
 }
 
-function testCovid() {
-
-  $db = getDBConnection();
-  $model_type = "RuleBased";
-  $learning_method = "PRip";
-
-  $table_names = ["covid19_italy_province"];
-  $columns = [["Date", "DaysSince", "DaysAgo"] , ["ProvinceCode", "ForceCategorical"], "Date", "TotalPositiveCases"];
-  $whereClauses = NULL;
-  $output_column_name = "ProvinceCode";
-
-  $db_fit = new DBFit($db);
-  // $db_fit->setModelType($model_type);
-  $db_fit->setInputTables($table_names);
-  $db_fit->setInputColumns($columns);
-  $db_fit->setWhereClauses($whereClauses);
-  $db_fit->setOutputColumnName($output_column_name);
-  $db_fit->setLimit(1000);
-  $db_fit->setLearningMethod($learning_method);
-  $db_fit->test_all_capabilities();
-
-}
-
-function testDiabetes() {
-  $trainingMode = [.8, .2];
-  //$trainingMode = "FullTraining";
-  $data = Instances::createFromARFF("diabetes.arff");
-  /* training modes */
-  switch (true) {
-    /* Full training: use data for both training and testing */
-    case $trainingMode == "FullTraining":
-      $trainData = $data;
-      $testData = $data;
-      break;
-    
-    /* Train+test split */
-    case is_array($trainingMode):
-      $trRat = $trainingMode[0]/($trainingMode[0]+$trainingMode[1]);
-      list($trainData, $testData) = Instances::partition($data, $trRat);
-      
-      break;
-    
-    default:
-      die_error("Unknown training mode ('$trainingMode')");
-      break;
-  }
-
-  /* Train */
-  $model = new RuleBasedModel();
-  $learner = new PRip();
-  $model->fit($trainData, $learner);
-
-  echo "Ultimately, here are the extracted rules: " . PHP_EOL;
-  foreach ($model->getRules() as $x => $rule) {
-    echo $x . ": " . $rule->toString() . PHP_EOL;
-  }
-
-  /* Test */
-  $ground_truths = [];
-  $classAttr = $testData->getClassAttribute();
-
-  for ($x = 0; $x < $testData->numInstances(); $x++) {
-    $ground_truths[] = $classAttr->reprVal($testData->inst_classValue($x));
-  }
-
-  // $testData->dropOutputAttr();
-  $predictions = $model->predict($testData)["predictions"];
-
-  // echo "\$ground_truths : " . get_var_dump($ground_truths) . PHP_EOL;
-  // echo "\$predictions : " . get_var_dump($predictions) . PHP_EOL;
-  $negatives = 0;
-  $positives = 0;
-  foreach ($ground_truths as $val) {
-    echo str_pad($val, 10, " ");
-  }
-  echo "\n";
-  foreach ($predictions as $val) {
-    echo str_pad($val, 10, " ");
-  }
-  echo "\n";
-  foreach ($ground_truths as $i => $val) {
-    if ($ground_truths[$i] != $predictions[$i]) {
-      $negatives++;
-    } else {
-      $positives++;
-    }
-  }
-  echo "Test accuracy: " . ($positives/($positives+$negatives));
-  echo "\n";
-
-}
 ?>

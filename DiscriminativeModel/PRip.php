@@ -163,9 +163,9 @@ class PRip extends Learner {
       /* Compute class weights & total weights */
       $totalWeights = $data->getSumOfWeights();
       $classWeights = 0;
-      for ($j = 0; $j < $data->numInstances(); $j++) {
-        if ($data->inst_classValue($j) == $classIndex) {
-          $classWeights += $data->inst_weight($j);
+      foreach ($data->iterateInsts() as $instance_id => $inst) {
+        if ($data->inst_classValue($instance_id) == $classIndex) {
+          $classWeights += $data->inst_weight($instance_id);
         }
       }
 
@@ -432,9 +432,9 @@ class PRip extends Learner {
             /* For revision, only consider the data already covered by the old rule */
             $newGrowData = Instances::createEmpty($growData);
             /* Split data */
-            for ($b = 0; $b < $growData->numInstances(); $b++) {
-              if ($revision->covers($growDatainst, $b)) { // TODO isn't this an error?
-                $newGrowData->pushInstance($growData->getInstance($b));
+            foreach ($growData->iterateInsts() as $instance_id => $inst) {
+              if ($revision->covers($growDatainst, $instance_id)) { // TODO isn't this an error?
+                $newGrowData->pushInstanceFrom($growData, $instance_id);
               }
             }
             $revision->grow($newGrowData, $this->minNo);
