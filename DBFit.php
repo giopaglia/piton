@@ -1,7 +1,7 @@
 <?php
 
 
-include "PorterStemmer.php";
+include "assets/PorterStemmer.php";
 include "DiscriminativeModel/RuleBasedModel.php";
 include "DiscriminativeModel/PRip.php";
 
