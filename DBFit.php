@@ -1117,7 +1117,7 @@ class DBFit {
                 $this->stop_words = [];
               }
               if (!isset($this->stop_words[$lang])) {
-                $this->stop_words[$lang] = explode("\n", file_get_contents($lang . "-stopwords.txt"));
+                $this->stop_words[$lang] = explode("\n", file_get_contents("assets/" . $lang . "-stopwords.txt"));
               }
               foreach ($raw_data as $raw_row) {
                 $text = $raw_row[$this->getColumnNickname($column)];
