@@ -1284,7 +1284,9 @@ class DBFit {
       $model = $this->learner->initModel();
 
       $model->fit($trainData, $this->learner);
-      
+      // "python", "sklearn/CART"
+      // "python", "wittengstein/RIPPER"
+
       echo "Trained model '$model_name'." . PHP_EOL;
 
       // die_error(strval(DEBUGMODE) . strval(DEBUGMODE_DATA) . strval(DEBUGMODE & DEBUGMODE_DATA));
@@ -1299,7 +1301,6 @@ class DBFit {
       $model->saveToDB($this->db, [$this->experimentID, $model_name], $model_id, $testData, $trainData);
       $model->dumpToDB($this->db, $model_id);
         // . "_" . join("", array_map([$this, "getColumnName"], ...).);
-
 
       $this->setHierarchyModel($recursionPath, $i_prob, clone $model);
       $prob_name = $this->getHierarchyName($recursionPath, $i_prob);

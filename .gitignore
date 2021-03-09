@@ -9,6 +9,7 @@ cachegrind.out*
 *.sql
 *.csv
 local-lib.php
+visitors.log
 
 !**/.gitignore
 !datasets/arff/.gitignore
