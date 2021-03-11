@@ -10,6 +10,7 @@ cachegrind.out*
 *.csv
 local-lib.php
 visitors.log
+paps.php
 
 !**/.gitignore
 !datasets/arff/.gitignore

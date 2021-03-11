@@ -113,7 +113,7 @@ class Instances {
   /**
    * Read data from file, (dense) ARFF/Weka format
    */
-  static function createFromARFF(string $path, string $csv_delimiter = "'") {
+  static function createFromARFF(string $path, string $csv_delimiter = "\"") {
     if (DEBUGMODE > 2) echo "Instances::createFromARFF($path)" . PHP_EOL;
     $f = fopen($path, "r");
     
@@ -154,6 +154,11 @@ class Instances {
     $data = [];
     $weights = [];
     $i = 0;
+
+    /** If the arff doesn't have an ID column, i create one */
+    if (!$ID_piton_is_present)
+      $instance_id = 1;
+
     while(!feof($f) && $line = /* mb_strtolower */ (fgets($f)))  {
       // echo $i;
       $row = str_getcsv($line, ",", $csv_delimiter);
@@ -162,6 +167,8 @@ class Instances {
         preg_match("/\s*(\d+)\s*/", $row[array_key_first($row)], $id);
         $instance_id = intval($id[1]);
         array_pop($row);
+      } else {
+        $instance_id = $instance_id + 1;
       }
 
       if (count($row) == count($attributes) + 1) {  
@@ -169,7 +176,7 @@ class Instances {
 
         $weights[] = floatval($w[1]);
         array_splice($row, array_key_last($row), 1);
-      } else if (count($row) != 1 + count($attributes)) {
+      } else if (count($row) != count($attributes)) {
         die_error("ARFF data wrongfully encoded. Found data row [$i] with " . 
           count($row) . " values when there are " . count($attributes) .
           " attributes.");
