@@ -113,7 +113,7 @@ class Instances {
   /**
    * Read data from file, (dense) ARFF/Weka format
    */
-  static function createFromARFF(string $path, string $csv_delimiter = "\"") {
+  static function createFromARFF(string $path, string $csv_delimiter = "'") {
     if (DEBUGMODE > 2) echo "Instances::createFromARFF($path)" . PHP_EOL;
     $f = fopen($path, "r");
     
@@ -157,7 +157,7 @@ class Instances {
 
     /** If the arff doesn't have an ID column, i create one */
     if (!$ID_piton_is_present)
-      $instance_id = 0;
+      $instance_id = -1;
 
     while(!feof($f) && $line = /* mb_strtolower */ (fgets($f)))  {
       // echo $i;
@@ -168,7 +168,7 @@ class Instances {
         $instance_id = intval($id[1]);
         array_pop($row);
       } else {
-        $instance_id = $instance_id + 1;
+        $instance_id += 1;
       }
 
       if (count($row) == count($attributes) + 1) {  
@@ -700,13 +700,18 @@ class Instances {
     $attributes = $this->getAttributes();
     $classAttr = array_shift($attributes);
     array_push($attributes, $classAttr);
+    $ID_piton_is_present = false;
 
     /* Attributes */
     fwrite($f, "@ATTRIBUTE '__ID_piton__' numeric");
     fwrite($f, "\n");
     foreach ($attributes as $attr) {
-      fwrite($f, "@ATTRIBUTE '" . addcslashes($attr->getName(), "'") . "' {$attr->getARFFType()}");
-      fwrite($f, "\n");
+      if ($attr->getName() === '__ID_piton__') {
+        $ID_piton_is_present = true;
+      } else {
+        fwrite($f, "@ATTRIBUTE '" . addcslashes($attr->getName(), "'") . "' {$attr->getARFFType()}");
+        fwrite($f, "\n");
+      }
     }
     
     /* Print the ARFF representation of a value of the attribute */
@@ -721,7 +726,11 @@ class Instances {
       $classVal = array_shift($row_perm);
       array_push($row_perm, $classVal);
 
-      fwrite($f, "$instance_id, " . join(",", $row_perm) . ", {" . $this->inst_weight($instance_id) . "}\n");
+      if ($ID_piton_is_present === false) {
+        fwrite($f, "$instance_id, " . join(",", $row_perm) . ", {" . $this->inst_weight($instance_id) . "}\n");
+      } else {
+        fwrite($f, "" . join(",", $row_perm) . ", {" . $this->inst_weight($instance_id) . "}\n");
+      }
     }
 
     fclose($f);
