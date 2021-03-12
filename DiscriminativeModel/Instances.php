@@ -1003,4 +1003,37 @@ class Instance extends ArrayObject {
      *
      * @return self
      */
+    /**
+ * Saves the current Instances in a table into the database
+ */
+function saveToDB(object &$db, string $tableName) {
+
+  $sql = "DROP TABLE IF EXISTS `$tableName`";
+  $stmt = $db->prepare($sql);
+  if (!$stmt)
+    die_error("Incorrect SQL query: $sql");
+  if (!$stmt->execute())
+    die_error("Query failed: $sql");
+  $stmt->close();
+
+  $sql = "CREATE TABLE `$tableName`"; // Name of the table/relation
+
+  $attributes = $this->getAttributes();
+  $classAttr = array_shift($attributes);  // mi salvo il classAttr... mi serve veramente qui?
+  array_push($attribtues, $classAttr);
+  $ID_piton_is_present = false;
+
+  $sql .= " (__ID_piton__ INT AUTO_INCREMENT PRIMARY KEY";
+  foreach ($attributes as $attr) {
+    if ($attr->getName() === '__ID_piton__') {
+      $ID_piton_is_present = true;
+    } else {
+      if ($attr->getType() === 'float')
+        $sql .= ", {$attr->getName()} DECIMAL)10.2) DEFAULT NULL";
+      else
+        $sql .= ", {$attr->getName()} VARCHAR(256) NOT NULL";
+    }
+  }
+  $sql .= ", weight INT DEFAULT 1";
+}
 ?>
