@@ -703,6 +703,7 @@ class Instances {
 
     /* Attributes */
     fwrite($f, "@ATTRIBUTE '__ID_piton__' numeric");
+    fwrite($f, "\n");
     foreach ($attributes as $attr) {
       fwrite($f, "@ATTRIBUTE '" . addcslashes($attr->getName(), "'") . "' {$attr->getARFFType()}");
       fwrite($f, "\n");
