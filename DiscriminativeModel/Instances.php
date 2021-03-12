@@ -157,7 +157,7 @@ class Instances {
 
     /** If the arff doesn't have an ID column, i create one */
     if (!$ID_piton_is_present)
-      $instance_id = 1;
+      $instance_id = 0;
 
     while(!feof($f) && $line = /* mb_strtolower */ (fgets($f)))  {
       // echo $i;
