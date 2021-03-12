@@ -974,8 +974,6 @@ class Instances {
     $this->attributes = array_map("clone_object", $this->attributes);
   }
 
-}
-
 /*
 /**
  * A single data instance.
@@ -1003,37 +1001,88 @@ class Instance extends ArrayObject {
      *
      * @return self
      */
-    /**
- * Saves the current Instances in a table into the database
- */
-function saveToDB(object &$db, string $tableName) {
 
-  $sql = "DROP TABLE IF EXISTS `$tableName`";
-  $stmt = $db->prepare($sql);
-  if (!$stmt)
-    die_error("Incorrect SQL query: $sql");
-  if (!$stmt->execute())
-    die_error("Query failed: $sql");
-  $stmt->close();
+  /**
+   * Saves the current Instances in a table into the database
+   */
+  function saveToDB(object &$db, string $tableName) {
 
-  $sql = "CREATE TABLE `$tableName`"; // Name of the table/relation
+    $sql = "DROP TABLE IF EXISTS `instances__$tableName`";
+    $stmt = $db->prepare($sql);
+    if (!$stmt)
+      die_error("Incorrect SQL query: $sql");
+    if (!$stmt->execute())
+      die_error("Query failed: $sql");
+    $stmt->close();
 
-  $attributes = $this->getAttributes();
-  $classAttr = array_shift($attributes);  // mi salvo il classAttr... mi serve veramente qui?
-  array_push($attribtues, $classAttr);
-  $ID_piton_is_present = false;
+    $sql = "CREATE TABLE `instances__$tableName`"; // Name of the table/relation
 
-  $sql .= " (__ID_piton__ INT AUTO_INCREMENT PRIMARY KEY";
-  foreach ($attributes as $attr) {
-    if ($attr->getName() === '__ID_piton__') {
-      $ID_piton_is_present = true;
-    } else {
-      if ($attr->getType() === 'float')
-        $sql .= ", {$attr->getName()} DECIMAL)10.2) DEFAULT NULL";
-      else
-        $sql .= ", {$attr->getName()} VARCHAR(256) NOT NULL";
+    // Attributes
+    $attributes = $this->getAttributes();
+    $classAttr = array_shift($attributes);  // mi salvo il classAttr... mi serve veramente qui?
+    array_push($attributes, $classAttr);
+    $ID_piton_is_present = false;
+
+    $sql .= " (__ID_piton__ INT AUTO_INCREMENT PRIMARY KEY";
+    foreach ($attributes as $attr) {
+      if ($attr->getName() === '__ID_piton__') {
+        $ID_piton_is_present = true;
+      } else {
+        if ($attr->getType() === 'float')
+          $sql .= ", {$attr->getName()} DECIMAL(10,2) DEFAULT NULL";
+        else
+          $sql .= ", {$attr->getName()} VARCHAR(256) NOT NULL";
+      }
     }
+    $sql .= ", weight INT DEFAULT 1)";
+
+    $stmt = $db->prepare($sql);
+    if (!$stmt)
+      die_error("Incorrect SQL query: $sql");
+    if (!$stmt->execute())
+      die_error("Query failed: $sql");
+    $stmt->close();
+
+    /* Print the ARFF representation of a value of the attribute */
+    $getARFFRepr = function ($val, Attribute $attr) {
+      return $val === NULL ? "?" : $attr->reprVal($val);
+    };
+
+    // Data
+    $arr_vals = [];
+    if ($ID_piton_is_present) {
+      foreach ($this->iterateRows() as $instance_id => $row) {
+        $row_perm = array_map($getARFFRepr, $this->getInstance($instance_id), $this->getAttributes());
+        $classVal = array_shift($row_perm);
+        array_push($row_perm, $classVal);
+        $str = "'" . join("', '", $row_perm) . "', '{$this->inst_weight($instance_id)}'";
+        $arr_vals[] = $str;
+      }
+    } else {
+      $i = 0;
+      foreach ($this->iterateRows() as $instance_id => $row) {
+        $row_perm = array_map($getARFFRepr, $this->getInstance($instance_id), $this->getAttributes());
+        $classVal = array_shift($row_perm);
+        array_push($row_perm, $classVal);
+        $str = "'" . (++$i) . "', '" . join("', '", $row_perm) . "', '{$this->inst_weight($instance_id)}'";
+        $arr_vals[] = $str;
+      }
+    }
+
+    $sql = "INSERT INTO `instances__$tableName` (__ID_piton__, ";
+
+    foreach ($attributes as $attr) {   
+        $sql .= "{$attr->getName()}, "; // It will also read ID_piton
+    }
+    // I use the fact that the weight isn't an attribute (I want to track it in the db table!)
+    $sql .= "weight) VALUES (" . join("), (", $arr_vals) . ")";
+
+    $stmt = $db->prepare($sql);
+    if (!$stmt)
+      die_error("Incorrect SQL query: $sql");
+    if (!$stmt->execute())
+      die_error("Query failed: $sql");
+    $stmt->close();
   }
-  $sql .= ", weight INT DEFAULT 1";
 }
 ?>
