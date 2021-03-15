@@ -50,7 +50,7 @@ class Instances {
       
       foreach ($data as $instance_id => &$inst) {
         if (is_array($weights)) {
-          $w = $weights[$instance_id];
+          $w = $weights[$instance_id-1];
         } else if(is_numeric($weights)) {
           $w = $weights;
         }
@@ -1003,23 +1003,34 @@ class Instance extends ArrayObject {
      */
 
   /**
-   * Saves the current Instances in a table into the database
+   * Saves the current Instances in a table into the database.
+   * 
+   * If there is a table in the database with the same name of $tableName, it is overwritten.
+   * It adds `instances__` as a prefix to $tableName, so it is possible to group them in a
+   * database administrator tool such as PhpMyAdmin.
    */
   function saveToDB(object &$db, string $tableName) {
 
-    $sql = "DROP TABLE IF EXISTS `instances__$tableName`";
+    $sql = "DROP TABLE IF EXISTS `instances__$tableName`"; // Drop the table if it already exists
+
+    // Query execution
     $stmt = $db->prepare($sql);
     if (!$stmt)
-      die_error("Incorrect SQL query: $sql");
+      die_error("Incorrect SQL query: $sql" . PHP_EOL);
     if (!$stmt->execute())
-      die_error("Query failed: $sql");
+      die_error("Query failed: $sql" . PHP_EOL);
     $stmt->close();
 
     $sql = "CREATE TABLE `instances__$tableName`"; // Name of the table/relation
 
-    // Attributes
+    /**
+     * Attributes
+     * The categorical attributes' domain is stored inside column comments in the database;
+     * for continuos attributes, 'numeric' is stored as a column comment instead.
+     * This semplifies the reading and reconstruction from a database of an object of type Instances.
+     */
     $attributes = $this->getAttributes();
-    $classAttr = array_shift($attributes);  // mi salvo il classAttr... mi serve veramente qui?
+    $classAttr = array_shift($attributes);
     array_push($attributes, $classAttr);
     $ID_piton_is_present = false;
 
@@ -1027,23 +1038,25 @@ class Instance extends ArrayObject {
     foreach ($attributes as $attr) {
       if ($attr->getName() === '__ID_piton__') {
         $ID_piton_is_present = true;
+      } else if ($attr instanceof DiscreteAttribute) {
+        $sql .= ", {$attr->getName()} VARCHAR(256) DEFAULT NULL COMMENT '{" . implode(",",$attr->getDomain()) . "}'";;
+      } else if ($attr instanceof ContinuousAttribute) {
+        $sql .= ", {$attr->getName()} DECIMAL(10,2) NOT NULL COMMENT 'numeric'";
       } else {
-        if ($attr->getType() === 'float')
-          $sql .= ", {$attr->getName()} DECIMAL(10,2) DEFAULT NULL";
-        else
-          $sql .= ", {$attr->getName()} VARCHAR(256) NOT NULL";
+        die_error("Error: couldn't decide the type of attribute {$attr->getName()}." . PHP_EOL);
       }
     }
     $sql .= ", weight INT DEFAULT 1)";
 
+    // Query execution
     $stmt = $db->prepare($sql);
     if (!$stmt)
-      die_error("Incorrect SQL query: $sql");
+      die_error("Incorrect SQL query: $sql" . PHP_EOL);
     if (!$stmt->execute())
-      die_error("Query failed: $sql");
+      die_error("Query failed: $sql" . PHP_EOL);
     $stmt->close();
-
-    /* Print the ARFF representation of a value of the attribute */
+    
+    /* Print the ARFF representation of a value of the attribute, which can be reused for the database */
     $getARFFRepr = function ($val, Attribute $attr) {
       return $val === NULL ? "?" : $attr->reprVal($val);
     };
@@ -1059,6 +1072,7 @@ class Instance extends ArrayObject {
         $arr_vals[] = $str;
       }
     } else {
+      // If ID_piton isn't present, a new ID is given instead (starting from 1)
       $i = 0;
       foreach ($this->iterateRows() as $instance_id => $row) {
         $row_perm = array_map($getARFFRepr, $this->getInstance($instance_id), $this->getAttributes());
@@ -1070,19 +1084,138 @@ class Instance extends ArrayObject {
     }
 
     $sql = "INSERT INTO `instances__$tableName` (__ID_piton__, ";
-
     foreach ($attributes as $attr) {   
-        $sql .= "{$attr->getName()}, "; // It will also read ID_piton
+        $sql .= "{$attr->getName()}, ";
     }
-    // I use the fact that the weight isn't an attribute (I want to track it in the db table!)
     $sql .= "weight) VALUES (" . join("), (", $arr_vals) . ")";
 
+    // Query execution
     $stmt = $db->prepare($sql);
     if (!$stmt)
-      die_error("Incorrect SQL query: $sql");
+      die_error("Incorrect SQL query: $sql" . PHP_EOL);
     if (!$stmt->execute())
-      die_error("Query failed: $sql");
+      die_error("Query failed: $sql" . PHP_EOL);
     $stmt->close();
+  }
+
+  /**
+   * (Re)Creates an object of class Instances from a table of the database
+   */
+  function createFromDB(object &$db, string $tableName) {
+    
+    $ID_piton_is_present = false;
+
+    /* Attributes */
+    $attributes = [];
+
+    // Read the name of the attributes
+    $sql = "SELECT group_concat(COLUMN_NAME)
+            FROM INFORMATION_SCHEMA.COLUMNS
+            WHERE TABLE_NAME = 'instances__$tableName';";
+
+    // Query execution
+    if (!($result = mysqli_query($db, $sql))) {
+      die_error("Error in SQL query!" . PHP_EOL);
+    }
+    
+    $tableAttributes = mysqli_fetch_array($result)[0];
+    mysqli_free_result($result);
+    $tableAttributes = explode(',', $tableAttributes);
+
+    foreach ($tableAttributes as $attr) {
+      if ($attr !== "__ID_piton__" && $attr !== "weight") {
+        // Recostruction of the domain of the attribute, stored in column comments in the database
+        $sql = "SELECT COLUMN_COMMENT
+                FROM INFORMATION_SCHEMA.COLUMNS
+                WHERE TABLE_NAME = 'instances__$tableName'
+                AND COLUMN_NAME = '$attr'";
+
+        // Query execution
+        if (!($result = mysqli_query($db, $sql))) {
+          die_error("Error in SQL query!" . PHP_EOL);
+        }
+
+        $domain = mysqli_fetch_array($result)[0];
+        mysqli_free_result($result);  
+        $attributes[] = Attribute::createFromDB($attr, $domain);
+      } else if ($attr === "__ID_piton__") {
+        $ID_piton_is_present = true;
+      } else if ($attr === "weight") {
+        break;
+      } else {
+        die_error("Unexpected error when reading attribute $attr from the database" . PHP_EOL);
+      }
+    }
+
+    $classAttr = array_pop($attributes);
+    array_unshift($attributes, $classAttr);
+
+    /* Print the internal representation given the ARFF value read, which can be reused for the database */
+    $getVal = function ($ARFFVal, Attribute $attr) {
+      $ARFFVal = trim($ARFFVal);
+      if ($ARFFVal === "?") {
+        return NULL;
+      }
+      $k = $attr->getKey($ARFFVal, true);
+      return $k;
+    };
+
+    /* Data */
+    $data = [];
+    $weights = [];
+    $i = 0;
+
+    /** If the table doesn't have an ID column, i create one;
+     *  it should have it if it is a recostruction of an object of class Instances
+     */
+    if (!$ID_piton_is_present)
+      $instance_id = 0;
+
+    $sql = "SELECT * FROM instances__$tableName";
+    if (!($result = mysqli_query($db, $sql))) {
+      die_error("Error in SQL query" . PHP_EOL);
+    }    
+
+    while ($row_data = mysqli_fetch_array($result))  {
+      $row = [];
+      // Must clear the array
+      if ($ID_piton_is_present) {
+        $row[] = $row_data['__ID_piton__'];
+      }
+      foreach ($attributes as $attr) {
+        $row[] = $row_data[$attr->getName()];
+      }
+      if (isset($row_data['weight'])) {
+        $row[] = $row_data['weight'];
+      }
+
+      if ($ID_piton_is_present) {
+        $instance_id = $row[array_key_first($row)];
+        array_shift($row);
+      } else {
+        ++$instance_id;
+      }
+
+      if (count($row) == count($attributes) + 1) { 
+        // Case weight is present 
+        $w = $row[array_key_last($row)];
+        $weights[] = floatval($w);
+        array_splice($row, array_key_last($row), 1);
+      } else if (count($row) != count($attributes)) {
+        die_error("Unexpected error when creating Instances' data from database at row $i" . PHP_EOL);
+      }
+
+      $data[$instance_id] = array_map($getVal, $row, $attributes);
+      $i++;
+    }
+
+    mysqli_free_result($result); 
+
+    if (!count($weights)) {
+      $weights = 1;
+    }
+
+    return new Instances($attributes, $data, $weights);
   }
 }
 ?>

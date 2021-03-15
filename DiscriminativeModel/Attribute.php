@@ -82,6 +82,27 @@ abstract class Attribute {
     return $attribute;
   }
 
+  /**
+   * Recreate the type and eventual domain for an attribute when reading it from a database table,
+   * making use of column comments
+   */
+  static function createFromDB(string $name, string $type, string $csv_delimiter = "'") : Attribute {        
+    switch (true) {
+      case preg_match("/\{\s*(.*)\s*\}/", $type, $domain_str);
+        $domain_arr = array_map("trim",  array_map("trim", str_getcsv($domain_str[1], ",", $csv_delimiter)));
+        $attribute = new DiscreteAttribute($name, "enum", $domain_arr);
+        break;
+      case isset(self::$ARFFtype2type[$type])
+       && in_array(self::$ARFFtype2type[$type], ["float", "int"]):
+        $attribute = new ContinuousAttribute($name, self::$ARFFtype2type[$type]);
+        break;
+      default:
+        die_error("Unknown ARFF type encountered: " . $type);
+        break;
+    }
+    return $attribute;
+  }
+
   /** Whether two attributes are equal (completely interchangeable) */
   function isEqualTo(Attribute $otherAttr) : bool {
     return (get_class($this) === get_class($otherAttr))
