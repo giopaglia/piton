@@ -254,6 +254,11 @@ class DiscreteAttribute extends Attribute {
     return $this->domain;
   }
 
+  /** Get the domain in the form 'value1','value2',...,'valueN' */
+  function getDomainString() : string {
+    return implode("','",$this->domain);
+  }
+
   function setDomain(array $domain)
   {
     foreach ($domain as $val) {

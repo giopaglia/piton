@@ -123,7 +123,7 @@ class Instances {
     while(!feof($f))  {
       $line = /* mb_strtolower */ (fgets($f));
       if (startsWith(mb_strtolower($line), "@attribute")) {
-        if (!startsWith(mb_strtolower($line), "@attribute '__ID_piton__'")) {
+        if (!startsWith(mb_strtolower($line), "@attribute '__id_piton__'")) {
           $attributes[] = Attribute::createFromARFF($line, $csv_delimiter);
         }
         else {
@@ -155,10 +155,9 @@ class Instances {
     $weights = [];
     $i = 0;
 
-    /** If the arff doesn't have an ID column, i create one */
+    /** If the arff doesn't have an ID column, i create one, starting from 1 */
     if (!$ID_piton_is_present)
-      $instance_id = -1;
-
+      $instance_id = 0;
     while(!feof($f) && $line = /* mb_strtolower */ (fgets($f)))  {
       // echo $i;
       $row = str_getcsv($line, ",", $csv_delimiter);
@@ -166,7 +165,7 @@ class Instances {
       if ($ID_piton_is_present) {
         preg_match("/\s*(\d+)\s*/", $row[array_key_first($row)], $id);
         $instance_id = intval($id[1]);
-        array_pop($row);
+        array_shift($row);
       } else {
         $instance_id += 1;
       }
@@ -181,9 +180,11 @@ class Instances {
           count($row) . " values when there are " . count($attributes) .
           " attributes.");
       }
+      
 
       $classVal = array_pop($row);
       array_unshift($row, $classVal);
+
       $data[$instance_id] = array_map($getVal, $row, $attributes);
       $i++;
     }
@@ -1039,7 +1040,7 @@ class Instance extends ArrayObject {
       if ($attr->getName() === '__ID_piton__') {
         $ID_piton_is_present = true;
       } else if ($attr instanceof DiscreteAttribute) {
-        $sql .= ", {$attr->getName()} VARCHAR(256) DEFAULT NULL COMMENT '{" . implode(",",$attr->getDomain()) . "}'";;
+        $sql .= ", {$attr->getName()} VARCHAR(256) DEFAULT NULL COMMENT \"{'" . $attr->getDomainString() . "'}\"";;
       } else if ($attr instanceof ContinuousAttribute) {
         $sql .= ", {$attr->getName()} DECIMAL(10,2) NOT NULL COMMENT 'numeric'";
       } else {
@@ -1147,9 +1148,6 @@ class Instance extends ArrayObject {
       }
     }
 
-    $classAttr = array_pop($attributes);
-    array_unshift($attributes, $classAttr);
-
     /* Print the internal representation given the ARFF value read, which can be reused for the database */
     $getVal = function ($ARFFVal, Attribute $attr) {
       $ARFFVal = trim($ARFFVal);
@@ -1165,7 +1163,7 @@ class Instance extends ArrayObject {
     $weights = [];
     $i = 0;
 
-    /** If the table doesn't have an ID column, i create one;
+    /** If the table doesn't have an ID column, i create one starting from 1;
      *  it should have it if it is a recostruction of an object of class Instances
      */
     if (!$ID_piton_is_present)
@@ -1193,7 +1191,7 @@ class Instance extends ArrayObject {
         $instance_id = $row[array_key_first($row)];
         array_shift($row);
       } else {
-        ++$instance_id;
+        $instance_id++;
       }
 
       if (count($row) == count($attributes) + 1) { 
