@@ -120,21 +120,24 @@ class Instances {
     $ID_piton_is_present = false;
     /* Attributes */
     $attributes = [];
+    $key = 0;
     while(!feof($f))  {
       $line = /* mb_strtolower */ (fgets($f));
       if (startsWith(mb_strtolower($line), "@attribute")) {
         if (!startsWith(mb_strtolower($line), "@attribute '__id_piton__'")) {
           $attributes[] = Attribute::createFromARFF($line, $csv_delimiter);
+          $key++;
         }
         else {
           $ID_piton_is_present = true;
+          $id_key = $key;
         }
       }
       if (startsWith(mb_strtolower($line), "@data")) {
         break;
       }
     }
-    $classAttr = array_pop($attributes);
+    $classAttr = array_pop($attributes);  // class Attribute must be in the last column
     array_unshift($attributes, $classAttr);
     // var_dump($attributes);
     // die_error("TODO");
@@ -163,9 +166,9 @@ class Instances {
       $row = str_getcsv($line, ",", $csv_delimiter);
 
       if ($ID_piton_is_present) {
-        preg_match("/\s*(\d+)\s*/", $row[array_key_first($row)], $id);
+        preg_match("/\s*(\d+)\s*/", $row[$id_key], $id);
         $instance_id = intval($id[1]);
-        array_shift($row);
+        array_splice($row, $id_key, 1);
       } else {
         $instance_id += 1;
       }
@@ -199,6 +202,7 @@ class Instances {
     return new Instances($attributes, $data, $weights);
   }
 
+  
   /**
    * Instances & attributes handling
    */

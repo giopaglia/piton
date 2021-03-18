@@ -9,8 +9,12 @@ cachegrind.out*
 *.sql
 *.csv
 local-lib.php
+local_lib.py
 visitors.log
 paps.php
+paps.py
+lib.py
+paps-todo
 
 !**/.gitignore
 !datasets/arff/.gitignore
