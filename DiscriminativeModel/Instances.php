@@ -202,6 +202,104 @@ class Instances {
     return new Instances($attributes, $data, $weights);
   }
 
+  static function createFromARFF2(string $path, string $classFeat, string $csv_delimiter = "'") {
+    /** It is possible to specify the class attribute wittgenstein style */
+    if (DEBUGMODE > 2) echo "Instances::createFromARFF($path)" . PHP_EOL;
+    $f = fopen($path, "r");
+    
+    $ID_piton_is_present = false;
+    /* Attributes */
+    $attributes = [];
+    $key = 0;
+    while(!feof($f))  {
+      $line = /* mb_strtolower */ (fgets($f));
+      if (startsWith(mb_strtolower($line), "@attribute")) {
+        if (!startsWith(mb_strtolower($line), "@attribute '__id_piton__'")) {
+          $newAttribute = Attribute::createFromARFF($line, $csv_delimiter);
+          $attributes[] = $newAttribute;
+          if ($newAttribute->getName() === $classFeat) {
+            $class_key = $key;
+          }
+          $key++;
+        }
+        else {
+          $ID_piton_is_present = true;
+          $id_key = $key;
+        }
+      }
+      if (startsWith(mb_strtolower($line), "@data")) {
+        break;
+      }
+    }
+
+    if ($id_key === $class_key) {
+      die_error("Unexpected error." . PHP_EOL);
+    }
+
+    $classAttr = $attributes[$class_key];
+    array_splice($attributes, $class_key, 1);
+    array_unshift($attributes, $classAttr);
+    
+    /* Print the internal representation given the ARFF value read */
+    $getVal = function ($ARFFVal, Attribute $attr) {
+      $ARFFVal = trim($ARFFVal);
+      if ($ARFFVal === "?") {
+        return NULL;
+      }
+      $k = $attr->getKey($ARFFVal, true);
+      return $k;
+    };
+
+    /* Data */
+    $data = [];
+    $weights = [];
+    $i = 0;
+
+    /** If the arff doesn't have an ID column, i create one, starting from 1 */
+    if (!$ID_piton_is_present)
+      $instance_id = 0;
+    while(!feof($f) && $line = /* mb_strtolower */ (fgets($f)))  {
+      // echo $i;
+      $row = str_getcsv($line, ",", $csv_delimiter);
+
+      if ($ID_piton_is_present) {
+        preg_match("/\s*(\d+)\s*/", $row[$id_key], $id);
+        $instance_id = intval($id[1]);
+        array_splice($row, $id_key, 1);
+      } else {
+        $instance_id += 1;
+      }
+
+      if (count($row) == count($attributes) + 1) {  
+        preg_match("/\s*\{\s*([\d\.]+)\s*\}\s*/", $row[array_key_last($row)], $w);
+
+        $weights[] = floatval($w[1]);
+        array_splice($row, array_key_last($row), 1);
+      } else if (count($row) != count($attributes)) {
+        die_error("ARFF data wrongfully encoded. Found data row [$i] with " . 
+          count($row) . " values when there are " . count($attributes) .
+          " attributes.");
+      }
+      
+
+      $classVal = $row[$class_key];
+      array_splice($row, $class_key, 1);
+      array_unshift($row, $classVal);
+
+      $data[$instance_id] = array_map($getVal, $row, $attributes);
+      $i++;
+    }
+    // var_dump($data);
+
+    if (!count($weights)) {
+      $weights = 1;
+    }
+
+    fclose($f);
+
+    return new Instances($attributes, $data, $weights);
+  }
+
   
   /**
    * Instances & attributes handling
