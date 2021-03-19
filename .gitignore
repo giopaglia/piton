@@ -15,6 +15,9 @@ paps.php
 paps.py
 lib.py
 paps-todo
+__pycache__/
+arff/
+*.sh
 
 !**/.gitignore
 !datasets/arff/.gitignore

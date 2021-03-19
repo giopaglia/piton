@@ -1258,6 +1258,7 @@ class DBFit {
 
       $dataframe->save_CSV("datasets/data-" . $this->getModelName($recursionPath, $i_prob) . ".csv");
       $dataframe->save_ARFF("datasets/arff/data-" . $this->getModelName($recursionPath, $i_prob) . ".arff");
+      $dataframe->saveToDB($this->db, "dataframe");
 
       /* Obtain and train, test set */
       list($trainData, $testData) = $this->getDataSplit($dataframe);
@@ -1276,6 +1277,8 @@ class DBFit {
         $testData->save_CSV("datasets/data-" . $this->getModelName($recursionPath, $i_prob) . "-TEST.csv"); // , false);
         $trainData->save_ARFF("datasets/arff/data-" . $this->getModelName($recursionPath, $i_prob) . "-TRAIN.arff");
         $testData->save_ARFF("datasets/arff/data-" . $this->getModelName($recursionPath, $i_prob) . "-TEST.arff");
+        $trainData->saveToDB($this->db, "trainData");
+        $testData->saveToDB($this->db, "testData");
       }
 
       /* Train */

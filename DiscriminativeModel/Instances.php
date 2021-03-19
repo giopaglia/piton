@@ -1110,95 +1110,87 @@ class Instance extends ArrayObject {
    * 
    * If there is a table in the database with the same name of $tableName, it is overwritten.
    * It adds `instances__` as a prefix to $tableName, so it is possible to group them in a
-   * database administrator tool such as PhpMyAdmin.
+   * database administrator tool such as PhpMyAdmin or MySQL Workbench.
    */
   function saveToDB(object &$db, string $tableName) {
 
-    $sql = "DROP TABLE IF EXISTS `instances__$tableName`"; // Drop the table if it already exists
+    $sql = "DROP TABLE IF EXISTS " . mysql_backtick_str("instances__$tableName");
+    mysql_prepare_and_executes($db, $sql);
 
-    // Query execution
-    $stmt = $db->prepare($sql);
-    if (!$stmt)
-      die_error("Incorrect SQL query: $sql" . PHP_EOL);
-    if (!$stmt->execute())
-      die_error("Query failed: $sql" . PHP_EOL);
-    $stmt->close();
-
-    $sql = "CREATE TABLE `instances__$tableName`"; // Name of the table/relation
+    $sql = "CREATE TABLE " . mysql_backtick_str("instances__$tableName");
 
     /**
      * Attributes
      * The categorical attributes' domain is stored inside column comments in the database;
      * for continuos attributes, 'numeric' is stored as a column comment instead.
      * This semplifies the reading and reconstruction from a database of an object of type Instances.
+     * 
+     * The class attribute, which in the Instances structure is saved as the first attribute,
+     * is moved at the end becoming the last attribute.
      */
     $attributes = $this->getAttributes();
     $classAttr = array_shift($attributes);
     array_push($attributes, $classAttr);
+
     $ID_piton_is_present = false;
 
-    $sql .= " (__ID_piton__ INT AUTO_INCREMENT PRIMARY KEY";
+    $sql .= " (`__ID_piton__` INT AUTO_INCREMENT PRIMARY KEY";
     foreach ($attributes as $attr) {
       if ($attr->getName() === '__ID_piton__') {
         $ID_piton_is_present = true;
       } else if ($attr instanceof DiscreteAttribute) {
-        $sql .= ", {$attr->getName()} VARCHAR(256) DEFAULT NULL COMMENT \"{'" . $attr->getDomainString() . "'}\"";;
+        $sql .= ", " . mysql_backtick_str($attr->getName())
+              . " VARCHAR(256) DEFAULT NULL COMMENT \""
+              . addcslashes($attr->getARFFType(), '"') . "\"";
       } else if ($attr instanceof ContinuousAttribute) {
-        $sql .= ", {$attr->getName()} DECIMAL(10,2) NOT NULL COMMENT 'numeric'";
+        $sql .= ", " . mysql_backtick_str($attr->getName())
+              . " DECIMAL(20,16) DEFAULT NULL COMMENT \"numeric\"";
       } else {
         die_error("Error: couldn't decide the type of attribute {$attr->getName()}." . PHP_EOL);
       }
     }
-    $sql .= ", weight INT DEFAULT 1)";
-
-    // Query execution
-    $stmt = $db->prepare($sql);
-    if (!$stmt)
-      die_error("Incorrect SQL query: $sql" . PHP_EOL);
-    if (!$stmt->execute())
-      die_error("Query failed: $sql" . PHP_EOL);
-    $stmt->close();
+    $sql .= ", `weight` INT DEFAULT 1)";
+    mysql_prepare_and_executes($db, $sql); // Prepares and executes the query
     
-    /* Print the ARFF representation of a value of the attribute, which can be reused for the database */
-    $getARFFRepr = function ($val, Attribute $attr) {
-      return $val === NULL ? "?" : $attr->reprVal($val);
+    /**
+     * Prints a representation of a value of the attribute;
+     * if the value is NULL, it prints the string "NULL";
+     * if the value contains a comma or a quote, it is escaped.
+     */
+    $getRepr = function ($val, Attribute $attr) {
+      return $val === NULL ? "NULL" : "'" . addcslashes($attr->reprVal($val), ",'") . "'";
     };
 
-    // Data
+    /**
+     * Data
+     */
     $arr_vals = [];
     if ($ID_piton_is_present) {
       foreach ($this->iterateRows() as $instance_id => $row) {
-        $row_perm = array_map($getARFFRepr, $this->getInstance($instance_id), $this->getAttributes());
+        $row_perm = array_map($getRepr, $this->getInstance($instance_id), $this->getAttributes());
         $classVal = array_shift($row_perm);
         array_push($row_perm, $classVal);
-        $str = "'" . join("', '", $row_perm) . "', '{$this->inst_weight($instance_id)}'";
+        $str = join(",", $row_perm) . ", '{$this->inst_weight($instance_id)}'";
         $arr_vals[] = $str;
       }
     } else {
       // If ID_piton isn't present, a new ID is given instead (starting from 1)
       $i = 0;
       foreach ($this->iterateRows() as $instance_id => $row) {
-        $row_perm = array_map($getARFFRepr, $this->getInstance($instance_id), $this->getAttributes());
+        $row_perm = array_map($getRepr, $this->getInstance($instance_id), $this->getAttributes());
         $classVal = array_shift($row_perm);
         array_push($row_perm, $classVal);
-        $str = "'" . (++$i) . "', '" . join("', '", $row_perm) . "', '{$this->inst_weight($instance_id)}'";
+        $str = "'" . (++$i) . "', ". join(",", $row_perm) . ", '{$this->inst_weight($instance_id)}'";
         $arr_vals[] = $str;
       }
     }
 
-    $sql = "INSERT INTO `instances__$tableName` (__ID_piton__, ";
+    $sql = "INSERT INTO " . mysql_backtick_str("instances__$tableName") . " (`__ID_piton__`, ";
     foreach ($attributes as $attr) {   
-        $sql .= "{$attr->getName()}, ";
+        $sql .= mysql_backtick_str($attr->getName()) .  ", ";
     }
-    $sql .= "weight) VALUES (" . join("), (", $arr_vals) . ")";
-
-    // Query execution
-    $stmt = $db->prepare($sql);
-    if (!$stmt)
-      die_error("Incorrect SQL query: $sql" . PHP_EOL);
-    if (!$stmt->execute())
-      die_error("Query failed: $sql" . PHP_EOL);
-    $stmt->close();
+    $sql .= "`weight`) VALUES (" . join("), (", $arr_vals) . ")";
+    mysql_prepare_and_executes($db, $sql); // Prepares and executes the query
   }
 
   /**

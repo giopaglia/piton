@@ -41,7 +41,41 @@ function warn($msg)
 function mysql_set($arr, $map_function = "mysql_quote_str") { return "(" . mysql_list($arr, $map_function) . ")"; }
 function mysql_list($arr, $map_function = "mysql_backtick_str") { return join(", ", array_map($map_function, $arr)); }
 function mysql_quote_str($str) { return "'$str'"; }
-function mysql_backtick_str($str) { return "`$str`"; }
+
+/**
+ * Add opening and closing backticks to a string.
+ * If the string contains a backsick, it stops the execution (escape doesn't work with backticks,
+ * better give an error than sanitizing the string).
+ */
+function mysql_backtick_str($str) {
+  if (strpos($str, '`') === false) {
+    return "`$str`";
+  } else {
+    die_error("The string $str contains a backtick." . PHP_EOL);
+  }
+}
+
+/**
+ * Prints the string given and ends the execution.
+ */
+function mysql_debug(string $sql) {
+  echo $sql . PHP_EOL;
+  die_error("die" . PHP_EOL);
+}
+
+/**
+ * Prepares and executes a mysql query without any output.
+ */
+function mysql_prepare_and_executes(object &$db, string $sql) {
+  $stmt = $db->prepare($sql);
+    if (!$stmt) {
+      die_error("Incorrect SQL query: $sql" . PHP_EOL);
+    }
+    if (!$stmt->execute()) {
+      die_error("Query failed: $sql" . PHP_EOL);
+    }
+    $stmt->close();
+}
 
 function &mysql_select(object &$db, string $sql, bool $silent = false) : object {
 
