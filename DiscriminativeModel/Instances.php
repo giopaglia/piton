@@ -1114,10 +1114,12 @@ class Instance extends ArrayObject {
    */
   function saveToDB(object &$db, string $tableName) {
 
-    $sql = "DROP TABLE IF EXISTS " . mysql_backtick_str("instances__$tableName");
+    //$sql = "DROP TABLE IF EXISTS " . mysql_backtick_str("instances__$tableName");
+    $sql = "DROP TABLE IF EXISTS " . mysql_backtick_str("$tableName");
     mysql_prepare_and_executes($db, $sql);
 
-    $sql = "CREATE TABLE " . mysql_backtick_str("instances__$tableName");
+    //$sql = "CREATE TABLE " . mysql_backtick_str("instances__$tableName");
+    $sql = "CREATE TABLE " . mysql_backtick_str("$tableName");
 
     /**
      * Attributes
@@ -1185,7 +1187,8 @@ class Instance extends ArrayObject {
       }
     }
 
-    $sql = "INSERT INTO " . mysql_backtick_str("instances__$tableName") . " (`__ID_piton__`, ";
+    //$sql = "INSERT INTO " . mysql_backtick_str("instances__$tableName") . " (`__ID_piton__`, ";
+    $sql = "INSERT INTO " . mysql_backtick_str("$tableName") . " (`__ID_piton__`, ";
     foreach ($attributes as $attr) {   
         $sql .= mysql_backtick_str($attr->getName()) .  ", ";
     }

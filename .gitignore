@@ -18,6 +18,7 @@ paps-todo
 __pycache__/
 arff/
 *.sh
+DOMANDE
 
 !**/.gitignore
 !datasets/arff/.gitignore

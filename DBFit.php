@@ -921,6 +921,20 @@ class DBFit {
     }
   }
 
+  /* Need a nickname for every table when saving Instances in the database,
+      since MySQL doesn't like table names longer that 64 characters.
+      It also tracks the name of the table in the DB.      
+  */
+  function getTableNickname(string $tableName) {
+    $tableNickname = "X" . md5($tableName);
+    $sql = "CREATE TABLE IF NOT EXISTS `Table reference` (`ID` INT AUTO_INCREMENT PRIMARY KEY, `Table nickname` VARCHAR(256) NULL, `Table name` VARCHAR(256) NOT NULL)";
+    mysql_prepare_and_executes($this->db, $sql);
+    $sql = "INSERT INTO `Table reference` (`Table nickname`, `Table name`) VALUES ('"
+          . mysqli_real_escape_string($this->db, $tableName) . "', '" . mysqli_real_escape_string($this->db,$tableNickname) . "')";
+    mysql_prepare_and_executes($this->db, $sql);
+    return $tableNickname;
+  }
+
   /* Helper */
   private function getSQLConstraints($idVal, array $recursionPath) : array {
     $constraints = $this->getSQLWhereClauses($idVal, $recursionPath);
@@ -1258,7 +1272,7 @@ class DBFit {
 
       $dataframe->save_CSV("datasets/data-" . $this->getModelName($recursionPath, $i_prob) . ".csv");
       $dataframe->save_ARFF("datasets/arff/data-" . $this->getModelName($recursionPath, $i_prob) . ".arff");
-      $dataframe->saveToDB($this->db, "dataframe");
+      $dataframe->saveToDB($this->db, $this->getTableNickname("data-" . $this->getModelName($recursionPath, $i_prob)));
 
       /* Obtain and train, test set */
       list($trainData, $testData) = $this->getDataSplit($dataframe);
@@ -1277,8 +1291,8 @@ class DBFit {
         $testData->save_CSV("datasets/data-" . $this->getModelName($recursionPath, $i_prob) . "-TEST.csv"); // , false);
         $trainData->save_ARFF("datasets/arff/data-" . $this->getModelName($recursionPath, $i_prob) . "-TRAIN.arff");
         $testData->save_ARFF("datasets/arff/data-" . $this->getModelName($recursionPath, $i_prob) . "-TEST.arff");
-        $trainData->saveToDB($this->db, "trainData");
-        $testData->saveToDB($this->db, "testData");
+        $trainData->saveToDB($this->db, $this->getTableNickname("data-" . $this->getModelName($recursionPath, $i_prob) . "-TRAIN")); // trainData
+        $testData->saveToDB($this->db, $this->getTableNickname("data-" . $this->getModelName($recursionPath, $i_prob) . "-TEST"));  // testData
       }
 
       /* Train */

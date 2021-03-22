@@ -125,3 +125,8 @@ TODO: at prediction time just interrogate the database once and then use that sa
 - test con piu' livelli (e.g quantita')
 // TODO bow possibility to specify the langage for each column
 // TODO stemming in italiano
+
+
+- TODO: create a dataCleaningThreshold attribute for DBFit and relative setter and getter methods. This value should be
+  between 0 and 1, meaning "do not remove more than this percentage of tuples; if you had to remove more instances,
+  remove the attribute instead" (the attribute would be too little informative).
