@@ -13,7 +13,6 @@ local_lib.py
 visitors.log
 paps.php
 paps.py
-lib.py
 paps-todo
 __pycache__/
 arff/
