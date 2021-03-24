@@ -182,8 +182,7 @@ class Instances {
         die_error("ARFF data wrongfully encoded. Found data row [$i] with " . 
           count($row) . " values when there are " . count($attributes) .
           " attributes.");
-      }
-      
+      }      
 
       $classVal = array_pop($row);
       array_unshift($row, $classVal);
@@ -1197,111 +1196,95 @@ class Instance extends ArrayObject {
   }
 
   /**
-   * (Re)Creates an object of class Instances from a table of the database
+   * (Re)Creates an object of class Instances from a table in the database
    */
   function createFromDB(object &$db, string $tableName) {
     
     $ID_piton_is_present = false;
 
-    /* Attributes */
+    /** Attributes */
     $attributes = [];
 
-    // Read the name of the attributes
-    $sql = "SELECT group_concat(COLUMN_NAME)
+    /** Read the name of the attributes */
+    $sql = "SELECT COLUMN_NAME
             FROM INFORMATION_SCHEMA.COLUMNS
-            WHERE TABLE_NAME = 'instances__$tableName';";
+            WHERE TABLE_NAME = '" . mysqli_real_escape_string($db, $tableName) . "'
+            ORDER BY ORDINAL_POSITION";
+    $result = mysql_select($db, $sql, true);
 
-    // Query execution
-    if (!($result = mysqli_query($db, $sql))) {
-      die_error("Error in SQL query!" . PHP_EOL);
-    }
-    
-    $tableAttributes = mysqli_fetch_array($result)[0];
+    while($tableAttribute = mysqli_fetch_array($result))
+      $tableAttributes[] = $tableAttribute[0];
     mysqli_free_result($result);
-    $tableAttributes = explode(',', $tableAttributes);
 
     foreach ($tableAttributes as $attr) {
       if ($attr !== "__ID_piton__" && $attr !== "weight") {
-        // Recostruction of the domain of the attribute, stored in column comments in the database
+        /** Recostruction of the domain of the attribute, stored in column comments in the database */
         $sql = "SELECT COLUMN_COMMENT
                 FROM INFORMATION_SCHEMA.COLUMNS
-                WHERE TABLE_NAME = 'instances__$tableName'
-                AND COLUMN_NAME = '$attr'";
-
-        // Query execution
-        if (!($result = mysqli_query($db, $sql))) {
-          die_error("Error in SQL query!" . PHP_EOL);
-        }
-
+                WHERE TABLE_NAME = '" . mysqli_real_escape_string($db, $tableName) . "'
+                AND COLUMN_NAME = '" . mysqli_real_escape_string($db, $attr) . "'";
+        $result = mysql_select($db, $sql, true);
         $domain = mysqli_fetch_array($result)[0];
-        mysqli_free_result($result);  
+        mysqli_free_result($result);
+
         $attributes[] = Attribute::createFromDB($attr, $domain);
       } else if ($attr === "__ID_piton__") {
         $ID_piton_is_present = true;
-      } else if ($attr === "weight") {
-        break;
-      } else {
+      } else if ($attr !== "weight") {
         die_error("Unexpected error when reading attribute $attr from the database" . PHP_EOL);
       }
     }
+    /**
+     * In the database table, the class Attribute is the last (excluding the ID and the weight column),
+     * but in an object of type Instances it's at the beginning; a swap between them is needed.
+     */
+    $classAttr = $attributes[array_key_last($attributes)];
+    array_splice($attributes, array_key_last($attributes), 1);
+    array_unshift($attributes, $classAttr);
 
-    /* Print the internal representation given the ARFF value read, which can be reused for the database */
-    $getVal = function ($ARFFVal, Attribute $attr) {
-      $ARFFVal = trim($ARFFVal);
-      if ($ARFFVal === "?") {
+    /** Prints the internal representation given the database value read */
+    $getVal = function ($DBVal, Attribute $attr) {
+      $DBVal = trim($DBVal);
+      if (empty($DBVal)) {
         return NULL;
       }
-      $k = $attr->getKey($ARFFVal, true);
+      $k = $attr->getKey($DBVal, true);
       return $k;
     };
 
-    /* Data */
+    /** Data */
     $data = [];
     $weights = [];
-    $i = 0;
 
-    /** If the table doesn't have an ID column, i create one starting from 1;
-     *  it should have it if it is a recostruction of an object of class Instances
+    /**
+     * If the table doesn't have an ID column, i create one starting from 1; however,
+     *  it should have one, being a reconstruction of an object of class Instances.
      */
     if (!$ID_piton_is_present)
       $instance_id = 0;
 
-    $sql = "SELECT * FROM instances__$tableName";
-    if (!($result = mysqli_query($db, $sql))) {
-      die_error("Error in SQL query" . PHP_EOL);
-    }    
+    $sql = "SELECT * FROM " . mysql_backtick_str(mysqli_real_escape_string($db, $tableName));
+    $result = mysql_select($db, $sql, true);
 
-    while ($row_data = mysqli_fetch_array($result))  {
+    while ($row_data = mysqli_fetch_array($result, MYSQLI_ASSOC))  {
       $row = [];
-      // Must clear the array
       if ($ID_piton_is_present) {
-        $row[] = $row_data['__ID_piton__'];
+        $instance_id = $row_data['__ID_piton__'];
+      } else {
+        $instance_id++;
       }
       foreach ($attributes as $attr) {
         $row[] = $row_data[$attr->getName()];
       }
       if (isset($row_data['weight'])) {
-        $row[] = $row_data['weight'];
+        $weights[] = floatval($row_data['weight']);
       }
 
-      if ($ID_piton_is_present) {
-        $instance_id = $row[array_key_first($row)];
-        array_shift($row);
-      } else {
-        $instance_id++;
-      }
-
-      if (count($row) == count($attributes) + 1) { 
-        // Case weight is present 
-        $w = $row[array_key_last($row)];
-        $weights[] = floatval($w);
-        array_splice($row, array_key_last($row), 1);
-      } else if (count($row) != count($attributes)) {
-        die_error("Unexpected error when creating Instances' data from database at row $i" . PHP_EOL);
+      if (count($row) != count($attributes)) {
+        die_error("Unexpected error when creating Instances' data from database at row of id: $instance_id" . PHP_EOL);
       }
 
       $data[$instance_id] = array_map($getVal, $row, $attributes);
-      $i++;
     }
 
     mysqli_free_result($result); 
