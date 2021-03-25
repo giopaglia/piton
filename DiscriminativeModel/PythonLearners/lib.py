@@ -1,5 +1,17 @@
 import pandas as pd
 import math as mt
+from io import StringIO 
+import sys
+
+class Capturing(list):  # and object of class Capturing can direct an output to a list
+    def __enter__(self):
+        self._stdout = sys.stdout
+        sys.stdout = self._stringio = StringIO()
+        return self
+    def __exit__(self, *args):
+        self.extend(self._stringio.getvalue().splitlines())
+        del self._stringio    # free up some memory
+        sys.stdout = self._stdout
 
 def object_attrs_to_cat(df):    # for evey attribute in the dataframe, if it's of type object, it converts it to categorical
     for column_name in df:
@@ -59,3 +71,15 @@ def clear_categorical_nan(df):  #removes every row echich contains a NaN value f
             df = na_free
     print("\n")
     return df
+
+def replace_words(s, words):    # given a string s, replaces the key dictionary words with respective dictionary values
+    for k, v in words.items():
+        s = s.replace(k, v)
+    return s
+
+def get_negative_class_value(df):   # gives the negative class attribute
+    class_attr = get_class_attr(df)
+    class_values = df[class_attr].unique()
+    neg_class_val = [i for i in class_values if i != class_attr]
+    return neg_class_val[0]
+

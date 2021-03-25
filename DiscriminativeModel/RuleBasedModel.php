@@ -1115,6 +1115,26 @@ end";
     return $model;
   }
 
+  /** Building a RuleBasedModel from a pre-parsed string result of the execution of a WittgensteinLearner */
+  static function fromWittgensteinString(string $str, DiscreteAttribute $classAttr = NULL, array $attributes) : RuleBasedModel {
+    /** Separating the rules */
+    $rules_str_arr = array_filter(preg_split("/[\n\r]/", trim($str)), function ($v) { return $v !== ""; });
+    $rules = [];
+    /** Getting the class attribute domain for encoding/decoding from [0]-[1] values */
+    $outputMap = array_flip($classAttr->getDomain());
+    /** Building classification rules */
+    foreach ($rules_str_arr as $rule_str) {
+      list($rule, $ruleAttributes) = ClassificationRule::fromString($rule_str, $outputMap);
+      $rules[] = $rule;
+    }
+    /** Building a new model */
+    $model = new RuleBasedModel();
+    $model->setRules($rules);
+    $model->setAttributes($attributes);
+    $model->reindexAttributes();
+    return $model;
+  }
+
   /* Print a textual representation of the rule */
   function __toString () : string {
     $rules = $this->getRules();

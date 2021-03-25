@@ -1,15 +1,6 @@
 <?php
 
-/*
- * Interface for learner/optimizers
- */
-abstract class Learner {
-  /* Returns an uninitialized DiscriminativeModel */
-  abstract function initModel() : DiscriminativeModel;
-
-  /* Trains a DiscriminativeModel */
-  abstract function teach(DiscriminativeModel &$model, Instances $data);
-}
+include_once "Learner.php";
 
 /*
  * Repeated Incremental Pruning to Produce Error Reduction (RIPPER),
@@ -691,59 +682,4 @@ class PRip extends Learner {
   }
 
 }
-
-/*
- * Interface for wittgenstein learner
- */
-class WittgensteinLearner extends Learner {
-  /** A WittgensteinLearner needs a connection to a db to exchange data */
-  private $db;
-
-  function getDB() : object {
-    return $this->db;
-  }
-
-  function setDB(object $db) :void {
-    $this->db = $db;
-  }
-
-  /* Returns an uninitialized DiscriminativeModel */
-  function initModel() : DiscriminativeModel {
-    return new RuleBasedModel();
-  }
-
-  /**
-   * Builds a model through a specified wittgenstein algorithm.
-   * 
-   * @param model the model to train
-   * @param tableNickname the Nickname given to the table by the md5 function where the data is stored in the database.
-   */
-  function teach(DiscriminativeModel &$model, Instances $data) {
-
-    /** Copy from PRIP teaching */
-    $data = clone $data;
-    //srand($this->seed);
-    $model->resetRules();
-
-    /* Remove instances with missing class */
-    $data->removeUselessInsts();
-    /** Copy from PRIP teaching */
-
-    $db = $this->getDB();
-    $data->SaveToDB($db, "trainData");
-    $command = escapeshellcmd("python DiscriminativeModel/PythonLearners/wittgenstein_learner.py trainData");
-    $output = shell_exec($command);
-    echo $output;
-    preg_match('/\[\[(.*?)\]\]/ms',$output,$matches);
-    $rule = $matches[0];
-    /** All good here */
-    /** TODO: add the rule to the model */
-    print("Given rule: " . $rule);
-
-    //$model->setRules($rule);
-
-    
-  }
-}
-
 ?>
