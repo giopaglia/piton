@@ -39,7 +39,7 @@ def print_dataframe(df):    # prints all the dataframe rows
 # I want to eliminate all columns that contains more than % of the data as NaN
 # Then I remove every row which contains a null data for a numeric attribute
 def clean_dataframe(df, cp):
-    th = mt.ceil(cp*len(df.index))
+    th = mt.ceil((1-cp)*len(df.index))
     print("removing cols with more than " + str(len(df.index) - th) + " NaN values\n")
     na_free = df.dropna(axis='columns', thresh=th)
     only_na = df.columns[~df.columns.isin(na_free.columns)]
@@ -76,6 +76,15 @@ def replace_words(s, words):    # given a string s, replaces the key dictionary 
     for k, v in words.items():
         s = s.replace(k, v)
     return s
+
+def contains_val(df, attr, val):    # returns True if the attribute of the df contains the val, otherwise it returns False
+    class_attr = get_class_attr(df)
+    class_values = df[class_attr].unique()
+    val = [i for i in class_values if i == class_attr]
+    if val:
+        return True
+    else:
+        return False
 
 def get_negative_class_value(df):   # gives the negative class attribute
     class_attr = get_class_attr(df)

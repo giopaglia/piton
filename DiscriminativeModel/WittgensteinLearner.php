@@ -3,14 +3,33 @@
 include_once "Learner.php";
 
 /*
- * Interface for wittgenstein learner
+ * Interface for wittgenstein learner.
+ * 
+ * This class offers compatibility with the python wittgenstein package, which
+ * implements two iterative coverage-based ruleset algorithms: IREP and RIPPERk.
+ * 
+ * The package must be installed on your operating system or python environment.
+ * To install, use:
+ *    $ pip install wittgenstein
+ * Requirements:
+ *    pandas
+ *    numpy
+ *    python version>=3.6
  */
 class WittgensteinLearner extends Learner {
+
+  /**
+   * The chosen iterative coverage-based ruleset algorithm used for classification.
+   * It is possibile to choose between IREP and RIPPERk.
+   */
+  private $classifier;
     
-  /** A WittgensteinLearner needs a connection to a db to exchange data */
+  /**
+   * A WittgensteinLearner needs a connection to a db to exchange data.
+   */
   private $db;
 
-  /*** Options that are useful during the training stage */
+  /*** Options that are useful during the training stage. */
 
   /**
    * Number of RIPPERk optimization iterations.
@@ -79,6 +98,42 @@ class WittgensteinLearner extends Learner {
    * int, default=0
    */
   private $verbosity;
+
+  /**
+   * The constructor of the WittgensteinLearner.
+   * A classifier algorithm and a database connection are required, but they can be changed later on.
+   * It is also possible to set a random seed, which is set to NULL by default.
+   * The other options are set to their default values, and can be set later on.
+   */
+  function __construct(string $classifier, object $db, ?int $randomState) {
+    $this->setClassifier($classifier);
+    $this->setDBConnection($db);
+    /** Options */
+    $this->setK(2);
+    $this->setDlAllowance(64);
+    $this->setPruneSize(0.33);
+    $this->setNDiscretizeBins(10);
+    $this->setMaxRules(NULL);
+    $this->setMaxRuleConds(NULL);
+    $this->setMaxTotalConds(NULL);
+    $this->setRandomState($randomState);
+    $this->setVerbosity(0);
+  }
+  
+  /**
+   * Gives information about the current wittgenstein classifier used for the training.
+   */
+  function getClassifier() : string {
+    return $this->classifier;
+  }
+
+  /**
+   * Sets the wittgenstein classifier to use for the training.
+   * It is possible to choose between IREP and RIPPERk.
+   */
+  function setClassifier(string $classifier) :void {
+    $this->classifier = $classifier;
+  }
   
   /**
    * Gives information about the database which the learner is connected,
@@ -236,6 +291,9 @@ class WittgensteinLearner extends Learner {
    */
   function teach(DiscriminativeModel &$model, Instances $data) {
 
+    /** Chosen classifier */
+    $classifier = $this->getClassifier();
+
     /** DB used to communicate with python */
     $db = $this->getDBConnection();
 
@@ -267,13 +325,18 @@ class WittgensteinLearner extends Learner {
     };
 
     /** Call to the python script that will use the training algorithm of the library */
-    $command = escapeshellcmd("python DiscriminativeModel/PythonLearners/wittgenstein_learner.py "
-                              . "reserved__tmpWittgensteinTrainData " . $getParameter($k) . " "
-                              . $getParameter($dlAllowance) . " " . $getParameter($pruneSize) . " "
-                              . $getParameter($nDiscretizeBins) . " " . $getParameter($maxRules) . " "
-                              . $getParameter($maxRuleConds) . " " . $getParameter($maxTotalConds) . " "
-                              . $getParameter($randomState) . " " . $getParameter($verbosity));
-    $output = shell_exec($command);
+    if ($classifier === "RIPPERk" || $classifier === "IREP") {
+      $command = escapeshellcmd("python DiscriminativeModel/PythonLearners/wittgenstein_learner.py "
+                                . $getParameter($classifier) . " reserved__tmpWittgensteinTrainData "
+                                . $getParameter($k) . " " . $getParameter($dlAllowance) . " "
+                                . $getParameter($pruneSize) . " " . $getParameter($nDiscretizeBins) . " "
+                                . $getParameter($maxRules) . " " . $getParameter($maxRuleConds) . " "
+                                . $getParameter($maxTotalConds) . " " . $getParameter($randomState) . " "
+                                . $getParameter($verbosity));
+      $output = shell_exec($command);
+    } else {
+      die_error("The classifier $classifier is invalid. Please choose between RIPPERk and IREP." . PHP_EOL);
+    }
     
     /** Drop of the temporary table for safety reason */
     $sql = "DROP TABLE reserved__tmpWittgensteinTrainData";
@@ -282,6 +345,9 @@ class WittgensteinLearner extends Learner {
     /** Parsing of the extracted rules to a string I can use to build a RuleBasedModel */
     echo $output;
     preg_match('/extracted_rule_based_model:(.*?)\[(.*?)\]/ms', $output, $matches);
+    if (empty($matches[0])) {
+      die_error("The WittgensteinLearner using $classifier did not return a valid RuleBasedModel." . PHP_EOL);
+    }
     $rule = $matches[0];
     if (substr($rule, 0, strlen('extracted_rule_based_model: [')) == 'extracted_rule_based_model: [') {
       $rule = substr($rule, strlen('extracted_rule_based_model: ['));
