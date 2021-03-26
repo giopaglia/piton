@@ -1064,10 +1064,11 @@ end";
   public function setAttributes(array $attributes) : self
   {
     $this->attributes = $attributes;
+    $this->reindexAttributes();
     return $this;
   }
 
-  function reindexAttributes() {
+  protected function reindexAttributes() {
     foreach ($this->attributes as $k => &$attribute) {
       $attribute->setIndex($k);
     }
@@ -1111,7 +1112,6 @@ end";
     $model = new RuleBasedModel();
     $model->setRules($rules);
     $model->setAttributes($attributes);
-    $model->reindexAttributes();
     return $model;
   }
 
@@ -1131,7 +1131,6 @@ end";
     $model = new RuleBasedModel();
     $model->setRules($rules);
     $model->setAttributes($attributes);
-    $model->reindexAttributes();
     return $model;
   }
 

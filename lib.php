@@ -68,13 +68,13 @@ function mysql_debug(string $sql) {
  */
 function mysql_prepare_and_executes(object &$db, string $sql) {
   $stmt = $db->prepare($sql);
-    if (!$stmt) {
-      die_error("Incorrect SQL query: $sql" . PHP_EOL);
-    }
-    if (!$stmt->execute()) {
-      die_error("Query failed: $sql" . PHP_EOL);
-    }
-    $stmt->close();
+  if (!$stmt) {
+    die_error("Incorrect SQL query: $sql" . PHP_EOL);
+  }
+  if (!$stmt->execute()) {
+    die_error("Query failed: $sql" . PHP_EOL);
+  }
+  $stmt->close();
 }
 
 function &mysql_select(object &$db, string $sql, bool $silent = false) : object {

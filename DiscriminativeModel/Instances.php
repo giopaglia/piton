@@ -408,7 +408,7 @@ class Instances {
       echo "Removed $c useless instances" . PHP_EOL;
   }
 
-  function reindexAttributes() {
+  protected function reindexAttributes() {
     foreach ($this->attributes as $k => &$attribute) {
       $attribute->setIndex($k);
     }
@@ -430,10 +430,11 @@ class Instances {
     return $attributesSubset === NULL ? $this->attributes : sub_array($this->attributes, $attributesSubset);
   }
   
-  protected function setAttributes(array $attributes)
+  protected function setAttributes(array $attributes) : self
   {
     $this->attributes = $attributes;
     $this->reindexAttributes();
+    return $this;
   }
 
   function getIds() : array
@@ -1164,7 +1165,7 @@ class Instance extends ArrayObject {
     if (!$ID_piton_is_present)
       $instance_id = 0;
 
-    $sql = "SELECT * FROM " . mysql_backtick_str(mysqli_real_escape_string($db, $tableName));
+    $sql = "SELECT * FROM " . mysql_backtick_str($tableName);
     $result = mysql_select($db, $sql, true);
 
     while ($row_data = mysqli_fetch_array($result, MYSQLI_ASSOC))  {
