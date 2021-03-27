@@ -702,6 +702,7 @@ table.blueTable tfoot .links a{
     $numRulesRNA = 0;
     $numRulesNRA = 0;
     $numRulesNRNA = 0;
+    $totNumRules = count($this->rules);
 
     $arr_vals = [];
     foreach ($this->rules as $rule) {
@@ -794,14 +795,16 @@ table.blueTable tfoot .links a{
     $sql .= ", date DATETIME NOT NULL";
     $sql .= ", modelName TEXT NOT NULL";
     $sql .= ", tableName TEXT NOT NULL";
-    $sql .= ", classId INT NOT NULL";
-    $sql .= ", className TEXT NOT NULL";
+    $sql .= ", totNumRules INT NOT NULL";
+
+    $sql .= ", classId INT";
+    $sql .= ", className TEXT";
 
     $sql .= ", numRulesRA INT DEFAULT NULL";
     $sql .= ", numRulesRNA INT DEFAULT NULL";
     $sql .= ", numRulesNRA INT DEFAULT NULL";
     $sql .= ", numRulesNRNA INT DEFAULT NULL";
-    $sql .= ", totNumRules INT AS (`numRulesRA` + `numRulesRNA` + `numRulesNRA` + `numRulesNRNA`)";
+    // $sql .= ", totNumRules INT AS (`numRulesRA` + `numRulesRNA` + `numRulesNRA` + `numRulesNRNA`)";
     $sql .= ", percRulesRA DECIMAL(10,2) AS (`numRulesRA` / `totNumRules`)";
     $sql .= ", percRulesRNA DECIMAL(10,2) AS (`numRulesRNA` / `totNumRules`)";
     $sql .= ", percRulesNRA DECIMAL(10,2) AS (`numRulesNRA` / `totNumRules`)";
@@ -939,11 +942,23 @@ end";
 
     $sql = "INSERT INTO `" . self::$indexTableName . "`";
     $sql .= " (";
+
     if ($batch_id !== NULL) {
       $sql .= "batch_id, ";
     }
-    $sql .= "date, modelName, tableName, classId, className";
-    $sql .= ", numRulesRA, numRulesRNA, numRulesNRA, numRulesNRNA";
+
+    $sql .= "date, modelName, tableName, ";
+
+    if ($allData !== NULL || $testData !== NULL) {
+      $sql .= "classId, className, ";
+    }
+
+    if ($testData !== NULL) {
+      $sql .= "numRulesRA, numRulesRNA, numRulesNRA, numRulesNRNA, ";
+    }
+
+    $sql .= "totNumRules";
+
     if ($allData !== NULL) {
       $allColumns = ["positives" => "totPositives", "negatives" => "totNegatives"];
       $sql .= ", " . join(", ", $allColumns);
@@ -965,53 +980,88 @@ end";
 
     $valuesSql = [];
     
-    if (DEBUGMODE > -1)
-      if ($testData !== NULL)
+    if (DEBUGMODE > -1) {
+      if ($testData !== NULL) {
         echo "  GLOBAL EVALUATION:" . PHP_EOL;
-    
-    foreach ($totMeasures as $classId => $totMeasures_) {
-      $className = $classAttr->reprVal($classId);
-
-      $valueSql = "";
-      if ($batch_id !== NULL) {
-        $valueSql .= "" . mysql_string($db, $batch_id) . ", '";
       }
-      $valueSql .= date('Y-m-d H:i:s') . "', '$modelName', '$tableName', $classId, '$className'";
-      // TODO rule numbers should refer to the model, not the className. Mmm
-      $valueSql .= ", " . strval($numRulesRA);
-      $valueSql .= ", " . strval($numRulesRNA);
-      $valueSql .= ", " . strval($numRulesNRA);
-      $valueSql .= ", " . strval($numRulesNRNA);
+    }
 
-      if (intval(DEBUGMODE) > -1) {
-        echo "    '$className', ($classId): " . PHP_EOL;
-      }
-
+    if ($allData !== NULL || $testData !== NULL) {
+      $classIds = [];
       if ($allData !== NULL) {
-        $vals = $totMeasures[$classId];
-        $valuesArray = array_map(function($col) use ($vals) { return $vals[$col]; }, array_keys($allColumns));
-        $valueSql .= ", " . join(", ", $valuesArray);
-
-        if (intval(DEBUGMODE) > -1) {
-          foreach ($allColumns as $col => $sql_col) {
-            echo "    $sql_col: " . $vals[$col] . PHP_EOL;
-          }
-        }
+        $classIds = array_merge($classIds, array_keys($totMeasures));
       }
       if ($testData !== NULL) {
-        $vals = $testMeasures[$classId];
-        $valuesArray = array_map(function($col) use ($vals) { return $vals[$col]; }, array_keys($testColumns));
+        $classIds = array_merge($classIds, array_keys($testMeasures));
+      }
+      $classIds = array_unique($classIds);
 
-        $valueSql .= ", " . join(", ", array_map("mysql_number", $valuesArray));
+      foreach ($classIds as $classId) {
+        $className = $classAttr->reprVal($classId);
+
+        $baseValueSql = "";
+        if ($batch_id !== NULL) {
+          $baseValueSql .= mysql_string($db, $batch_id) . ", ";
+        }
+        $baseValueSql .= mysql_string($db, date('Y-m-d H:i:s')) . ", "
+          . mysql_string($db, $modelName) . ", "
+          . mysql_string($db, $tableName) . ", "
+          . $classId . ", "
+          . mysql_string($db, $className);
+        // TODO rule numbers should refer to the model, not the className. Mmm
+        
+        if ($testData !== NULL) {
+          $baseValueSql .= ", " . strval($numRulesRA);
+          $baseValueSql .= ", " . strval($numRulesRNA);
+          $baseValueSql .= ", " . strval($numRulesNRA);
+          $baseValueSql .= ", " . strval($numRulesNRNA);
+        }
+        $baseValueSql .= ", " . strval($totNumRules);
+
+        $valueSql = "";
+        $valueSql .= $baseValueSql;
 
         if (intval(DEBUGMODE) > -1) {
-          foreach ($testColumns as $col => $sql_col) {
-            echo "    $sql_col: " . $vals[$col] . PHP_EOL;
+          echo "    '$className', ($classId): " . PHP_EOL;
+        }
+
+        if ($allData !== NULL) {
+          $vals = $totMeasures[$classId];
+          $valuesArray = array_map(function($col) use ($vals) { return $vals[$col]; }, array_keys($allColumns));
+          $valueSql .= ", " . join(", ", $valuesArray);
+
+          if (intval(DEBUGMODE) > -1) {
+            foreach ($allColumns as $col => $sql_col) {
+              echo "    $sql_col: " . $vals[$col] . PHP_EOL;
+            }
           }
         }
+        if ($testData !== NULL) {
+          $vals = $testMeasures[$classId];
+          $valuesArray = array_map(function($col) use ($vals) { return $vals[$col]; }, array_keys($testColumns));
+
+          $valueSql .= ", " . join(", ", array_map("mysql_number", $valuesArray));
+
+          if (intval(DEBUGMODE) > -1) {
+            foreach ($testColumns as $col => $sql_col) {
+              echo "    $sql_col: " . $vals[$col] . PHP_EOL;
+            }
+          }
+        }
+        $valuesSql[] = $valueSql;
+        // die_error("stop.");
       }
-      $valuesSql[] = $valueSql;
-      // die_error("stop.");
+    } else {
+      $baseValueSql = "";
+      if ($batch_id !== NULL) {
+        $baseValueSql .= mysql_string($db, $batch_id) . ", ";
+      }
+      $baseValueSql .= mysql_string($db, date('Y-m-d H:i:s')) . ", "
+          . mysql_string($db, $modelName) . ", "
+          . mysql_string($db, $tableName);
+      // TODO rule numbers should refer to the model, not the className. Mmm
+      $baseValueSql .= ", " . strval($totNumRules);
+      $valuesSql[] = $baseValueSql;
     }
 
     $sql .= join("), (", $valuesSql) . ")";
