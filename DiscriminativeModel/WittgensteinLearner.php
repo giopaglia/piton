@@ -10,7 +10,7 @@ include_once "Learner.php";
  * 
  * The package must be installed on your operating system or python environment.
  * To install, use:
- *    $ pip install wittgenstein
+ *    $ pip3 install wittgenstein
  * Requirements:
  *    pandas
  *    numpy
