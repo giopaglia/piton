@@ -31,6 +31,7 @@ class Instances {
           . "Weights argument can only be an integer value or an array (or NULL), but got \""
           . gettype($weights) . "\".");
     }
+
     $this->setAttributes($attributes);
 
     if(!($this->getClassAttribute() instanceof DiscreteAttribute))
@@ -50,7 +51,8 @@ class Instances {
       
       foreach ($data as $instance_id => &$inst) {
         if (is_array($weights)) {
-          $w = $weights[$instance_id-1];
+          $w = $weights[$instance_id]; # DEBUG
+          #$w = $weights[$instance_id-1]; # DEBUG
         } else if(is_numeric($weights)) {
           $w = $weights;
         }
@@ -176,7 +178,7 @@ class Instances {
       if (count($row) == count($attributes) + 1) {  
         preg_match("/\s*\{\s*([\d\.]+)\s*\}\s*/", $row[array_key_last($row)], $w);
 
-        $weights[] = floatval($w[1]);
+        $weights[$instance_id] = floatval($w[1]); # debug
         array_splice($row, array_key_last($row), 1);
       } else if (count($row) != count($attributes)) {
         die_error("ARFF data wrongfully encoded. Found data row [$i] with " . 

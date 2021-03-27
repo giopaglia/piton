@@ -38,7 +38,7 @@ class WittgensteinLearner extends Learner {
   private $k;  
 
   /**
-   * Terminate Ruleset grow phase early if a Ruleset description length is encountered
+   * Terminate RIPPERk Ruleset grow phase early if a Ruleset description length is encountered
    * that is more than this amount above the lowest description length so far encountered.
    * int, default=64
    */
@@ -76,7 +76,7 @@ class WittgensteinLearner extends Learner {
   private $maxRuleConds;
 
   /**
-   * Maximum number of total conds in entire ruleset.
+   * Maximum number of total conds in entire ruleset (RIPPERk only).
    * int, default=None
    */
   private $maxTotalConds;
@@ -104,6 +104,8 @@ class WittgensteinLearner extends Learner {
    * A classifier algorithm and a database connection are required, but they can be changed later on.
    * It is also possible to set a random seed, which is set to NULL by default.
    * The other options are set to their default values, and can be set later on.
+   * Warning: k, dlAllowance and maxTotalConds are only used by the RIPPERk classifier and will not be
+   * considered when using the IREP classifier.
    */
   function __construct(string $classifier, object $db, ?int $randomState) {
     $this->setClassifier($classifier);

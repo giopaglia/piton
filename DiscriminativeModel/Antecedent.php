@@ -485,6 +485,7 @@ class ContinuousAntecedent extends _Antecedent {
    */
   function covers(Instances &$data, int $instance_id) : bool {
     $isCover = true;
+    echo $this->attribute;
     $index = $this->attribute->getIndex();
     $val = $data->inst_val($instance_id, $index);
     // $val = $this->inst_valueOfAttr($data, $instance_id);
