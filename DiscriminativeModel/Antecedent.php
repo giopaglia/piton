@@ -34,7 +34,7 @@ abstract class _Antecedent {
   /**
    * Constructor
    */
-  function __construct(Attribute $attribute) {
+  function __construct(Attribute $attribute) {    
     $this->attribute   = $attribute;
     // $this->attributeIndex   = $attribute->getIndex();
     $this->value       = NAN;
@@ -45,6 +45,9 @@ abstract class _Antecedent {
   }
 
   static function createFromAttribute(Attribute $attribute) : _Antecedent {
+    /* if ($attribute->getIndex() === NULL) {
+      die_error("Attribute $attribute of antecedent not indexed." . PHP_EOL);
+    } */
     switch (true) {
       case $attribute instanceof DiscreteAttribute:
         $antecedent = new DiscreteAntecedent($attribute);
@@ -59,13 +62,13 @@ abstract class _Antecedent {
     return $antecedent;
   }
 
-  static function fromString(string $str) : _Antecedent {
+  static function fromString(string $str, ?array $attrs_map = NULL) : _Antecedent {
     switch (true) {
       case preg_match("/^\s*\(?\s*(.*(?:\S))\s+(!=|=)\s+(.*(?:[^\s\)]))\s*\)?\s*$/", $str):
-        $antecedent = DiscreteAntecedent::fromString($str);
+        $antecedent = DiscreteAntecedent::fromString($str, $attrs_map);
         break;
       case preg_match("/^\s*\(?\s*(.*(?:\S))\s*(>=|<=)\s*(.*(?:[^\s\)]))\s*\)?\s*$/", $str):
-        $antecedent = ContinuousAntecedent::fromString($str);
+        $antecedent = ContinuousAntecedent::fromString($str, $attrs_map);
         break;
       default:
         die_error("Invalid antecedent string encountered: " . PHP_EOL . $str);
@@ -248,7 +251,7 @@ class DiscreteAntecedent extends _Antecedent {
     return $isCover;
   }
 
-  static function fromString(string $str) : DiscreteAntecedent {
+  static function fromString(string $str, ?array $attrs_map = NULL) : DiscreteAntecedent {
     if (DEBUGMODE > 2)
       echo "DiscreteAntecedent->fromString($str)" . PHP_EOL;
     
@@ -266,8 +269,12 @@ class DiscreteAntecedent extends _Antecedent {
       echo "name: " . get_var_dump($name) . PHP_EOL;
     if (DEBUGMODE > 2)
       echo "reprvalue: " . get_var_dump($reprvalue) . PHP_EOL;
-    
-    $ant = _Antecedent::createFromAttribute(new DiscreteAttribute($name, "parsed", [strval($reprvalue)]));
+
+    $attribute = new DiscreteAttribute($name, "parsed", [strval($reprvalue)]);
+    if($attrs_map !== NULL) {
+      $attribute->setIndex($attrs_map[$name]);
+    }
+    $ant = _Antecedent::createFromAttribute($attribute);
     $ant->sign = ($sign == "=" ? 0 : 1);
     $ant->value = 0;
     
@@ -512,7 +519,7 @@ class ContinuousAntecedent extends _Antecedent {
     return $isCover;
   }
 
-  static function fromString(string $str) : ContinuousAntecedent {
+  static function fromString(string $str, ?array $attrs_map = NULL) : ContinuousAntecedent {
     if (DEBUGMODE > 2)
       echo "ContinuousAntecedent->fromString($str)" . PHP_EOL;
     
@@ -530,7 +537,17 @@ class ContinuousAntecedent extends _Antecedent {
     if (DEBUGMODE > 2)
       echo "reprvalue: " . get_var_dump($reprvalue) . PHP_EOL;
     
-    $ant = _Antecedent::createFromAttribute(new ContinuousAttribute($name, "parsed"));
+    $attribute = new ContinuousAttribute($name, "parsed");
+    if($attrs_map !== NULL) {
+      $attribute->setIndex($attrs_map[$name]);
+    }
+    $ant = _Antecedent::createFromAttribute($attribute);
+
+    /* if ($attrs_map !== NULL) {
+      $attr_index = $attrs_map[$name];
+      $ant->setIndex($attr_index);
+    } */
+
     $ant->value = ($sign == "<=" ? 0 : 1);
     $ant->splitPoint = $reprvalue;
     if (DEBUGMODE > 2)

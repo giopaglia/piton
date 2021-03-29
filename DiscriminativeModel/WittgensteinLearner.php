@@ -357,11 +357,11 @@ class WittgensteinLearner extends Learner {
     $rule = rtrim($rule, "]");
     
     /** Creation of the rule based model; nb: I cannot use the same model or it will not update outside of the function */
-    $newModel = RuleBasedModel::fromWittgensteinString($rule, $classAttr, $attributes);
+    $newModel = RuleBasedModel::fromString($rule, $classAttr);
 
     /** Model update */
     $model->setRules($newModel->getRules());
-    $model->setAttributes($attributes);
+    $model->setAttributes($newModel->getAttributes());
   }
 }
 ?>

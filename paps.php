@@ -27,7 +27,7 @@ $model->fit($trainData, $learner);
 echo "MODEL:" . PHP_EOL . $model . PHP_EOL;
 
 // $model->save(join_paths(MODELS_FOLDER, $model_name));
-$model->saveToDB($db, [$experimentID, $model_name], $model_id, $iris, $iris); 
+/* $model->saveToDB($db, [$experimentID, $model_name], $model_id, $iris, $iris);  */
 $model->saveToDB($db, [$experimentID, $model_name], $model_id, $testData, $trainData);
 /* $model->dumpToDB($db, $model_id);
 

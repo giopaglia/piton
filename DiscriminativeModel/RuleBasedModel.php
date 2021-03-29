@@ -1146,38 +1146,31 @@ end";
   }
 
   // TODO: here I'm asssumning a classification rule
-  static function fromString(string $str, ?DiscreteAttribute $classAttr = NULL) : RuleBasedModel {
+  static function fromString(string $str, ?DiscreteAttribute $classAttr = NULL, ?array $attrs = NULL) : RuleBasedModel {
     $rules_str_arr = array_filter(preg_split("/[\n\r]/", trim($str)), function ($v) { return $v !== ""; });
     $rules = [];
     if ($classAttr === NULL) {
       $classAttr = new DiscreteAttribute("outputAttr", "parsedOutputAttr", []);
     }
     $outputMap = array_flip($classAttr->getDomain());
-    $attributes = [$classAttr];
-    foreach ($rules_str_arr as $rule_str) {
-      list($rule, $ruleAttributes) = ClassificationRule::fromString($rule_str, $outputMap);
-      $rules[] = $rule;
-      $attributes = array_merge($attributes, $ruleAttributes);
+    if ($attrs === NULL) {  // I must create the attributes
+      $attributes = [$classAttr];
+      foreach ($rules_str_arr as $rule_str) {
+        list($rule, $ruleAttributes) = ClassificationRule::fromString($rule_str, $outputMap);
+        $rules[] = $rule;
+        $attributes = array_merge($attributes, $ruleAttributes);
+      }
+    } else {  // I already have the attributes
+      $attributes = $attrs;
+      foreach ($attrs as $attr) {
+        $attrs_map[$attr->getName()] = $attr->getIndex();
+      }
+      foreach ($rules_str_arr as $rule_str) {
+        list($rule, $ruleAttributes) = ClassificationRule::fromString($rule_str, $outputMap, $attrs_map);
+        $rules[] = $rule;
+      }
     }
-    $model = new RuleBasedModel();
-    $model->setRules($rules);
-    $model->setAttributes($attributes);
-    return $model;
-  }
-
-  /** Building a RuleBasedModel from a pre-parsed string result of the execution of a WittgensteinLearner */
-  static function fromWittgensteinString(string $str, DiscreteAttribute $classAttr = NULL, array $attributes) : RuleBasedModel {
-    /** Separating the rules */
-    $rules_str_arr = array_filter(preg_split("/[\n\r]/", trim($str)), function ($v) { return $v !== ""; });
-    $rules = [];
-    /** Getting the class attribute domain for encoding/decoding from [0]-[1] values */
-    $outputMap = array_flip($classAttr->getDomain());
-    /** Building classification rules */
-    foreach ($rules_str_arr as $rule_str) {
-      list($rule, $ruleAttributes) = ClassificationRule::fromString($rule_str, $outputMap);
-      $rules[] = $rule;
-    }
-    /** Building a new model */
+    
     $model = new RuleBasedModel();
     $model->setRules($rules);
     $model->setAttributes($attributes);

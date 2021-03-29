@@ -221,7 +221,7 @@ class ClassificationRule extends _Rule {
     return $out_dict;
   }
 
-  static function fromString(string $str, ?array $outputMap = NULL) {
+  static function fromString(string $str, ?array $outputMap = NULL, ?array $attrs_map = NULL) {
     if (DEBUGMODE > 2)
       echo "ClassificationRule->fromString($str)" . PHP_EOL;
     
@@ -264,9 +264,16 @@ class ClassificationRule extends _Rule {
     if (DEBUGMODE > 2)
       echo "ants_str_arr: " . get_var_dump($ants_str_arr) . PHP_EOL;
 
-    $antecedents = array_map(function ($str) {
-      return _Antecedent::fromString($str);
-      }, $ants_str_arr);
+    if ($attrs_map !== NULL) {  // Case $attrs_map is present (I'm passing the attributes, not creating them)
+      $antecedents = [];
+      foreach ($ants_str_arr as $ant) {
+        $antecedents[] = _Antecedent::fromString($ant, $attrs_map);
+      }
+    } else {  // Case $attrs_map is missing, I'm creating the attributes
+      $antecedents = array_map(function ($str) {
+        return _Antecedent::fromString($str);
+        }, $ants_str_arr);
+    }
     
     if (DEBUGMODE > 2)
       echo "consequent: " . $consequent . PHP_EOL;
