@@ -33,27 +33,23 @@ class WittgensteinLearner extends Learner {
 
   /**
    * Number of RIPPERk optimization iterations.
-   * int, default=2
    */
   private $k;  
 
   /**
    * Terminate RIPPERk Ruleset grow phase early if a Ruleset description length is encountered
    * that is more than this amount above the lowest description length so far encountered.
-   * int, default=64
    */
   private $dlAllowance;  
 
   /**
    * Proportion of training set to be used for pruning.
-   * float, default=.33
    */
   private $pruneSize;
 
   /**
    * Fit apparent numeric attributes into a maximum of n_discretize_bins discrete bins,
    * inclusive on upper part of range. Pass None to disable auto-discretization.
-   * int, default=10
    */
   private $nDiscretizeBins;
 
@@ -65,25 +61,21 @@ class WittgensteinLearner extends Learner {
 
   /**
    * Maximum number of rules
-   * int, default=None
    */
   private $maxRules;
 
   /**
    * Maximum number of conds per rule.
-   * int, default=None
    */
   private $maxRuleConds;
 
   /**
    * Maximum number of total conds in entire ruleset (RIPPERk only).
-   * int, default=None
    */
   private $maxTotalConds;
 
   /**
    * Random seed for repeatable results.
-   * int, default=None
    */
   private $randomState;
 
@@ -95,7 +87,6 @@ class WittgensteinLearner extends Learner {
    *                3: Show Ruleset grow/optimization calculations
    *                4: Show Rule grow/prune steps
    *                5: Show Rule grow/prune calculations
-   * int, default=0
    */
   private $verbosity;
 
@@ -103,23 +94,23 @@ class WittgensteinLearner extends Learner {
    * The constructor of the WittgensteinLearner.
    * A classifier algorithm and a database connection are required, but they can be changed later on.
    * It is also possible to set a random seed, which is set to NULL by default.
-   * The other options are set to their default values, and can be set later on.
+   * The other options are set to NULL and will be set by pyhton to their default values, and can be set later on.
    * Warning: k, dlAllowance and maxTotalConds are only used by the RIPPERk classifier and will not be
    * considered when using the IREP classifier.
    */
-  function __construct(string $classifier, object $db, ?int $randomState) {
+  function __construct(string $classifier, object $db, ?int $randomState = NULL) {
     $this->setClassifier($classifier);
     $this->setDBConnection($db);
+    $this->setRandomState($randomState);
     /** Options */
-    $this->setK(2);
-    $this->setDlAllowance(64);
-    $this->setPruneSize(0.33);
-    $this->setNDiscretizeBins(10);
+    $this->setK(NULL);
+    $this->setDlAllowance(NULL);
+    $this->setPruneSize(NULL);
+    $this->setNDiscretizeBins(NULL);
     $this->setMaxRules(NULL);
     $this->setMaxRuleConds(NULL);
     $this->setMaxTotalConds(NULL);
-    $this->setRandomState($randomState);
-    $this->setVerbosity(0);
+    $this->setVerbosity(NULL);
   }
   
   /**
@@ -315,21 +306,22 @@ class WittgensteinLearner extends Learner {
     $classAttr = $data->getClassAttribute();
     
     /** Saving the training data set in a temporary table in the database */
-    $data->SaveToDB($db, "reserved__tmpWittgensteinTrainData");
+    $tableName = "reserved__tmpWittgensteinTrainData" . uniqid();
+    $data->SaveToDB($db, $tableName);
 
     /** If a parameter is NULL, I translate it to None */
     $getParameter = function ($parameter) {
       if ($parameter === NULL) {
         return "None";
       } else {
-        return $parameter;
+        return addcslashes($parameter, '"');
       }
     };
 
     /** Call to the python script that will use the training algorithm of the library */
     if ($classifier === "RIPPERk" || $classifier === "IREP") {
       $command = escapeshellcmd("python DiscriminativeModel/PythonLearners/wittgenstein_learner.py "
-                                . $getParameter($classifier) . " reserved__tmpWittgensteinTrainData "
+                                . $getParameter($classifier) . " " . $getParameter($tableName) . " "
                                 . $getParameter($k) . " " . $getParameter($dlAllowance) . " "
                                 . $getParameter($pruneSize) . " " . $getParameter($nDiscretizeBins) . " "
                                 . $getParameter($maxRules) . " " . $getParameter($maxRuleConds) . " "
@@ -341,7 +333,7 @@ class WittgensteinLearner extends Learner {
     }
     
     /** Drop of the temporary table for safety reason */
-    $sql = "DROP TABLE reserved__tmpWittgensteinTrainData";
+    $sql = "DROP TABLE $tableName";
     mysql_prepare_and_executes($db, $sql);
 
     /** Parsing of the extracted rules to a string I can use to build a RuleBasedModel */
@@ -357,11 +349,11 @@ class WittgensteinLearner extends Learner {
     $rule = rtrim($rule, "]");
     
     /** Creation of the rule based model; nb: I cannot use the same model or it will not update outside of the function */
-    $newModel = RuleBasedModel::fromString($rule, $classAttr);
+    $newModel = RuleBasedModel::fromString($rule, $classAttr, $attributes);
 
     /** Model update */
     $model->setRules($newModel->getRules());
-    $model->setAttributes($newModel->getAttributes());
+    $model->setAttributes($attributes);
   }
 }
 ?>
