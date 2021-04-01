@@ -3,6 +3,7 @@ include_once "lib.php";
 include_once "DBFit.php";
 include_once "local-lib.php";
 include_once "DiscriminativeModel/WittgensteinLearner.php";
+include_once "DiscriminativeModel/SklearnLearner.php";
 
 $db = getDBConnection();
 
@@ -18,7 +19,8 @@ $testData = Instances::createFromDB($db, "X" . md5("data-Terapie osteoprotettive
 $trainData = Instances::createFromARFF("trainData.arff");
 $testData = Instances::createFromARFF("testData.arff");
 
-$learner = new WittgensteinLearner("RIPPERk", $db, 2);
+#$learner = new WittgensteinLearner("RIPPERk", $db, 2);
+$learner = new SklearnLearner($db);
 
 /* Train */
 $model = $learner->initModel();
@@ -28,7 +30,7 @@ echo "MODEL:" . PHP_EOL . $model . PHP_EOL;
 
 // $model->save(join_paths(MODELS_FOLDER, $model_name));
 /* $model->saveToDB($db, [$experimentID, $model_name], $model_id, $iris, $iris);  */
-/* $model->saveToDB($db, [$experimentID, $model_name], $model_id, $testData, $trainData); */
+$model->saveToDB($db, [$experimentID, $model_name], $model_id); 
 /* $model->dumpToDB($db, $model_id);
 
 /* echo "Trained model '$model_name'." . PHP_EOL;

@@ -1,5 +1,7 @@
 import pandas as pd
 import math as mt
+from sklearn.tree import _tree
+from sklearn.tree import export_text
 from io import StringIO 
 import sys
 
@@ -92,3 +94,40 @@ def get_negative_class_value(df):   # gives the negative class attribute
     neg_class_val = [i for i in class_values if i != class_attr]
     return neg_class_val[0]
 
+def tree_to_ruleset(decision_tree, features_name, class_att):   # given a decision tree it builds the relative rule based model
+                                                                # (a bit naife, a lot of redundancy, todo: find a way to tie tiable rules)
+    tree_ = decision_tree.tree_ # creates a copy of the tree
+    feature_name = [            # the name of the attributes (features)
+        features_name[i] if i != _tree.TREE_UNDEFINED else "undefined!"
+        for i in tree_.feature
+    ]
+    antecedents = []            # instantiation of the array containing the antecedents of the rule
+
+    def print_rule(rule):       # prints the given rule, given an array with the consequent as the last element, and the others being antecedents
+        consequent = rule.pop()         # it saves the consequent value 
+        last_antecedent = rule.pop()    # it saves the last antecedent
+        rule_str = ""                   
+        for antecedent in rule:
+            rule_str += (antecedent + " AND ")  # add AND at the end of the string (it is not le last antecedent)
+        rule_str += (last_antecedent + " => " + consequent)  # concatenate the antecedents with their last and the consequent
+        print(rule_str)
+
+    def recurse(node, depth, antecedents):  # recursion on the tree nodes to create the rules
+        if(tree_.feature[node] != _tree.TREE_UNDEFINED):    # if it is not a leaf
+            name = feature_name[node]
+            threshold = tree_.threshold[node]
+
+            left_antecedents = antecedents.copy()
+            right_antecedents = antecedents.copy()
+            
+            left_antecedents.append("({} <= {})".format(name, threshold))
+            recurse(tree_.children_left[node], depth + 1, left_antecedents) # recursion on the left node
+            right_antecedents.append("({} > {})".format(name, threshold))
+            recurse(tree_.children_right[node], depth + 1, right_antecedents)   # recursion on the right node
+        else:
+            rule = antecedents.copy()
+            consequent = class_att[1] if tree_.value[node].T[0] != 0 else class_att[0]    # it evaluetes the classification (logic similar to sklearn.tree.export_text)
+            rule.append(consequent)
+            print_rule(rule)
+
+    recurse(0, 1, antecedents)

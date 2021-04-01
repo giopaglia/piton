@@ -28,11 +28,10 @@ $minNo = 2;
   echo "numFolds: $numFolds" . PHP_EOL;
   echo "minNo: $minNo" . PHP_EOL;
 
-  //$lr = new PRip(NULL);
-  $lr = new WittgensteinLearner("RIPPER", getDBConnection());
-  /* $lr->setNumOptimizations($numOptimizations);
+  $lr = new PRip(NULL);
+  $lr->setNumOptimizations($numOptimizations);
   $lr->setNumFolds($numFolds);
-  $lr->setMinNo($minNo); */
+  $lr->setMinNo($minNo);
   testMed($lr);
 }
 

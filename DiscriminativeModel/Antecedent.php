@@ -67,7 +67,7 @@ abstract class _Antecedent {
       case preg_match("/^\s*\(?\s*(.*(?:\S))\s+(!=|=)\s+(.*(?:[^\s\)]))\s*\)?\s*$/", $str):
         $antecedent = DiscreteAntecedent::fromString($str, $attrs_map);
         break;
-      case preg_match("/^\s*\(?\s*(.*(?:\S))\s*(>=|<=)\s*(.*(?:[^\s\)]))\s*\)?\s*$/", $str):
+      case preg_match("/^\s*\(?\s*(.*(?:\S))\s*(>=|<=|>)\s*(.*(?:[^\s\)]))\s*\)?\s*$/", $str):
         $antecedent = ContinuousAntecedent::fromString($str, $attrs_map);
         break;
       default:
@@ -523,7 +523,7 @@ class ContinuousAntecedent extends _Antecedent {
     if (DEBUGMODE > 2)
       echo "ContinuousAntecedent->fromString($str)" . PHP_EOL;
     
-    if (!preg_match("/^\s*\(?\s*(.*(?:\S))\s*(>=|<=)\s*(.*(?:[^\s\)]))\s*\)?\s*$/", $str, $w)) {
+    if (!preg_match("/^\s*\(?\s*(.*(?:\S))\s*(>|<=)\s*(.*(?:[^\s\)]))\s*\)?\s*$/", $str, $w)) {
       die_error("Couldn't parse ContinuousAntecedent string \"$str\".");
     }
     $name = $w[1];

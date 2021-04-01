@@ -1163,6 +1163,9 @@ end";
     } else {  // I already have the attributes
       $attributes = $attrs;
       foreach ($attrs as $attr) {
+        if ($attr->getIndex() === NULL) {
+          die_error("The attribute $attr's index is not valid." . PHP_EOL);
+        }
         $attrs_map[$attr->getName()] = $attr->getIndex();
       }
       foreach ($rules_str_arr as $rule_str) {
