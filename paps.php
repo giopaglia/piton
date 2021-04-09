@@ -20,7 +20,7 @@ $trainData = Instances::createFromARFF("trainData.arff");
 $testData = Instances::createFromARFF("testData.arff");
 
 #$learner = new WittgensteinLearner("RIPPERk", $db, 2);
-$learner = new SklearnLearner($db);
+$learner = new SklearnLearner("CART", $db);
 
 /* Train */
 $model = $learner->initModel();

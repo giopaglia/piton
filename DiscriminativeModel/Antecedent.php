@@ -67,7 +67,7 @@ abstract class _Antecedent {
       case preg_match("/^\s*\(?\s*(.*(?:\S))\s+(!=|=)\s+(.*(?:[^\s\)]))\s*\)?\s*$/", $str):
         $antecedent = DiscreteAntecedent::fromString($str, $attrs_map);
         break;
-      case preg_match("/^\s*\(?\s*(.*(?:\S))\s*(>=|<=|>)\s*(.*(?:[^\s\)]))\s*\)?\s*$/", $str):
+      case preg_match("/^\s*\(?\s*(.*(?:\S))\s*(>=|<=|>|<)\s*(.*(?:[^\s\)]))\s*\)?\s*$/", $str):
         $antecedent = ContinuousAntecedent::fromString($str, $attrs_map);
         break;
       default:
@@ -492,7 +492,6 @@ class ContinuousAntecedent extends _Antecedent {
    */
   function covers(Instances &$data, int $instance_id) : bool {
     $isCover = true;
-    echo $this->attribute;
     $index = $this->attribute->getIndex();
     $val = $data->inst_val($instance_id, $index);
     // $val = $this->inst_valueOfAttr($data, $instance_id);
@@ -502,16 +501,27 @@ class ContinuousAntecedent extends _Antecedent {
     // echo "sign " . toString($this->value) . PHP_EOL;
     // echo "splitPoint " . toString($this->splitPoint) . PHP_EOL;
     // echo "this " . $this->toString(true) . PHP_EOL;
+
     if ($val !== NULL) {
       if ($this->value == 0) { // First bag
         if (!($val <= $this->splitPoint)) {
           $isCover = false;
         }
-      } else if (!($val >= $this->splitPoint)) {
+      } else if ($this->value == 1) {
+        if (!($val >= $this->splitPoint)) {
+          $isCover = false;
+        }
+      } else if ($this->value == 2) {
+        if (!($val < $this->splitPoint)) {
+          $isCover = false;
+        }
+      } else if ($this->value == 3) {
+        if (!($val > $this->splitPoint)) {
+          $isCover = false;
+        }
+      } else {
         $isCover = false;
       }
-    } else {
-      $isCover = false;
     }
     // echo "[$instance_id]" . $data->inst_toString($instance_id) . PHP_EOL; "antd doesn't cover: " . $this->toString()
     //       . "[$instance_id]" . $data->inst_toString($instance_id) . PHP_EOL;
@@ -523,7 +533,7 @@ class ContinuousAntecedent extends _Antecedent {
     if (DEBUGMODE > 2)
       echo "ContinuousAntecedent->fromString($str)" . PHP_EOL;
     
-    if (!preg_match("/^\s*\(?\s*(.*(?:\S))\s*(>|<=)\s*(.*(?:[^\s\)]))\s*\)?\s*$/", $str, $w)) {
+    if (!preg_match("/^\s*\(?\s*(.*(?:\S))\s*(<=|>=|>|<)\s*(.*(?:[^\s\)]))\s*\)?\s*$/", $str, $w)) {
       die_error("Couldn't parse ContinuousAntecedent string \"$str\".");
     }
     $name = $w[1];
@@ -548,7 +558,19 @@ class ContinuousAntecedent extends _Antecedent {
       $ant->setIndex($attr_index);
     } */
 
-    $ant->value = ($sign == "<=" ? 0 : 1);
+    // $ant->value = ($sign == "<=" ? 0 : 1);
+
+    if ($sign == "<=")
+      $ant->value = 0;
+    else if ($sign == ">=")
+      $ant->value = 1;
+    else if ($sign == "<")
+      $ant->value = 2;
+    else if ($sign == ">")
+      $ant->value = 3;
+    else
+      die_error("Invalid operator for continuous antecedent creation from string." . PHP_EOL);
+
     $ant->splitPoint = $reprvalue;
     if (DEBUGMODE > 2)
       echo $ant->toString(true);
@@ -559,14 +581,28 @@ class ContinuousAntecedent extends _Antecedent {
    * Print a textual representation of the antecedent
    */
   function toString(bool $short = false) : string {
-    if ($short) {
-      return "{$this->attribute->getName()}" . (($this->value == 0) ? " <= " : " >= ") .
+
+    $val = null;
+      if ($this->value == 0)
+        $val = " <= ";
+      else if ($this->value == 1)
+        $val = " >= ";
+      else if ($this->value == 2)
+        $val = " < ";
+      else if ($this->value == 3)
+        $val = " > ";
+      else
+        die_error("Unexpected error when creating a continuous antecedent from string." . PHP_EOL);
+
+    if ($short) {    
+      // return "{$this->attribute->getName()}" . (($this->value == 0) ? " <= " : " >= ") .
+      return "{$this->attribute->getName()}" . $val .
         $this->splitPoint
         // number_format($this->splitPoint, 6)
         ;
     }
     else {
-      return "ContinuousAntecedent: ({$this->attribute->getName()}" . (($this->value == 0) ? " <= " : " >= ") .
+      return "ContinuousAntecedent: ({$this->attribute->getName()}" . $val .
         $this->splitPoint
         // number_format($this->splitPoint, 6)
         . ") (maxInfoGain={$this->maxInfoGain}, accuRate={$this->accuRate}, cover={$this->cover}, accu={$this->accu})";

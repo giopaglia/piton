@@ -124,7 +124,7 @@ class WittgensteinLearner extends Learner {
    * Sets the wittgenstein classifier to use for the training.
    * It is possible to choose between IREP and RIPPERk.
    */
-  function setClassifier(string $classifier) :void {
+  function setClassifier(string $classifier) : void {
     $this->classifier = $classifier;
   }
   
@@ -139,7 +139,7 @@ class WittgensteinLearner extends Learner {
   /**
    * Sets the database used for the communication with the python script
    */
-  function setDBConnection(object $db) :void {
+  function setDBConnection(object $db) : void {
     $this->db = $db;
   }
 
