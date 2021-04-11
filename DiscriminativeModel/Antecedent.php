@@ -67,7 +67,7 @@ abstract class _Antecedent {
       case preg_match("/^\s*\(?\s*(.*(?:\S))\s+(!=|=)\s+(.*(?:[^\s\)]))\s*\)?\s*$/", $str):
         $antecedent = DiscreteAntecedent::fromString($str, $attrs_map);
         break;
-      case preg_match("/^\s*\(?\s*(.*(?:\S))\s*(>=|<=|>|<)\s*(.*(?:[^\s\)]))\s*\)?\s*$/", $str):
+      case preg_match("/^\s*\(?\s*(.*(?:\S))\s*(<=|>=|>|<)\s*(.*(?:[^\s\)]))\s*\)?\s*$/", $str):
         $antecedent = ContinuousAntecedent::fromString($str, $attrs_map);
         break;
       default:
@@ -512,11 +512,11 @@ class ContinuousAntecedent extends _Antecedent {
           $isCover = false;
         }
       } else if ($this->value == 2) {
-        if (!($val < $this->splitPoint)) {
+        if (!($val > $this->splitPoint)) {
           $isCover = false;
         }
       } else if ($this->value == 3) {
-        if (!($val > $this->splitPoint)) {
+        if (!($val < $this->splitPoint)) {
           $isCover = false;
         }
       } else {
@@ -558,15 +558,13 @@ class ContinuousAntecedent extends _Antecedent {
       $ant->setIndex($attr_index);
     } */
 
-    // $ant->value = ($sign == "<=" ? 0 : 1);
-
     if ($sign == "<=")
       $ant->value = 0;
     else if ($sign == ">=")
       $ant->value = 1;
-    else if ($sign == "<")
-      $ant->value = 2;
     else if ($sign == ">")
+      $ant->value = 2;
+    else if ($sign == "<")
       $ant->value = 3;
     else
       die_error("Invalid operator for continuous antecedent creation from string." . PHP_EOL);
@@ -582,27 +580,27 @@ class ContinuousAntecedent extends _Antecedent {
    */
   function toString(bool $short = false) : string {
 
-    $val = null;
+    $sign_str = null;
       if ($this->value == 0)
-        $val = " <= ";
+        $sign_str = " <= ";
       else if ($this->value == 1)
-        $val = " >= ";
+        $sign_str = " >= ";
       else if ($this->value == 2)
-        $val = " < ";
+        $sign_str = " > ";
       else if ($this->value == 3)
-        $val = " > ";
+        $sign_str = " < ";
       else
         die_error("Unexpected error when creating a continuous antecedent from string." . PHP_EOL);
 
     if ($short) {    
       // return "{$this->attribute->getName()}" . (($this->value == 0) ? " <= " : " >= ") .
-      return "{$this->attribute->getName()}" . $val .
+      return "{$this->attribute->getName()}" . $sign_str .
         $this->splitPoint
         // number_format($this->splitPoint, 6)
         ;
     }
     else {
-      return "ContinuousAntecedent: ({$this->attribute->getName()}" . $val .
+      return "ContinuousAntecedent: ({$this->attribute->getName()}" . $sign_str .
         $this->splitPoint
         // number_format($this->splitPoint, 6)
         . ") (maxInfoGain={$this->maxInfoGain}, accuRate={$this->accuRate}, cover={$this->cover}, accu={$this->accu})";

@@ -11,7 +11,7 @@ include_once "Learner.php";
  * 
  * The package must be installed on your operating system or python environment.
  * To install, use:
- *    $ pip3 install -U scikit-learn
+ *    $ pip3 install -U scikit-learn pymysql
  */
 class SklearnLearner extends Learner {  
   /**
@@ -433,7 +433,7 @@ class SklearnLearner extends Learner {
     /** Saving the training data set in a temporary table in the database */
     $tableName = "reserved__tmpWittgensteinTrainData" . uniqid();
     $data->SaveToDB($db, $tableName);
-
+    
     /** If a parameter is NULL, I translate it to None */
     $getParameter = function ($parameter) {
       if ($parameter === NULL) {
