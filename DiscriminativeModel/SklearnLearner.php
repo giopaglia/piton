@@ -420,6 +420,7 @@ class SklearnLearner extends Learner {
     $minSamplesLeaf = $this->getMinSamplesLeaf();
     $minWeightFractionLeaf = $this->getMinWeightFractionLeaf();
     $maxFeatures = $this->getMaxFeatures();
+    $randomState = $this->getRandomState();
     $maxLeafNodes = $this->getMaxLeafNodes();
     $minImpurityDecrease = $this->getMinImpurityDecrease();
     $minImpuritySplit = $this->getMinImpuritySplit();
