@@ -53,7 +53,7 @@ function testMed($lr) {
   , ["diagnosi", "diagnosi.id_referto = referti.id", "LEFT JOIN"]
   , ["densitometrie", "densitometrie.id_referto = referti.id", "LEFT JOIN"]
   // id_referto is still in raccomandazioni_terapeutiche even if the whole table is changed, maybe they have been incorporated
-  , ["raccomandazioni_terapeutiche", ["raccomandazioni_terapeutiche.id_referto = referti.id"], "LEFT JOIN"]
+  //, ["raccomandazioni_terapeutiche", ["raccomandazioni_terapeutiche.id_referto = referti.id"], "LEFT JOIN"]
   ]);
   
   $db_fit->setWhereClauses([
@@ -107,13 +107,13 @@ function testMed($lr) {
   $db_fit->addInputColumn(["CONCAT('', COALESCE(anamnesi.frattura_familiarita,0))", "ForceCategorical", "fracture familiarity"]);
   // current smoker
   // checkbox+value("Anamnesi.ABUSO_FUMO_CHECKBOX" "Anamnesi.ABUSO_FUMO")
-  $db_fit->addInputColumn(["CONCAT('', IF(ISNULL(anamnesi.abuso_fumo_checkbox),'No',IF(anamnesi.abuso_fumo_checkbox, anamnesi.abuso_fumo, 'No')))", "ForceCategorical", "smoking habits"]);
+  $db_fit->addInputColumn(["CONCAT('', IF(ISNULL(anamnesi.abuso_fumo),'No',IF(anamnesi.abuso_fumo, anamnesi.abuso_fumo, 'No')))", "ForceCategorical", "smoking habits"]);
   // alcol abuse
   // checkbox+value("Anamnesi.ALCOL_CHECKBOX" "Anamnesi.ALCOL")
-  $db_fit->addInputColumn(["CONCAT('', IF(ISNULL(anamnesi.alcol_checkbox),NULL,IF(anamnesi.alcol_checkbox, anamnesi.alcol, 'No')))", "ForceCategorical", "alcohol intake"]);
+  $db_fit->addInputColumn(["CONCAT('', IF(ISNULL(anamnesi.alcol),NULL,IF(anamnesi.alcol, anamnesi.alcol, 'No')))", "ForceCategorical", "alcohol intake"]);
   // current corticosteoroid use
   // checkbox+value("Anamnesi.USO_CORTISONE_CHECKBOX" "Anamnesi.USO_CORTISONE")
-  $db_fit->addInputColumn(["CONCAT('', IF(ISNULL(anamnesi.uso_cortisone_checkbox),'No',IF(anamnesi.uso_cortisone_checkbox, anamnesi.uso_cortisone, 'No')))", "ForceCategorical", "cortisone"]);
+  $db_fit->addInputColumn(["CONCAT('', IF(ISNULL(anamnesi.uso_cortisone),'No',IF(anamnesi.uso_cortisone, anamnesi.uso_cortisone, 'No')))", "ForceCategorical", "cortisone"]);
   // current illnesses
   $db_fit->addInputColumn(["CONCAT('', COALESCE(anamnesi.malattie_attuali_artrite_reum,0))", "ForceCategorical", "rheumatoid arthritis"]);
   $db_fit->addInputColumn(["CONCAT('', COALESCE(anamnesi.malattie_attuali_artrite_psor,0))", "ForceCategorical", "psoriatic arthritis"]);
@@ -123,27 +123,28 @@ function testMed($lr) {
 
   // secondary causes
   // note: now there exists a column for each of them in the CMO database
-  $db_fit->addInputColumn(["CONCAT('', COALESCE(anamnesi.diabete_insulino_dipendente,0))", "ForceCategoricalBinary", "diabetes mellitus"]);
-  $db_fit->addInputColumn(["CONCAT('', COALESCE(anamnesi.menopausa_prematura,0))", "ForceCategoricalBinary", "early menopause"]);
-  $db_fit->addInputColumn(["CONCAT('', COALESCE(anamnesi.malnutrizione_cronica,0))", "ForceCategoricalBinary", "chronic malnutrition"]);
-  $db_fit->addInputColumn(["CONCAT('', COALESCE(anamnesi.osteogenesi_imperfecta_in_eta_adulta,0))", "ForceCategoricalBinary", "adult osteogenesis imperfecta"]);
-  $db_fit->addInputColumn(["CONCAT('', COALESCE(anamnesi.ipertiroidismo_non_trattato_per_lungo_tempo,0))", "ForceCategoricalBinary", "untreated chronic hyperthyroidism"]);
+  $db_fit->addInputColumn(["CONCAT('', COALESCE(anamnesi.diabete_insulino_dipendente,0))", "ForceCategorical", "diabetes mellitus"]);
+  $db_fit->addInputColumn(["CONCAT('', COALESCE(anamnesi.menopausa_prematura,0))", "ForceCategorical", "early menopause"]);
+  $db_fit->addInputColumn(["CONCAT('', COALESCE(anamnesi.malnutrizione_cronica,0))", "ForceCategorical", "chronic malnutrition"]);
+  $db_fit->addInputColumn(["CONCAT('', COALESCE(anamnesi.osteogenesi_imperfecta_in_eta_adulta,0))", "ForceCategorical", "adult osteogenesis imperfecta"]);
+  $db_fit->addInputColumn(["CONCAT('', COALESCE(anamnesi.ipertiroidismo_non_trattato_per_lungo_tempo,0))", "ForceCategorical", "untreated chronic hyperthyroidism"]);
 
   // FRAX
   // defra/frax_applicabile => algoritmi non applicabile contrario!
   // $db_fit->addInputColumn(["IF(diagnosi.FRAX_APPLICABILE,0+IF(ISNULL(Diagnosi.FRAX_PERCENTUALE),NULL,IF(Diagnosi.FRAX_PERCENTUALE OR Diagnosi.FRAX_FRATTURE_MAGGIORI < 0.1, 0, Diagnosi.FRAX_FRATTURE_MAGGIORI)),NULL)", NULL, "FRAX (major fractures)"]);
-  $db_fit->addInputColumn(["IF(ISNULL(diagnosi.algoritmi_non_applicabile),0+IF(ISNULL(diagnosi.frax_fratture_aggiori_percentuale_01),NULL,IF(diagnosi.frax_fratture_aggiori_percentuale_01 OR diagnosi.frax_fratture_aggiori_percentuale < 0.1, 0, diagnosi.frax_fratture_aggiori_percentuale)),NULL)", NULL, "FRAX (major fractures)"]);
+  $db_fit->addInputColumn(["IF(ISNULL(diagnosi.algoritmi_non_applicabile),0+IF(ISNULL(diagnosi.frax_fratture_maggiori_percentuale_01),NULL,IF(diagnosi.frax_fratture_maggiori_percentuale_01 OR diagnosi.frax_fratture_maggiori < 0.1, 0, diagnosi.frax_fratture_maggiori)),NULL)", NULL, "FRAX (major fractures)"]);
   // $db_fit->addInputColumn(["IF(Diagnosi.FRAX_APPLICABILE,0+IF(ISNULL(Diagnosi.FRAX_COLLO_FEMORE_PERCENTUALE),NULL,IF(Diagnosi.FRAX_COLLO_FEMORE_PERCENTUALE OR Diagnosi.FRAX_COLLO_FEMORE < 0.1, 0, Diagnosi.FRAX_COLLO_FEMORE)),NULL)", NULL, "FRAX (femur)"]);
 
   // DeFRA
   $db_fit->addInputColumn(["IF(ISNULL(diagnosi.algoritmi_non_applicabile),0+IF(ISNULL(diagnosi.defra_percentuale_01),NULL,IF((diagnosi.defra_percentuale_01 OR diagnosi.defra < 0.1) AND diagnosi.defra_percentuale_50 = 0, 0,IF(ISNULL(diagnosi.defra_percentuale_50),NULL,IF(diagnosi.defra_percentuale_50 OR diagnosi.defra > 50, 50, diagnosi.defra)))),NULL)", NULL, "DeFRA"]);
 
   // clinical information (20 fields)
+  // TODO solve checkboxes migration
   $db_fit->addInputColumn(["CONCAT('', COALESCE(anamnesi.patologie_uterine,0))", "ForceCategorical", "endometrial pathologies"]);
   $db_fit->addInputColumn(["CONCAT('', COALESCE(anamnesi.neoplasia,0))", "ForceCategorical", "breast cancer"]);
   $db_fit->addInputColumn(["CONCAT('', COALESCE(anamnesi.sintomi_vasomotori,0))", "ForceCategorical", "vasomotor symptoms"]);
   $db_fit->addInputColumn(["CONCAT('', COALESCE(anamnesi.sintomi_distrofici,0))", "ForceCategorical", "distrofic symptoms"]);
-  $db_fit->addInputColumn(["CONCAT('', COALESCE(anamnesi.displidemia,0))", "ForceCategorical", "dyslipidemia"]);
+  $db_fit->addInputColumn(["CONCAT('', COALESCE(anamnesi.dislipidemia,0))", "ForceCategorical", "dyslipidemia"]);
   $db_fit->addInputColumn(["CONCAT('', COALESCE(anamnesi.ipertensione,0))", "ForceCategorical", "hypertension"]);
   $db_fit->addInputColumn(["CONCAT('', COALESCE(anamnesi.rischio_tev,0))", "ForceCategorical", "venous thromboembolism risk factors"]);
   $db_fit->addInputColumn(["CONCAT('', COALESCE(anamnesi.patologia_cardiaca,0))", "ForceCategorical", "cardiac pathologies"]);
@@ -181,7 +182,7 @@ function testMed($lr) {
   // I didn't know how to migrate the following
   // current DXA hip total T score
   // now we have separated right and left
-  // QUESTION: maybe here we want to consider them as the same attribute? Is it relevant they are separated?
+  // QUESTION: maybe here we want to consider them as the same attribute? Is it relevant they are separated? TODO
   // $db_fit->addInputColumn(["densitometrie.NECK_T_SCORE", NULL, "neck T-score"]);
   $db_fit->addInputColumn(["densitometrie.neck_l_t_score", NULL, "neck left T-score"]);
   $db_fit->addInputColumn(["densitometrie.neck_r_t_score", NULL, "neck right T-score"]);
@@ -196,8 +197,10 @@ function testMed($lr) {
       [
         /*["raccomandazioni_terapeutiche", ["raccomandazioni_terapeutiche.id_raccomandazione_terapeutica = raccomandazioni_terapeutiche.id"
         , "raccomandazioni_terapeutiche.tipo != 'Indagini approfondimento'"], "LEFT JOIN"]*/
-        ["raccomandazioni_terapeutiche_unitarie", ["raccomandazioni_terapeutiche.id = raccomandazioni_terapeutiche_unitarie.id_raccomandazione_terapeutica"
-        , "raccomandazioni_terapeutiche.tipo != 'Indagini approfondimento'"], "LEFT JOIN"]
+        /* ["raccomandazioni_terapeutiche_unitarie", ["raccomandazioni_terapeutiche.id = raccomandazioni_terapeutiche_unitarie.id_raccomandazione_terapeutica"
+        , "raccomandazioni_terapeutiche.tipo != 'Indagini approfondimento'"], "LEFT JOIN"] */
+        ["raccomandazioni_terapeutiche", ["raccomandazioni_terapeutiche.id_referto = referti.id",
+        "raccomandazioni_terapeutiche.tipo != 'Indagini approfondimento'"], "LEFT JOIN"]
       ],
       "ForceCategoricalBinary",
       "Terapia"
