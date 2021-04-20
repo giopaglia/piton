@@ -9,25 +9,35 @@ include "lib.php";
 include "local-lib.php";
 
 include "DBFit.php";
+include_once "DiscriminativeModel/WittgensteinLearner.php";
+include_once "DiscriminativeModel/SklearnLearner.php";
 
 /******************************************************************************
 *                                                                             *
 *                              Here I test stuff                              *
 *                                                                             *
 *******************************************************************************/
-$numOptimizations = 2;
-$numFolds = 5;
-$minNo = 2;
-{
-  echo "PARAMETERS: ($numOptimizations, $numFolds, $minNo)" . PHP_EOL;
-  echo "numOptimizations: $numOptimizations" . PHP_EOL;
-  echo "numFolds: $numFolds" . PHP_EOL;
-  echo "minNo: $minNo" . PHP_EOL;
+// $numOptimizations = 2;
+// $numFolds = 5;
+// $minNo = 2;
+// {
+    // echo "PRip" . PHP_EOL;
+//   echo "PARAMETERS: ($numOptimizations, $numFolds, $minNo)" . PHP_EOL;
+//   echo "numOptimizations: $numOptimizations" . PHP_EOL;
+//   echo "numFolds: $numFolds" . PHP_EOL;
+//   echo "minNo: $minNo" . PHP_EOL;
 
-  $lr = new PRip(NULL);
-  $lr->setNumOptimizations($numOptimizations);
-  $lr->setNumFolds($numFolds);
-  $lr->setMinNo($minNo);
+//   $lr = new PRip(NULL);
+//   $lr->setNumOptimizations($numOptimizations);
+//   $lr->setNumFolds($numFolds);
+//   $lr->setMinNo($minNo);
+//   testMed($lr);
+// }
+
+{
+  echo "WittgensteinLearner" . PHP_EOL;
+  $ouputDB = getPitonDBConnection();
+  $lr = new WittgensteinLearner("RIPPERk", $ouputDB);
   testMed($lr);
 }
 
@@ -37,9 +47,10 @@ $minNo = 2;
 /******************************************************************************/
 
 function testMed($lr) {
-  $db = getDBConnection();
+  $inputDB = getInputDBConnection();
+  $ouputDB = getPitonDBConnection();
 
-  $db_fit = new DBFit($db);
+  $db_fit = new DBFit($inputDB, $ouputDB);
 
   $db_fit->setTrainingMode([.8, .2]);
   $db_fit->setCutOffValue(0.10);

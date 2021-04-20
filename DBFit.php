@@ -42,7 +42,8 @@ include "DiscriminativeModel/PRip.php";
 class DBFit {
 
   /* Database access (Object-Oriented MySQL style) */
-  private $db;
+  private $inputDB;
+  private $outputDB;
 
   /*
     The database tables where the input columns are (array of table-terms, one for each table)
@@ -248,12 +249,17 @@ class DBFit {
   , "boolean"    => ["" => "bool"]
   ];
 
-  function __construct(object $db) {
+  function __construct(object $inputDB, ?object $outputDB = null) {
     echo "DBFit(DB)" . PHP_EOL;
-    if (!(get_class($db) == "mysqli"))
+    if ($outputDB == null) {
+      $outputDB = $inputDB;
+    }
+    if (!(get_class($inputDB) == "mysqli" && get_class($outputDB) == "mysqli"))
       die_error("DBFit requires a mysqli object, but got object of type "
-        . get_class($db) . ".");
-    $this->db = $db;
+        . get_class($inputDB) . ", "
+        . get_class($outputDB) . ".");
+    $this->inputDB = $inputDB;
+    $this->outputDB = $outputDB;
     $this->setInputTables([]);
     $this->setInputColumns([]);
     $this->setOutputColumns([]);
@@ -904,7 +910,7 @@ class DBFit {
       /* Query database */
       // echo $sql . PHP_EOL;
       // die();
-      $raw_data = mysql_select($this->db, $sql, $silent);
+      $raw_data = mysql_select($this->inputDB, $sql, $silent);
       return $raw_data;
     }
   }
@@ -928,10 +934,10 @@ class DBFit {
   function getTableNickname(string $tableName) {
     $tableNickname = "X" . md5($tableName);
     $sql = "CREATE TABLE IF NOT EXISTS `Table reference` (`ID` INT AUTO_INCREMENT PRIMARY KEY, `Table nickname` VARCHAR(256) NULL, `Table name` VARCHAR(256) NOT NULL)";
-    mysql_prepare_and_executes($this->db, $sql);
+    mysql_prepare_and_executes($this->inputDB, $sql);
     $sql = "INSERT INTO `Table reference` (`Table nickname`, `Table name`) VALUES ('"
-          . mysqli_real_escape_string($this->db, $tableName) . "', '" . mysqli_real_escape_string($this->db,$tableNickname) . "')";
-    mysql_prepare_and_executes($this->db, $sql);
+          . mysqli_real_escape_string($this->inputDB, $tableName) . "', '" . mysqli_real_escape_string($this->inputDB,$tableNickname) . "')";
+    mysql_prepare_and_executes($this->inputDB, $sql);
     return $tableNickname;
   }
 
@@ -1272,7 +1278,7 @@ class DBFit {
 
       $dataframe->save_CSV("datasets/data-" . $this->getModelName($recursionPath, $i_prob) . ".csv");
       $dataframe->save_ARFF("datasets/arff/data-" . $this->getModelName($recursionPath, $i_prob) . ".arff");
-      $dataframe->saveToDB($this->db, $this->getTableNickname("data-" . $this->getModelName($recursionPath, $i_prob)));
+      $dataframe->saveToDB($this->outputDB, $this->getTableNickname("data-" . $this->getModelName($recursionPath, $i_prob)));
 
       /* Obtain and train, test set */
       list($trainData, $testData) = $this->getDataSplit($dataframe);
@@ -1291,8 +1297,8 @@ class DBFit {
         $testData->save_CSV("datasets/data-" . $this->getModelName($recursionPath, $i_prob) . "-TEST.csv"); // , false);
         $trainData->save_ARFF("datasets/arff/data-" . $this->getModelName($recursionPath, $i_prob) . "-TRAIN.arff");
         $testData->save_ARFF("datasets/arff/data-" . $this->getModelName($recursionPath, $i_prob) . "-TEST.arff");
-        $trainData->saveToDB($this->db, $this->getTableNickname("data-" . $this->getModelName($recursionPath, $i_prob) . "-TRAIN")); // trainData
-        $testData->saveToDB($this->db, $this->getTableNickname("data-" . $this->getModelName($recursionPath, $i_prob) . "-TEST"));  // testData
+        $trainData->saveToDB($this->outputDB, $this->getTableNickname("data-" . $this->getModelName($recursionPath, $i_prob) . "-TRAIN")); // trainData
+        $testData->saveToDB($this->outputDB, $this->getTableNickname("data-" . $this->getModelName($recursionPath, $i_prob) . "-TEST"));  // testData
       }
 
       /* Train */
@@ -1315,8 +1321,8 @@ class DBFit {
       $model->save(join_paths(MODELS_FOLDER, $model_name));
       // $model->save(join_paths(MODELS_FOLDER, date("Y-m-d_H:i:s") . $model_name));
 
-      $model->saveToDB($this->db, [$this->experimentID, $model_name], $model_id, $testData, $trainData);
-      $model->dumpToDB($this->db, $model_id);
+      $model->saveToDB($this->outputDB, [$this->experimentID, $model_name], $model_id, $testData, $trainData);
+      $model->dumpToDB($this->outputDB, $model_id);
         // . "_" . join("", array_map([$this, "getColumnName"], ...).);
 
       $this->setHierarchyModel($recursionPath, $i_prob, clone $model);
@@ -1353,7 +1359,6 @@ class DBFit {
             . $numDataframes . ")) "
           . " with domain " . toString($outputAttribute->getDomain())
           . ". " . PHP_EOL;
-        ob_flush();
 
         // echo get_var_dump($outputAttribute->getDomain()) . PHP_EOL;
 
@@ -1710,15 +1715,25 @@ class DBFit {
     }
   }
 
-
-  function getDb() : object
+  function getInputDB() : object
   {
-    return $this->db;
+    return $this->inputDB;
   }
 
-  function setDb(object $db) : self
+  function setInputDB(object $inputDB) : self
   {
-    $this->db = $db;
+    $this->inputDB = $inputDB;
+    return $this;
+  }
+
+  function getOutputDB() : object
+  {
+    return $this->outputDB;
+  }
+
+  function setOutputDB(object $outputDB) : self
+  {
+    $this->outputDB = $outputDB;
     return $this;
   }
 
@@ -2005,7 +2020,7 @@ class DBFit {
             . " AND (COLUMN_NAME = '" . $this->getColumnName($column) . "'"
             . " OR CONCAT(TABLE_NAME,'.',COLUMN_NAME) = '" . $this->getColumnName($column)
              . "')";
-      $raw_data = mysql_select($this->db, $sql, true);
+      $raw_data = mysql_select($this->inputDB, $sql, true);
       foreach ($raw_data as $col) {
         if (in_array($columnName,
             [$col["TABLE_NAME"].".".$col["COLUMN_NAME"], $col["COLUMN_NAME"]])) {
@@ -2118,7 +2133,7 @@ class DBFit {
     $this->listAvailableModels();
     // TODO
     // $start = microtime(TRUE);
-    // $this->model->LoadFromDB($this->db, str_replace(".", ":", $this->getOutputColumnAttributes()[0]))->getName();
+    // $this->model->LoadFromDB($this->outputDB, str_replace(".", ":", $this->getOutputColumnAttributes()[0]))->getName();
     // $end = microtime(TRUE);
     // echo "LoadFromDB took " . ($end - $start) . " seconds to complete." . PHP_EOL;
 
@@ -2154,7 +2169,7 @@ class DBFit {
     /* Obtain column names from database */
     $sql = "SELECT * FROM `information_schema`.`columns` WHERE `table_name` IN "
           . mysql_set(array_map([$this, "getTableName"], $this->inputTables)) . " ";
-    $raw_data = mysql_select($this->db, $sql, true);
+    $raw_data = mysql_select($this->inputDB, $sql, true);
 
     $colsNames = [];
     foreach ($raw_data as $raw_col) {

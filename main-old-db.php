@@ -43,6 +43,7 @@ $minNo = 2;
 /******************************************************************************/
 
 function testMed($lr) {
+  TODO separate InputDBConnection and OutputDBConnection
   $db = getDBConnection();
 
   $db_fit = new DBFit($db);
