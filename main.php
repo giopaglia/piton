@@ -17,29 +17,29 @@ include_once "DiscriminativeModel/SklearnLearner.php";
 *                              Here I test stuff                              *
 *                                                                             *
 *******************************************************************************/
-// $numOptimizations = 2;
-// $numFolds = 5;
-// $minNo = 2;
-// {
-    // echo "PRip" . PHP_EOL;
-//   echo "PARAMETERS: ($numOptimizations, $numFolds, $minNo)" . PHP_EOL;
-//   echo "numOptimizations: $numOptimizations" . PHP_EOL;
-//   echo "numFolds: $numFolds" . PHP_EOL;
-//   echo "minNo: $minNo" . PHP_EOL;
-
-//   $lr = new PRip(NULL);
-//   $lr->setNumOptimizations($numOptimizations);
-//   $lr->setNumFolds($numFolds);
-//   $lr->setMinNo($minNo);
-//   testMed($lr);
-// }
-
+$numOptimizations = 2;
+$numFolds = 5;
+$minNo = 2;
 {
-  echo "WittgensteinLearner" . PHP_EOL;
-  $ouputDB = getPitonDBConnection();
-  $lr = new WittgensteinLearner("RIPPERk", $ouputDB);
+    echo "PRip" . PHP_EOL;
+  echo "PARAMETERS: ($numOptimizations, $numFolds, $minNo)" . PHP_EOL;
+  echo "numOptimizations: $numOptimizations" . PHP_EOL;
+  echo "numFolds: $numFolds" . PHP_EOL;
+  echo "minNo: $minNo" . PHP_EOL;
+
+  $lr = new PRip(NULL);
+  $lr->setNumOptimizations($numOptimizations);
+  $lr->setNumFolds($numFolds);
+  $lr->setMinNo($minNo);
   testMed($lr);
 }
+
+// {
+//   echo "WittgensteinLearner" . PHP_EOL;
+//   $ouputDB = getPitonDBConnection();
+//   $lr = new WittgensteinLearner("RIPPERk", $ouputDB);
+//   testMed($lr);
+// }
 
 /******************************************************************************/
 /******************************************************************************/
